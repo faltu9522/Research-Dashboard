@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research tracker</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --navy:#1f2a44; --accent:#2f56c5;
+  --red:#b42318; --red-bg:#fde2e2; --amber:#93370d; --amber-bg:#fef0c7; --violet:#5b21b6; --violet-bg:#ede9fe;
+  --blue:#1d4ed8; --blue-bg:#dbeafe; --green:#05603a; --green-bg:#d1fadf; --grey:#6b7280; --grey-bg:#eef0f3;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --bg:#0f141c; --card:#171d28; --ink:#e5e7eb; --muted:#9aa3b2; --line:#2a3342; --navy:#c7d2fe; --accent:#7c9bff;
+    --red:#ffb4a8; --red-bg:#4a1f1b; --amber:#fcd59a; --amber-bg:#4a3414; --violet:#d4c4ff; --violet-bg:#2d2250;
+    --blue:#a9c4ff; --blue-bg:#1d2f57; --green:#8be2b0; --green-bg:#163a2a; --grey:#9aa3b2; --grey-bg:#222a38;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 80px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+h1{margin:0;font-size:24px;color:var(--navy);letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:12.5px}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+nav button{background:none;border:0;padding:9px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:600}
+nav button.on{color:var(--navy);border-color:var(--accent)}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sm{padding:3px 9px;font-size:12px;border-radius:6px;box-shadow:none}
+.btn.danger{color:var(--red)}
+.banner{border-radius:10px;padding:11px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner.red{background:var(--red-bg);color:var(--red)} .banner.amber{background:var(--amber-bg);color:var(--amber)}
+.banner b{font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+.tile{background:var(--card);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.tile .l{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.tile .v{font-size:30px;font-weight:700;line-height:1.15;margin:2px 0}
+.tile .s{font-size:11.5px;color:var(--muted)}
+.tile[data-go]{cursor:pointer;transition:transform .1s,border-color .1s}
+.tile[data-go]:hover{transform:translateY(-1px);border-color:var(--accent)}
+.flash{animation:flash 1.4s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 3px transparent}}
+.bar[data-stage]{cursor:pointer}.bar[data-stage]:hover b{color:var(--accent)}
+.tile.pulse{border-color:var(--amber);animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 4px var(--amber-bg)}}
+section{margin-bottom:26px}
+section>h2{font-size:15px;margin:0 0 8px;color:var(--navy);display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--navy);padding-bottom:5px}
+section>h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.list{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.row{display:grid;grid-template-columns:minmax(0,2.4fr) 140px minmax(0,1.8fr) 72px minmax(0,2fr) auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line);cursor:pointer}
+.row:first-child{border-top:0}
+.row:hover{background:var(--bg)}
+.row.head{cursor:default;font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;background:var(--bg);padding:6px 12px}
+.row.head:hover{background:var(--bg)}
+.row.rev{grid-template-columns:minmax(0,2.4fr) minmax(0,2.2fr) 90px 60px 150px}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .n{text-align:center;font-weight:700}
+.row.glow{box-shadow:inset 3px 0 0 var(--red)}
+.row.glow.amber{box-shadow:inset 3px 0 0 #d99a1b}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.s-Revision-due,.s-Revision-requested{background:var(--red-bg);color:var(--red)}
+.s-Needs-resubmission{background:var(--amber-bg);color:var(--amber)}
+.s-Not-yet-submitted,.s-Planned{background:var(--violet-bg);color:var(--violet)}
+.s-Under-review{background:var(--blue-bg);color:var(--blue)}
+.s-Accepted,.s-Published{background:var(--green-bg);color:var(--green)}
+.s-Rejected,.s-Returned-by-office,.s-Revision-resubmitted,.s-Closed-rejected,.s-Parked,.s-Withdrawn{background:var(--grey-bg);color:var(--grey)}
+.hot{color:var(--red)} .warm{color:var(--amber)}
+.chk{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:6px}
+.chk.red{background:var(--red-bg);color:var(--red)} .chk.amber{background:var(--amber-bg);color:var(--amber)}
+.empty{padding:18px;color:var(--muted);text-align:center}
+.charts{display:grid;grid-template-columns:1fr 1.4fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 10px;font-size:13px;color:var(--navy)}
+.bar{display:grid;grid-template-columns:130px 1fr 28px;gap:8px;align-items:center;margin:5px 0;font-size:12.5px}
+.bar i{display:block;height:12px;border-radius:3px;background:var(--accent);min-width:2px}
+.q{display:flex;align-items:flex-end;gap:6px;height:120px}
+.q div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;font-size:10.5px;color:var(--muted)}
+.q .cols{display:flex;gap:2px;align-items:flex-end;width:100%;justify-content:center;height:100px}
+.q .cols i{width:42%;border-radius:2px 2px 0 0;background:var(--accent)} .q .cols i.d{background:var(--line)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.tools input[type=search],.tools select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.tools input[type=search]{min-width:260px}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 10px;background:var(--bg);position:sticky;top:0}
+td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--bg)}
+td.dim{color:var(--muted)}
+/* drawer + dialogs */
+.scrim{position:fixed;inset:0;background:rgba(15,20,28,.45);display:none;z-index:20}
+.scrim.on{display:block}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,100vw);background:var(--bg);z-index:21;overflow:auto;transform:translateX(100%);transition:transform .18s;padding:18px 20px 60px;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+.drawer.on{transform:none}
+.drawer h2{margin:0 0 4px;font-size:18px;color:var(--navy)}
+.field{display:grid;gap:3px;margin-bottom:10px}
+.field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tl{margin-top:6px;border-left:2px solid var(--line);padding-left:14px}
+.ev{position:relative;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px}
+.ev:before{content:"";position:absolute;left:-21px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--line);border:2px solid var(--bg)}
+.ev.s-open:before{background:var(--blue)} .ev.s-plan:before{background:var(--violet)} .ev.s-rev:before{background:var(--red)}
+.ev .top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.ev .j{font-weight:600}
+.ev .meta{color:var(--muted);font-size:12px;margin-top:2px}
+.ev .acts{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+dialog{border:0;border-radius:12px;padding:18px;width:min(520px,94vw);background:var(--card);color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(15,20,28,.5)}
+dialog h3{margin:0 0 12px;color:var(--navy)}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--navy);color:var(--bg);padding:10px 14px;border-radius:10px;display:none;gap:12px;align-items:center;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+#toast.on{display:flex}
+#toast button{background:rgba(255,255,255,.18);color:inherit;border:0;border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:700}
+@media (max-width:860px){.row,.row.rev{grid-template-columns:1fr auto}.row .hide-s,.row.head{display:none}.charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Research tracker</h1>
+      <div class="sub" id="asof"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="addPaper">+ New paper</button>
+      <button class="btn" id="addSub">+ Log submission</button>
+      <button class="btn" id="settings" title="Settings and backup">⚙</button>
+    </div>
+  </header>
+  <div id="banners"></div>
+  <nav id="nav">
+    <button data-v="dash" class="on">Dashboard</button>
+    <button data-v="papers">Papers</button>
+    <button data-v="subs">All submissions</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Paper details"></aside>
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const STATUSES = ["Planned","Under review","Revision requested","Revision resubmitted","Rejected","Returned by office","Accepted","Withdrawn"];
+const OVERRIDES = ["","Closed – rejected","Parked","Published","Withdrawn"];
+const TYPES = ["Journal article","EPW / short piece","Book chapter","Other"];
+const STAGE_ORDER = ["Revision due","Needs resubmission","Not yet submitted","Under review","Accepted","Closed – rejected","Parked","Published","Withdrawn"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cls = s => "s-" + String(s).replace(/[^A-Za-z]+/g, "-").replace(/-$/,"");
+const pill = s => `<span class="pill ${cls(s)}">${esc(s)}</span>`;
+
+let S = { papers: [], subs: [], last_update: 0 };
+let view = "dash", openPaper = null, filters = { q: "", stage: "", status: "", paper: "" };
+const settings = { get chase(){ return +localStorage.getItem("chaseDays") || 90 }, set chase(v){ localStorage.setItem("chaseDays", v) },
+                   get nudge(){ return +localStorage.getItem("nudgeDays") || 10 }, set nudge(v){ localStorage.setItem("nudgeDays", v) } };
+
+/* ---------- api ---------- */
+async function api(method, url, body){
+  const r = await fetch(url, { method, headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined });
+  if(!r.ok){ const e = await r.json().catch(()=>({})); toast("Error: " + (e.error || r.status)); throw new Error(e.error); }
+  return r.json();
+}
+async function load(){ S = await (await fetch("/api/data")).json(); render(); }
+
+/* ---------- dates & logic ---------- */
+const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10) };
+const dayN = iso => Math.floor(Date.parse(iso + "T00:00:00Z") / 864e5);
+const daysSince = iso => iso ? dayN(todayISO()) - dayN(iso) : null;
+const fmt = iso => { if(!iso) return ""; const [y,m,d] = iso.split("-"); return `${+d} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${y.slice(2)}` };
+const isOpen = s => s.status === "Under review" || s.status === "Revision requested";
+const isSent = s => s.status !== "Planned";
+const label = p => p.name || p.title;
+
+function analyse(){
+  const byPaper = new Map(S.papers.map(p => [p.id, []]));
+  S.subs.forEach(s => byPaper.get(s.paper_id)?.push(s));
+  return S.papers.map(p => {
+    const subs = byPaper.get(p.id) || [];
+    const sent = subs.filter(isSent), planned = subs.filter(s => s.status === "Planned");
+    let stage;
+    if(p.override) stage = p.override;
+    else if(subs.some(s => s.status === "Accepted")) stage = "Accepted";
+    else if(subs.some(s => s.status === "Revision requested")) stage = "Revision due";
+    else if(subs.some(s => s.status === "Under review")) stage = "Under review";
+    else if(sent.length) stage = "Needs resubmission";
+    else stage = "Not yet submitted";
+    const lastSent = [...sent].sort((a,b) => (a.submitted||"").localeCompare(b.submitted||"") || a.position - b.position).pop();
+    const lastDecision = sent.map(s => s.decided).filter(Boolean).sort().pop() || "";
+    const openSub = subs.filter(isOpen).sort((a,b) => (a.submitted||"").localeCompare(b.submitted||""))[0];
+    return { p, subs, sent, planned, stage, lastSent, lastDecision, openSub,
+             idle: stage === "Needs resubmission" && lastDecision ? daysSince(lastDecision) : null,
+             next: planned[0], rejections: sent.filter(s => ["Rejected","Returned by office"].includes(s.status)).length };
+  });
+}
+const ACTION = {"Revision due":3000,"Needs resubmission":2000,"Not yet submitted":1000};
+function attention(A){
+  return A.filter(a => ACTION[a.stage]).sort((x,y) => (ACTION[y.stage] + Math.min(y.idle||0,999)) - (ACTION[x.stage] + Math.min(x.idle||0,999)));
+}
+function waiting(A){
+  return S.subs.filter(isOpen).map(s => ({ s, p: S.papers.find(p => p.id === s.paper_id), days: daysSince(s.submitted) }))
+    .filter(x => x.p && !x.p.override).sort((a,b) => (b.days ?? -1) - (a.days ?? -1));
+}
+
+/* ---------- render ---------- */
+function render(){
+  const A = analyse(), todo = attention(A), W = waiting(A);
+  const chase = W.filter(w => w.days != null && w.days >= settings.chase);
+  const n = todo.length + chase.length;
+  document.title = (n ? `(${n}) ` : "") + "Research tracker";
+  setFavicon(n);
+  const upd = S.last_update ? Math.floor((Date.now()/1000 - S.last_update) / 86400) : null;
+  $("#asof").textContent = `Today ${fmt(todayISO())}` + (upd != null ? ` · last updated ${upd === 0 ? "today" : upd + " day" + (upd>1?"s":"") + " ago"}` : "");
+  let b = "";
+  const rev = A.filter(a => a.stage === "Revision due");
+  if(rev.length) b += `<div class="banner red"><span><b>${rev.length} revision${rev.length>1?"s":""} due:</b> ${rev.map(a => esc(label(a.p))).join(", ")}</span></div>`;
+  if(upd != null && upd >= settings.nudge) b += `<div class="banner amber"><span><b>Nothing logged for ${upd} days.</b> Any submissions, decisions or editor emails to record?</span><button class="btn sm" id="nudgeAdd">Log something</button></div>`;
+  $("#banners").innerHTML = b;
+  $("#nudgeAdd")?.addEventListener("click", () => subDialog());
+  document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x.dataset.v === view));
+  $("#main").innerHTML = view === "dash" ? dashView(A, todo, W, chase) : view === "papers" ? papersView(A) : subsView();
+  bindMain();
+  if(openPaper != null) drawer(A);
+}
+
+function dashView(A, todo, W, chase){
+  const sentN = S.subs.filter(isSent).length;
+  const rej = S.subs.filter(s => ["Rejected","Returned by office"].includes(s.status)).length;
+  const acc = S.subs.filter(s => s.status === "Accepted").length;
+  const dec = S.subs.filter(s => isSent(s) && s.submitted && s.decided && !isOpen(s));
+  const avg = dec.length ? Math.round(dec.reduce((t,s) => t + dayN(s.decided) - dayN(s.submitted), 0) / dec.length) : "–";
+  const live = A.filter(a => !["Closed – rejected","Parked","Published","Withdrawn"].includes(a.stage));
+  const tile = (l,v,s,c,extra="",go="") => `<div class="tile ${extra}" ${go?`data-go="${go}" role="button" tabindex="0" title="Click to open"`:""}><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div><div class="s">${s}</div></div>`;
+  let h = `<div class="tiles">
+    ${tile("Papers tracked", live.length, "excl. closed / parked", "var(--navy)", "", "papers")}
+    ${tile("Waiting on you", todo.length, "to (re)submit or revise", "var(--amber)", todo.length ? "pulse" : "", "wait")}
+    ${tile("Under review", A.filter(a=>a.stage==="Under review").length, "with a journal now", "var(--blue)", "", "review")}
+    ${tile("Chase editor", chase.length, `waiting ${settings.chase}+ days`, chase.length ? "var(--red)" : "var(--muted)", chase.length ? "pulse" : "", "review")}
+    ${tile("Submissions sent", sentN, `${rej} rejected or returned`, "var(--navy)", "", "subs")}
+    ${tile("Accepted", acc, `avg ${avg} days to a decision`, "var(--green)", "", "accepted")}
+  </div>`;
+  h += `<section id="secWait"><h2>Waiting on you <small>${todo.length ? "longest idle first · click a row to act" : ""}</small></h2><div class="list">`;
+  if(!todo.length) h += `<div class="empty">Nothing waiting. Every live paper is with a journal.</div>`;
+  else {
+    h += `<div class="row head"><span>Paper</span><span>Stage</span><span class="hide-s">Last journal tried</span><span style="text-align:center">Idle d</span><span class="hide-s">Next in queue</span><span></span></div>`;
+    todo.forEach(a => {
+      const hot = a.stage === "Revision due" || (a.idle ?? 0) >= 180, warm = (a.idle ?? 0) >= 60;
+      h += `<div class="row glow ${hot ? "" : warm || a.stage === "Not yet submitted" ? "amber" : "amber"}" data-paper="${a.p.id}">
+        <span class="t" title="${esc(a.p.title)}">${esc(label(a.p))}</span>${`<span>${pill(a.stage)}</span>`}
+        <span class="m hide-s">${esc(a.lastSent?.journal || "–")}</span>
+        <span class="n ${(a.idle??0)>=180?"hot":(a.idle??0)>=60?"warm":""}">${a.idle ?? ""}</span>
+        <span class="m hide-s">${a.next ? esc(a.next.journal) : `<i style="color:var(--muted)">no journal queued</i>`}</span>
+        <span>${a.next ? `<button class="btn sm primary" data-submit-next="${a.next.id}">Submit →</button>` : `<button class="btn sm" data-queue="${a.p.id}">+ Queue</button>`}</span></div>`;
+    });
+  }
+  h += `</div></section><section id="secReview"><h2>Under review now <small>${W.length ? "longest wait first" : ""}</small></h2><div class="list">`;
+  if(!W.length) h += `<div class="empty">Nothing is under review.</div>`;
+  else {
+    h += `<div class="row head rev"><span>Paper</span><span>Journal</span><span>Submitted</span><span style="text-align:center">Days</span><span>Check</span></div>`;
+    W.forEach(w => {
+      const over = w.days >= 2*settings.chase, chk = w.days >= settings.chase;
+      h += `<div class="row rev ${chk ? "glow" + (over ? "" : " amber") : ""}" data-paper="${w.p.id}">
+        <span class="t">${esc(label(w.p))}</span><span class="m">${esc(w.s.journal)}${w.s.status==="Revision requested"?" · "+pill("Revision requested"):""}</span>
+        <span>${fmt(w.s.submitted)}</span><span class="n ${over?"hot":chk?"warm":""}">${w.days ?? ""}</span>
+        <span>${over ? `<span class="chk red">Overdue: chase editor</span>` : chk ? `<span class="chk amber">Check status</span>` : ""}</span></div>`;
+    });
+  }
+  h += `</div></section><section><h2>Pipeline</h2><div class="charts"><div class="card"><h3>Papers by stage</h3>`;
+  const counts = STAGE_ORDER.map(s => [s, A.filter(a => a.stage === s).length]), mx = Math.max(1, ...counts.map(c => c[1]));
+  counts.filter(c => c[1] || ["Revision due","Needs resubmission","Under review","Accepted"].includes(c[0])).forEach(([s,c]) =>
+    h += `<div class="bar" data-stage="${s}" title="Show these papers"><span>${s}</span><i style="width:${c/mx*100}%"></i><b>${c}</b></div>`);
+  h += `</div><div class="card"><h3>Submissions and decisions per quarter <span class="sub">(<span style="color:var(--accent)">■</span> sent <span style="color:var(--line)">■</span> decisions)</span></h3><div class="q">`;
+  const now = new Date(), cq = now.getFullYear()*4 + Math.floor(now.getMonth()/3), qs = [];
+  for(let i = 9; i >= 0; i--) qs.push(cq - i);
+  const qOf = iso => { const [y,m] = iso.split("-"); return +y*4 + Math.floor((+m-1)/3) };
+  const sentQ = qs.map(q => S.subs.filter(s => isSent(s) && s.submitted && qOf(s.submitted) === q).length);
+  const decQ = qs.map(q => S.subs.filter(s => s.decided && qOf(s.decided) === q).length);
+  const qm = Math.max(1, ...sentQ, ...decQ);
+  qs.forEach((q,i) => h += `<div title="${sentQ[i]} sent, ${decQ[i]} decisions"><span class="cols"><i style="height:${sentQ[i]/qm*100}%"></i><i class="d" style="height:${decQ[i]/qm*100}%"></i></span>${String(Math.floor(q/4)).slice(2)}Q${q%4+1}</div>`);
+  return h + `</div></div></div></section>`;
+}
+
+function papersView(A){
+  const q = filters.q.toLowerCase();
+  const rows = A.filter(a => (!filters.stage || a.stage === filters.stage) &&
+    (!q || (a.p.title + a.p.name + a.p.authors + a.p.notes + a.subs.map(s => s.journal).join(" ")).toLowerCase().includes(q)))
+    .sort((x,y) => STAGE_ORDER.indexOf(x.stage) - STAGE_ORDER.indexOf(y.stage));
+  let h = `<div class="tools"><input type="search" id="fq" placeholder="Search title, authors, journal…" value="${esc(filters.q)}">
+    <select id="fstage"><option value="">All stages</option>${STAGE_ORDER.map(s => `<option ${filters.stage===s?"selected":""}>${s}</option>`).join("")}</select>
+    <span class="sub">${rows.length} of ${A.length} papers</span></div><div class="list">
+    <div class="row head"><span>Paper</span><span>Stage</span><span class="hide-s">Last journal tried</span><span style="text-align:center">Sent</span><span class="hide-s">Next in queue</span><span></span></div>`;
+  rows.forEach(a => h += `<div class="row" data-paper="${a.p.id}"><span class="t" title="${esc(a.p.title)}">${esc(label(a.p))}</span><span>${pill(a.stage)}</span>
+    <span class="m hide-s">${esc(a.openSub?.journal || a.lastSent?.journal || "–")}</span><span class="n">${a.sent.length}</span>
+    <span class="m hide-s">${a.next ? esc(a.next.journal) : ""}</span><span></span></div>`);
+  return h + `</div>`;
+}
+
+function subsView(){
+  const q = filters.q.toLowerCase();
+  const pn = id => label(S.papers.find(p => p.id === id) || {name:"?"});
+  const rows = S.subs.filter(s => (!filters.status || s.status === filters.status) && (!filters.paper || s.paper_id == filters.paper) &&
+    (!q || (s.journal + s.notes + pn(s.paper_id)).toLowerCase().includes(q)))
+    .sort((a,b) => (b.submitted || "0000").localeCompare(a.submitted || "0000"));
+  let h = `<div class="tools"><input type="search" id="fq" placeholder="Search journal, paper, notes…" value="${esc(filters.q)}">
+    <select id="fstatus"><option value="">All statuses</option>${STATUSES.map(s => `<option ${filters.status===s?"selected":""}>${s}</option>`).join("")}</select>
+    <select id="fpaper"><option value="">All papers</option>${S.papers.map(p => `<option value="${p.id}" ${filters.paper==p.id?"selected":""}>${esc(label(p))}</option>`).join("")}</select>
+    <span class="sub">${rows.length} rows</span></div><div class="list"><table><thead><tr><th>Submitted</th><th>Decision</th><th>Paper</th><th>Journal</th><th>Status</th><th>Days</th></tr></thead><tbody>`;
+  rows.slice(0, 400).forEach(s => {
+    const d = s.submitted ? (s.decided ? dayN(s.decided) - dayN(s.submitted) : isSent(s) ? daysSince(s.submitted) : "") : "";
+    h += `<tr class="click" data-sub="${s.id}"><td>${fmt(s.submitted)}</td><td class="dim">${fmt(s.decided)}</td><td>${esc(pn(s.paper_id))}</td>
+      <td>${esc(s.journal)} <span class="sub">${esc(s.rating)}</span></td><td>${pill(s.status)}</td><td class="dim">${d}</td></tr>`;
+  });
+  return h + `</tbody></table></div>`;
+}
+
+function bindMain(){
+  document.querySelectorAll("[data-go]").forEach(el => { const go = () => goTo(el.dataset.go); el.addEventListener("click", go); el.addEventListener("keydown", e => { if(e.key === "Enter") go(); }); });
+  document.querySelectorAll("[data-stage]").forEach(el => el.addEventListener("click", () => { view = "papers"; filters = { q:"", stage: el.dataset.stage, status:"", paper:"" }; render(); window.scrollTo(0,0); }));
+  document.querySelectorAll("[data-paper]").forEach(el => el.addEventListener("click", e => { if(e.target.closest("button")) return; openPaper = +el.dataset.paper; drawer(analyse()); }));
+  document.querySelectorAll("[data-sub]").forEach(el => el.addEventListener("click", () => subDialog(+el.dataset.sub)));
+  document.querySelectorAll("[data-submit-next]").forEach(el => el.addEventListener("click", () => submitNow(+el.dataset.submitNext)));
+  document.querySelectorAll("[data-queue]").forEach(el => el.addEventListener("click", () => subDialog(null, +el.dataset.queue, "Planned")));
+  const keep = (id, key, ev) => $(id)?.addEventListener(ev, e => { filters[key] = e.target.value; const pos = e.target.selectionStart; render(); const n = $(id); if(n && n.type === "search"){ n.focus(); n.setSelectionRange(pos,pos); } });
+  keep("#fq","q","input"); keep("#fstage","stage","change"); keep("#fstatus","status","change"); keep("#fpaper","paper","change");
+}
+
+function goTo(go){
+  if(go === "wait" || go === "review"){
+    const el = document.getElementById(go === "wait" ? "secWait" : "secReview");
+    el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    return;
+  }
+  view = go === "papers" ? "papers" : "subs";
+  filters = { q:"", stage:"", status: go === "accepted" ? "Accepted" : "", paper:"" };
+  render(); window.scrollTo(0, 0);
+}
+
+/* ---------- drawer ---------- */
+function drawer(A){
+  const a = A.find(x => x.p.id === openPaper);
+  if(!a){ closeDrawer(); return; }
+  const p = a.p, d = $("#drawer");
+  const keepScroll = d.scrollTop;
+  const sent = [...a.sent].sort((x,y) => (x.submitted||"9999").localeCompare(y.submitted||"9999") || x.position - y.position);
+  const ev = s => {
+    const cl = s.status === "Revision requested" ? "s-rev" : s.status === "Under review" ? "s-open" : s.status === "Planned" ? "s-plan" : "";
+    const days = isOpen(s) ? daysSince(s.submitted) : s.submitted && s.decided ? dayN(s.decided) - dayN(s.submitted) : null;
+    const acts = [];
+    if(s.status === "Planned") acts.push(`<button class="btn sm primary" data-act="submit" data-id="${s.id}">Submitted today →</button>`,
+      `<button class="btn sm" data-act="up" data-id="${s.id}">↑</button><button class="btn sm" data-act="down" data-id="${s.id}">↓</button>`);
+    if(s.status === "Under review") acts.push(`<button class="btn sm" data-act="Rejected" data-id="${s.id}">Rejected</button><button class="btn sm" data-act="Revision requested" data-id="${s.id}">Revision requested</button><button class="btn sm" data-act="Accepted" data-id="${s.id}">Accepted</button>`);
+    if(s.status === "Revision requested") acts.push(`<button class="btn sm primary" data-act="Revision resubmitted" data-id="${s.id}">Revised &amp; resubmitted</button>`);
+    acts.push(`<button class="btn sm" data-act="edit" data-id="${s.id}">Edit</button>`);
+    return `<div class="ev ${cl}"><div class="top"><span class="j">${esc(s.journal)} <span class="sub">${esc(s.rating)}</span></span>${pill(s.status)}</div>
+      <div class="meta">${s.submitted ? "Submitted " + fmt(s.submitted) : ""}${s.decided ? " · decision " + fmt(s.decided) : ""}${days != null ? ` · ${days} days` : ""}${s.title_used ? `<br>Title used: ${esc(s.title_used)}` : ""}${s.notes ? `<br>${esc(s.notes)}` : ""}</div>
+      <div class="acts">${acts.join("")}</div></div>`;
+  };
+  d.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><h2>${esc(label(p))}</h2><div>${pill(a.stage)} <span class="sub">${a.sent.length} sent · ${a.rejections} rejected${a.idle != null ? ` · idle ${a.idle} days` : ""}</span></div></div><button class="btn sm" id="dClose">Close ✕</button></div>
+    <h3 style="margin:18px 0 6px;font-size:13px">History</h3><div class="tl">${sent.map(ev).join("") || `<div class="sub" style="margin-bottom:8px">Not submitted anywhere yet.</div>`}</div>
+    <h3 style="margin:16px 0 6px;font-size:13px;display:flex;justify-content:space-between;align-items:center">Queue: journals to try next <button class="btn sm" id="dQueue">+ Add journal</button></h3>
+    <div class="tl">${a.planned.map(ev).join("") || `<div class="sub">No journals queued.</div>`}</div>
+    <h3 style="margin:18px 0 8px;font-size:13px">Paper details</h3>
+    <div class="field"><label>Title</label><input id="pTitle" value="${esc(p.title)}"></div>
+    <div class="grid2"><div class="field"><label>Short name (optional)</label><input id="pName" value="${esc(p.name)}"></div>
+      <div class="field"><label>Authors</label><input id="pAuthors" value="${esc(p.authors)}"></div></div>
+    <div class="grid2"><div class="field"><label>Type</label><select id="pType">${TYPES.map(t => `<option ${p.type===t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Override stage</label><select id="pOverride">${OVERRIDES.map(t => `<option value="${t}" ${p.override===t?"selected":""}>${t || "(none: calculated automatically)"}</option>`).join("")}</select></div></div>
+    <div class="field"><label>Notes</label><textarea id="pNotes" rows="3">${esc(p.notes)}</textarea></div>
+    <div style="display:flex;justify-content:space-between"><button class="btn danger sm" id="pDel">Delete paper</button><button class="btn primary" id="pSave">Save details</button></div>`;
+  d.classList.add("on"); $("#scrim").classList.add("on"); d.scrollTop = keepScroll;
+  $("#dClose").onclick = closeDrawer;
+  $("#dQueue").onclick = () => subDialog(null, p.id, "Planned");
+  $("#pSave").onclick = async () => {
+    await api("PUT", `/api/papers/${p.id}`, { title: $("#pTitle").value, name: $("#pName").value, authors: $("#pAuthors").value, type: $("#pType").value, override: $("#pOverride").value, notes: $("#pNotes").value });
+    toast("Saved"); await load();
+  };
+  $("#pDel").onclick = async () => { if(confirm(`Delete "${label(p)}" and all its submissions? This cannot be undone.`)){ await api("DELETE", `/api/papers/${p.id}`); closeDrawer(); await load(); } };
+  d.querySelectorAll("[data-act]").forEach(b => b.onclick = () => rowAction(b.dataset.act, +b.dataset.id, a));
+}
+function closeDrawer(){ openPaper = null; $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on"); }
+$("#scrim").onclick = closeDrawer;
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !$("#dlg").open) closeDrawer(); });
+
+async function rowAction(act, id, a){
+  const s = S.subs.find(x => x.id === id);
+  if(act === "edit") return subDialog(id);
+  if(act === "submit") return submitNow(id);
+  if(act === "up" || act === "down"){
+    const ids = a.planned.map(x => x.id), i = ids.indexOf(id), j = act === "up" ? i-1 : i+1;
+    if(j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await api("POST", "/api/submissions/order", { ids }); return load();
+  }
+  dateDialog(`${act}: ${s.journal}`, todayISO(), "Date of decision", async (date, note) => {
+    await api("PUT", `/api/submissions/${id}`, { status: act, decided: date, notes: [s.notes, note].filter(Boolean).join(" · ") });
+    await load();
+    if(act === "Rejected" || act === "Returned by office"){
+      const nx = analyse().find(x => x.p.id === s.paper_id)?.next;
+      toast(nx ? `Next in queue: ${nx.journal}` : "No journal queued for this paper", nx ? { label: "Submit now", fn: () => submitNow(nx.id) } : { label: "Add journal", fn: () => subDialog(null, s.paper_id, "Planned") });
+    } else if(act === "Revision resubmitted") toast("Now add the revised submission", { label: "Add", fn: () => subDialog(null, s.paper_id, "Under review", { journal: s.journal, rating: s.rating, submitted: todayISO(), notes: "Revised version" }) });
+  }, act === "Revision resubmitted");
+}
+function submitNow(id){
+  const s = S.subs.find(x => x.id === id);
+  dateDialog(`Submitted to ${s.journal}`, todayISO(), "Date submitted", async date => {
+    await api("PUT", `/api/submissions/${id}`, { status: "Under review", submitted: date });
+    toast("Logged. It will be flagged if it waits too long."); await load();
+  });
+}
+
+/* ---------- dialogs ---------- */
+function dateDialog(title, def, lab, onOk, noNote){
+  const d = $("#dlg");
+  d.innerHTML = `<h3>${esc(title)}</h3><div class="field"><label>${lab}</label><input type="date" id="dd" value="${def}"></div>
+    ${noNote ? "" : `<div class="field"><label>Note (optional)</label><input id="dn" placeholder="e.g. 3 reviews, editor comments"></div>`}
+    <div class="dlg-actions"><button class="btn" id="dNo">Cancel</button><button class="btn primary" id="dYes">Save</button></div>`;
+  d.showModal();
+  $("#dNo").onclick = () => d.close();
+  $("#dYes").onclick = async () => { const v = $("#dd").value, n = $("#dn")?.value || ""; d.close(); await onOk(v, n); };
+}
+function subDialog(id, paperId, status, preset = {}){
+  const s = id ? S.subs.find(x => x.id === id) : { paper_id: paperId || openPaper || "", journal: "", rating: "", status: status || "Under review", submitted: status === "Planned" ? "" : todayISO(), decided: "", notes: "", title_used: "", ...preset };
+  const d = $("#dlg");
+  d.innerHTML = `<h3>${id ? "Edit submission" : "Log submission"}</h3>
+    <div class="field"><label>Paper</label><select id="sPaper">${S.papers.map(p => `<option value="${p.id}" ${p.id==s.paper_id?"selected":""}>${esc(label(p))}</option>`).join("")}</select></div>
+    <div class="grid2"><div class="field"><label>Journal</label><input id="sJournal" list="journals" value="${esc(s.journal)}"></div>
+      <div class="field"><label>Rating / index</label><input id="sRating" value="${esc(s.rating)}" placeholder="A*, B, Q1, SSCI…"></div></div>
+    <datalist id="journals">${[...new Set(S.subs.map(x => x.journal))].sort().map(j => `<option value="${esc(j)}">`).join("")}</datalist>
+    <div class="field"><label>Status</label><select id="sStatus">${STATUSES.map(t => `<option ${s.status===t?"selected":""}>${t}</option>`).join("")}</select></div>
+    <div class="grid2"><div class="field"><label>Date submitted</label><input type="date" id="sSub" value="${s.submitted}"></div>
+      <div class="field"><label>Date of decision</label><input type="date" id="sDec" value="${s.decided}"></div></div>
+    <div class="field"><label>Title used (if retitled)</label><input id="sTitle" value="${esc(s.title_used)}"></div>
+    <div class="field"><label>Notes</label><textarea id="sNotes" rows="2">${esc(s.notes)}</textarea></div>
+    <div class="dlg-actions">${id ? `<button class="btn danger" id="sDel" style="margin-right:auto">Delete</button>` : ""}<button class="btn" id="sNo">Cancel</button><button class="btn primary" id="sYes">Save</button></div>`;
+  d.showModal();
+  const rating = {}; S.subs.forEach(x => x.rating && (rating[x.journal.toLowerCase()] ||= x.rating));
+  $("#sJournal").addEventListener("change", e => { if(!$("#sRating").value) $("#sRating").value = rating[e.target.value.toLowerCase()] || ""; });
+  $("#sNo").onclick = () => d.close();
+  if(id) $("#sDel").onclick = async () => { if(confirm("Delete this row?")){ d.close(); await api("DELETE", `/api/submissions/${id}`); await load(); } };
+  $("#sYes").onclick = async () => {
+    const body = { paper_id: +$("#sPaper").value, journal: $("#sJournal").value.trim(), rating: $("#sRating").value.trim(), status: $("#sStatus").value,
+      submitted: $("#sSub").value, decided: $("#sDec").value, title_used: $("#sTitle").value, notes: $("#sNotes").value };
+    if(!body.journal){ $("#sJournal").focus(); return; }
+    if(body.status !== "Planned" && !body.submitted && !confirm("No submission date. Save anyway? (It won't sort or time correctly.)")) return;
+    d.close();
+    await (id ? api("PUT", `/api/submissions/${id}`, body) : api("POST", "/api/submissions", body));
+    toast("Saved"); await load();
+  };
+}
+function paperDialog(){
+  const d = $("#dlg");
+  d.innerHTML = `<h3>New paper</h3><div class="field"><label>Title</label><input id="nTitle"></div>
+    <div class="grid2"><div class="field"><label>Short name (optional)</label><input id="nName"></div><div class="field"><label>Authors</label><input id="nAuthors"></div></div>
+    <div class="field"><label>Type</label><select id="nType">${TYPES.map(t => `<option>${t}</option>`).join("")}</select></div>
+    <div class="field"><label>Journals to try, in order (one per line, optional)</label><textarea id="nQueue" rows="4" placeholder="Human Relations&#10;Organization Studies"></textarea></div>
+    <div class="dlg-actions"><button class="btn" id="nNo">Cancel</button><button class="btn primary" id="nYes">Add paper</button></div>`;
+  d.showModal(); $("#nTitle").focus();
+  $("#nNo").onclick = () => d.close();
+  $("#nYes").onclick = async () => {
+    const title = $("#nTitle").value.trim(); if(!title){ $("#nTitle").focus(); return; }
+    d.close();
+    const { id } = await api("POST", "/api/papers", { title, name: $("#nName").value.trim(), authors: $("#nAuthors").value.trim(), type: $("#nType").value });
+    for(const j of $("#nQueue").value.split("\n").map(x => x.trim()).filter(Boolean)) await api("POST", "/api/submissions", { paper_id: id, journal: j, status: "Planned" });
+    openPaper = id; toast("Paper added"); await load();
+  };
+}
+function settingsDialog(){
+  const d = $("#dlg");
+  d.innerHTML = `<h3>Settings and backup</h3>
+    <div class="grid2"><div class="field"><label>Chase editor after (days)</label><input type="number" id="stChase" min="14" value="${settings.chase}"></div>
+    <div class="field"><label>“Nothing logged” reminder after (days)</label><input type="number" id="stNudge" min="2" value="${settings.nudge}"></div></div>
+    <p class="sub">Your data is stored in <code>data/research.db</code> next to the app, with a daily backup in <code>data/backups</code>.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="/api/export" download>Download backup (JSON)</a>
+    <label class="btn">Restore from backup…<input type="file" id="stImp" accept=".json" hidden></label></div>
+    <div class="dlg-actions"><button class="btn" id="stNo">Cancel</button><button class="btn primary" id="stYes">Save</button></div>`;
+  d.showModal();
+  $("#stNo").onclick = () => d.close();
+  $("#stYes").onclick = () => { settings.chase = +$("#stChase").value || 90; settings.nudge = +$("#stNudge").value || 10; d.close(); render(); };
+  $("#stImp").onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    if(!confirm("This replaces ALL current data with the backup file. Continue?")) return;
+    try { await api("POST", "/api/import", JSON.parse(await f.text())); d.close(); toast("Restored"); await load(); } catch(err){ toast("That file didn't look like a backup"); }
+  };
+}
+
+/* ---------- misc ---------- */
+let toastT;
+function toast(msg, action){
+  const t = $("#toast"); t.innerHTML = `<span>${esc(msg)}</span>` + (action ? `<button id="tAct">${esc(action.label)}</button>` : ""); t.classList.add("on");
+  if(action) $("#tAct").onclick = () => { t.classList.remove("on"); action.fn(); };
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), action ? 9000 : 2500);
+}
+function setFavicon(n){
+  const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+  x.fillStyle = "#1f2a44"; x.beginPath(); x.roundRect(4,4,56,56,12); x.fill();
+  x.fillStyle = "#fff"; x.font = "bold 36px system-ui"; x.textAlign = "center"; x.fillText("R", 32, 44);
+  if(n){ x.fillStyle = "#d92d20"; x.beginPath(); x.arc(48,16,16,0,7); x.fill(); x.fillStyle = "#fff"; x.font = "bold 22px system-ui"; x.fillText(n > 99 ? "99" : n, 48, 24); }
+  let l = document.querySelector("link[rel=icon]"); if(!l){ l = document.createElement("link"); l.rel = "icon"; document.head.appendChild(l); }
+  l.href = c.toDataURL();
+}
+$("#addPaper").onclick = paperDialog;
+$("#addSub").onclick = () => subDialog(null, openPaper || undefined);
+$("#settings").onclick = settingsDialog;
+$("#nav").addEventListener("click", e => { const v = e.target.dataset?.v; if(v){ view = v; filters = { q:"", stage:"", status:"", paper:"" }; render(); } });
+document.addEventListener("visibilitychange", () => { if(!document.hidden && !$("#dlg").open) load(); });
+load();
+</script>
+</body>
+</html>
