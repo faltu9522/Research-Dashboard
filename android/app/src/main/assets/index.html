@@ -216,7 +216,7 @@ function subCard(s, opts={}){
   return `<div class="card tap" data-act="editsub" data-id="${s.id}">
     <div class="row"><div class="grow">
       <div class="t">${esc(s.journal)}${s.rating?` <span class="m">· ${esc(s.rating)}</span>`:""}</div>
-      ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}</div>`}
+      ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}${p&&p.authors?" · "+esc(p.authors):""}</div>`}
       <div class="m">${s.submitted?"Submitted "+fmt(s.submitted):""}${s.decided?" · decided "+fmt(s.decided):""}</div>
       <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span> ${open?chaseFlag(d):""}
       ${open&&portal.src==="search"?'<span class="chip s-closed">link: web search</span>':""}</div>
@@ -228,6 +228,7 @@ function paperCard(p){
   const i = paperInfo(p);
   return `<div class="card tap" data-act="paper" data-id="${p.id}">
     <div class="row"><div class="grow"><div class="t">${esc(p.key)}</div>
+      <div class="m">${p.authors?"👤 "+esc(p.authors):'<span style="color:var(--warn)">👤 Authors not added</span>'}</div>
       <div class="m">${i.last?"Last: "+esc(i.last.journal):"Never sent out"}${i.next?" · Next: "+esc(i.next.journal):""}</div>
       <div style="margin-top:5px"><span class="chip ${stageClass(i.stage)}">${esc(i.stage)}</span>
       <span class="m">${i.sent} sent · ${i.rejections} rejected</span></div></div>
@@ -447,7 +448,7 @@ function showPaper(p){
   openSheet(`<h3><span>${esc(p.key)}</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div><span class="chip ${stageClass(i.stage)}">${esc(i.stage)}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
     <dl class="kv" style="margin-top:10px">
-      <dt>Title</dt><dd>${esc(p.title||"—")}</dd><dt>Authors</dt><dd>${esc(p.authors||"—")}</dd><dt>Type</dt><dd>${esc(p.type)}</dd>
+      <dt>Title</dt><dd>${esc(p.title||"—")}</dd><dt>Authors</dt><dd>${p.authors?esc(p.authors):'<button class="link" onclick="editPaper(paperById(\''+p.id+'\'))">+ Add authors</button>'}</dd><dt>Type</dt><dd>${esc(p.type)}</dd>
       <dt>Last tried</dt><dd>${i.last?esc(i.last.journal):"—"}</dd><dt>Last decision</dt><dd>${fmt(i.lastDec)}</dd>
       <dt>Next in queue</dt><dd>${i.next?esc(i.next.journal):"—"}</dd><dt>Sent</dt><dd>${i.sent} · ${i.rejections} rejected</dd>
       ${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}
