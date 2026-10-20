@@ -52,6 +52,11 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "Android");
         web.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageFinished(WebView view, String url) {
+                openFromIntent(getIntent());
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri u = req.getUrl();
                 if ("file".equals(u.getScheme())) return false;
@@ -82,6 +87,21 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openFromIntent(intent);
+    }
+
+    /** A tapped reminder carries "open" = the tab to show. */
+    private void openFromIntent(Intent intent) {
+        String open = intent == null ? null : intent.getStringExtra("open");
+        if (open == null) return;
+        intent.removeExtra("open");
+        web.evaluateJavascript("window.rdOpen && rdOpen(" + JSONObject.quote(open) + ")", null);
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         web.saveState(out);
@@ -100,6 +120,12 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        web.evaluateJavascript("window.rdPermissionsChanged && rdPermissionsChanged()", null);
+    }
+
+    @Override
     public void onBackPressed() {
         web.evaluateJavascript("window.rdBack ? rdBack() : false", handled -> {
             if (!"true".equals(handled)) MainActivity.super.onBackPressed();
@@ -108,7 +134,8 @@ public class MainActivity extends Activity {
 
     private void openExternal(String url) {
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            Uri u = Uri.parse(url);
+            startActivity(new Intent("mailto".equals(u.getScheme()) ? Intent.ACTION_SENDTO : Intent.ACTION_VIEW, u));
         } catch (ActivityNotFoundException e) {
             Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show();
         }
@@ -130,6 +157,30 @@ public class MainActivity extends Activity {
     }
 
     private class Bridge {
+        @JavascriptInterface
+        public void setReminderData(String json) {
+            Reminders.setData(MainActivity.this, json);
+        }
+
+        @JavascriptInterface
+        public boolean notificationsAllowed() {
+            if (Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != 0) return false;
+            return ((android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE)).areNotificationsEnabled();
+        }
+
+        @JavascriptInterface
+        public void requestNotifications() {
+            if (Build.VERSION.SDK_INT >= 33) {
+                runOnUiThread(() -> requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 3));
+            }
+        }
+
+        @JavascriptInterface
+        public void testReminder() {
+            Reminders.test(MainActivity.this);
+        }
+
         @JavascriptInterface
         public void openInBrowser(String url) {
             runOnUiThread(() -> MainActivity.this.openInBrowser(url));

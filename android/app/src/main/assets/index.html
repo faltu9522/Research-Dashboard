@@ -83,6 +83,22 @@ textarea{min-height:70px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:13.5px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+.stattiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .ax{fill:var(--muted);font-size:10px}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .bar{cursor:pointer}
+.chart .bar.dim{opacity:.35}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.readout{font-size:13px;min-height:19px;color:var(--ink);margin-top:6px}
+:root{--s1:#2a78d6;--s2:#eb6834}
+@media (prefers-color-scheme: dark){:root{--s1:#3987e5;--s2:#d95926}}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:6px 4px;border-bottom:1px solid var(--line)}
+table.tbl td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+table.tbl td.n,table.tbl th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hbar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);min-width:2px}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 </style>
 </head>
@@ -123,6 +139,7 @@ function persist(touch=true){
   if(touch) S.settings.lastUpdated = today();
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
   if(touch) scheduleAutoSync();
+  pushReminders();
 }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -197,6 +214,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.datase
 $("#fab").onclick=()=>editSub(null);
 window.addEventListener("popstate",()=>{ if($("#sheet").classList.contains("open")) closeSheet(); });
 // Android back button → close sheet first, else go to dashboard, else exit.
+window.rdOpen = t => { closeSheet(); setTab(t==="review"?"review":"home"); };
 window.rdBack = function(){
   if($("#sheet").classList.contains("open")){ closeSheet(); return true; }
   if(tab!=="home"){ setTab("home"); return true; }
@@ -210,7 +228,8 @@ function subCard(s, opts={}){
   if(open){
     acts = `<div class="actions">
       <button class="primary" data-act="portal" data-id="${s.id}">Open journal login ↗</button>
-      <button data-act="decide" data-id="${s.id}">Record decision</button></div>`;
+      <button data-act="decide" data-id="${s.id}">Record decision</button>
+      ${s.status==="Under review"&&d!=null&&d>=(+S.settings.chaseDays||90)?`<button data-act="chase" data-id="${s.id}">✉ Email editor</button>`:""}</div>`;
   }else if(s.status==="Planned" && opts.planActions!==false){
     acts = `<div class="actions"><button data-act="submitnow" data-id="${s.id}">Mark submitted today</button>
       <button class="ghost" data-act="portal" data-id="${s.id}">Journal site ↗</button></div>`;
@@ -241,14 +260,15 @@ function paperCard(p){
 /* ---------- views ---------- */
 function render(){
   $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
-  $("#fab").style.display = (tab==="more")?"none":"block";
+  $("#fab").style.display = (tab==="more"||tab==="stats")?"none":"block";
   const v=$("#view");
   if(tab==="home") v.innerHTML=viewHome();
   else if(tab==="review") v.innerHTML=viewReview();
   else if(tab==="papers") v.innerHTML=viewPapers();
   else if(tab==="subs") v.innerHTML=viewSubs();
+  else if(tab==="stats") v.innerHTML=viewStats();
   else v.innerHTML=viewMore();
-  bindSearch();
+  bindSearch(); bindMore(); if(tab==="stats") bindStats();
 }
 function stats(){
   const infos = S.papers.map(p=>({p,...paperInfo(p)}));
@@ -284,6 +304,7 @@ function viewHome(){
     <button class="tile" data-go="subs:All sent"><b>${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
     <button class="tile" data-go="subs:Accepted"><b>${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
   </div>
+  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats &amp; insights →</button></div>
   <h2>Under review now <small>longest wait first</small></h2>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
   <h2>Waiting on you <small>most urgent first</small></h2>
@@ -332,7 +353,11 @@ function viewMore(){
     <label for="chase">Chase editor after (days)</label>
     <input id="chase" type="number" min="1" value="${esc(S.settings.chaseDays)}">
     <div class="hint">Under-review submissions older than this are flagged “Check status”; at twice this they're “Overdue”.</div>
+    <label for="myname">Your name (signs chase emails)</label>
+    <input id="myname" value="${esc(S.settings.myName||"")}" placeholder="e.g. Dr S. Kaushal">
   </div>
+  <h2>Reminders</h2>
+  <div class="card">${remindCard()}</div>
   <h2>Backup &amp; Excel</h2>
   <div class="card">
     <div class="actions" style="margin-top:0">
@@ -355,10 +380,15 @@ function viewMore(){
   <div class="hint">Discards all changes made in the app.</div></div>
   <div class="hint" style="text-align:center;margin:20px 0">RD SK · ${S.papers.length} papers · ${S.subs.length} submission rows</div>`;
 }
+function bindMore(){
+  const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); render(); toast("Saved"); };
+  const n=$("#myname"); if(n) n.onchange=()=>{ S.settings.myName=n.value.trim(); persist(false); toast("Saved"); };
+  const r=$("#remind"); if(r) r.onchange=()=>{ S.settings.reminders=r.checked; persist(false); if(r.checked) askNotifications(); render(); };
+}
 function bindSearch(){
   const q=$("#q"); if(!q) return;
   q.oninput=()=>{ query=q.value; const pos=q.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(pos,pos); };
-  const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); toast("Saved"); };
+
 }
 
 /* ---------- click routing ---------- */
@@ -372,6 +402,9 @@ document.addEventListener("click",e=>{
   switch(a.dataset.act){
     case "portal": e.stopPropagation(); openUrl(portalFor(s.journal).url); break;
     case "decide": e.stopPropagation(); decide(s); break;
+    case "chase": e.stopPropagation(); chaseEmail(s); break;
+    case "testnotif": if(window.Android&&Android.testReminder){ if(!Android.notificationsAllowed()) { askNotifications(true); toast("Allow notifications for RD SK first"); } else { Android.testReminder(); toast("Test notification sent"); } } else toast("Works in the phone app"); break;
+    case "asknotif": askNotifications(true); break;
     case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); persist(); render(); toast("Marked under review · "+s.journal); break;
     case "editsub": editSub(s); break;
     case "paper": showPaper(paperById(id)); break;
@@ -431,17 +464,22 @@ function editSub(s, presetPaper){
     <div><label for="ff">Date of decision</label><input type="date" id="ff" value="${esc(s.decided)}"></div></div>
     <label for="fn">Notes</label><textarea id="fn">${esc(s.notes)}</textarea>
     <label for="ft">Title used (if retitled)</label><input id="ft" value="${esc(s.titleUsed)}">
+    <div class="two"><div><label for="fm">Manuscript ID</label><input id="fm" value="${esc(s.msid||"")}" placeholder="e.g. ORG-26-0412" autocapitalize="characters"></div>
+    <div><label for="fx">Editorial office email</label><input id="fx" type="email" value="${esc((S.contacts||{})[s.journal]||"")}" placeholder="for chase emails" autocapitalize="off"></div></div>
     <label for="fu">Login link for this journal</label><input id="fu" type="url" placeholder="https://…" value="${esc(S.portals[s.journal]||"")}">
     <div class="hint" id="fuh">${portal?(portal.src==="yours"?"Using your link.":portal.src==="built-in"?"Built-in: "+esc(portal.url):"No known link yet: opens a web search. Paste the journal's login page here once you find it."):"Leave blank to use the built-in link or a web search."}</div>
     <div class="actions"><button class="primary" id="fsave">Save</button>
       ${s.journal?`<button id="fopen">Open journal login ↗</button>`:""}
+      ${!isNew&&s.status==="Under review"?`<button id="fchase">✉ Email editor</button>`:""}
       ${isNew?"":`<button class="danger" id="fdel">Delete</button>`}</div>`);
+  if($("#fchase")) $("#fchase").onclick=()=>chaseEmail(s);
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
   $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
   $("#fsave").onclick=()=>{
     const pid=$("#fp").value, j=$("#fj").value.trim();
     if(!pid) return toast("Choose a paper"); if(!j) return toast("Enter a journal");
-    Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim(), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim()});
+    Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim(), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim(), msid:$("#fm").value.trim()});
+    S.contacts=S.contacts||{}; const em=$("#fx").value.trim(); if(em) S.contacts[j]=em; else delete S.contacts[j];
     const u=$("#fu").value.trim();
     if(u) S.portals[j]=/^https?:\/\//i.test(u)?u:"https://"+u; else delete S.portals[j];
     if(isNew) S.subs.push(s);
@@ -620,6 +658,136 @@ function fromWorkbook(wb){
   return {version:1,settings:{},papers,subs,portals:{}};
 }
 
+/* ---------- reminders (native notifications; the page sends a summary on each save) ---------- */
+function pushReminders(){
+  if(!(window.Android && Android.setReminderData)) return;
+  const subs=S.subs.filter(s=>s.status==="Under review"&&s.submitted).map(s=>{ const p=paperById(s.paper)||{}; return {id:s.id, journal:s.journal, paper:p.key||"", submitted:s.submitted}; });
+  try{ Android.setReminderData(JSON.stringify({enabled:S.settings.reminders!==false, chaseDays:+S.settings.chaseDays||90, lastUpdated:S.settings.lastUpdated||"", subs})); }catch(e){}
+}
+function askNotifications(force){
+  if(!(window.Android && Android.requestNotifications)) return;
+  if(!force && S.settings.askedNotif) return;
+  S.settings.askedNotif=true; persist(false);
+  if(!Android.notificationsAllowed()) Android.requestNotifications();
+}
+window.rdPermissionsChanged = () => { if(tab==="more") render(); };
+function remindCard(){
+  const on=S.settings.reminders!==false, app=!!(window.Android&&Android.notificationsAllowed), allowed=app?Android.notificationsAllowed():true;
+  return `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);margin-top:0"><input type="checkbox" id="remind" style="width:auto" ${on?"checked":""}> Remind me about submissions</label>
+    <div class="hint">Around 9 am: a notification when a submission reaches ${+S.settings.chaseDays||90} days under review (and again at ${2*(+S.settings.chaseDays||90)}), plus a weekly nudge if nothing has been recorded for 7 days. Tap a notification to open the list and email the editor.</div>
+    ${on&&app&&!allowed?`<div class="banner" style="margin-top:10px">Notifications are blocked for RD SK. <button class="link" data-act="asknotif">Allow notifications</button> (or Android Settings → Apps → RD SK → Notifications).</div>`:""}
+    ${on?`<div class="actions"><button data-act="testnotif">Send a test notification</button></div>`:""}`;
+}
+
+/* ---------- chase-editor email ---------- */
+function chaseEmail(s){
+  const p=paperById(s.paper)||{}, d=subDays(s), title=s.titleUsed||p.title||p.key||"";
+  const to=(S.contacts||{})[s.journal]||"", name=S.settings.myName||"";
+  const many=(p.authors||"").split(/,|;| and /).filter(x=>x.trim()).length>2;
+  const subject=`Status enquiry${s.msid?" – Manuscript "+s.msid:""}: “${title}”`;
+  const body=`Dear Editor,
+
+I hope you are well. I am writing to enquire about the status of our manuscript “${title}”${s.msid?" (Manuscript ID: "+s.msid+")":""}, submitted to ${s.journal.replace(/-A$/,"")} on ${fmt(s.submitted)}.
+
+It has now been under consideration for ${d} days, and we would be grateful for any update on its progress or an expected timeline for a decision.
+
+Thank you for your time and for handling our submission.
+
+Kind regards,
+${name||"[Your name]"}${many?"\n(on behalf of all authors)":""}`;
+  const url="mailto:"+encodeURIComponent(to).replace(/%40/g,"@")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+  if(!to) toast("Tip: add the editorial office email on the submission to fill in the To: field");
+  openUrl(url);
+}
+
+/* ---------- stats ---------- */
+const DECIDED=["Rejected","Accepted","Revision requested","Revision resubmitted","Returned by office","Withdrawn"];
+const median=a=>{ if(!a.length) return null; const b=a.slice().sort((x,y)=>x-y), m=b.length>>1; return b.length%2?b[m]:Math.round((b[m-1]+b[m])/2); };
+const qOf=iso=>{ const [y,m]=iso.split("-").map(Number); return y*4+Math.floor((m-1)/3); };
+const qName=q=>Math.floor(q/4)+" Q"+(q%4+1);
+let statsShowAll=false;
+function statData(){
+  const sent=S.subs.filter(s=>isSent(s)&&s.submitted);
+  const dec=sent.filter(s=>DECIDED.includes(s.status)&&s.decided);
+  const rej=dec.filter(s=>s.status==="Rejected"), acc=dec.filter(s=>s.status==="Accepted");
+  const rejDays=rej.map(subDays).filter(x=>x!=null);
+  const quick=rejDays.filter(x=>x<=14).length;
+  const reviewed=rejDays.filter(x=>x>14);
+  const nowQ=qOf(today()), qs=[]; for(let q=nowQ-7;q<=nowQ;q++) qs.push({q,label:qName(q),sub:0,dec:0});
+  sent.forEach(s=>{ const r=qs.find(x=>x.q===qOf(s.submitted)); if(r) r.sub++; });
+  dec.forEach(s=>{ const r=qs.find(x=>x.q===qOf(s.decided)); if(r) r.dec++; });
+  const out={}; sent.forEach(s=>{ const k=s.status==="Revision resubmitted"?"Revision requested":s.status; out[k]=(out[k]||0)+1; });
+  const J={}; sent.forEach(s=>{ const k=s.journal.replace(/-A$/,"").replace(/\s*\((Sage|Wiley|SAGE)\)$/,""); const j=J[k]=J[k]||{name:k,n:0,days:[],rej:0,acc:0,open:0}; j.n++;
+    if(DECIDED.includes(s.status)&&s.decided){ j.days.push(subDays(s)); } if(s.status==="Rejected") j.rej++; if(s.status==="Accepted") j.acc++; if(isOpen(s)) j.open++; });
+  const journals=Object.values(J).map(j=>({...j,med:median(j.days)})).sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name));
+  const papers=S.papers.map(p=>{ const i=paperInfo(p), ss=i.subs.filter(s=>isSent(s)&&s.submitted).map(s=>s.submitted).sort(); return {p,i,first:ss[0]||"",age:ss[0]?daysBetween(ss[0],today()):null}; })
+    .filter(x=>x.i.sent>0).sort((a,b)=>b.i.sent-a.i.sent||(b.age||0)-(a.age||0));
+  return {sent,dec,rej,acc,rejDays,quick,reviewed,qs,out,journals,papers,
+    accRate:acc.length+rej.length?Math.round(100*acc.length/(acc.length+rej.length)):null};
+}
+function viewStats(){
+  const D=statData();
+  const tile=(v,l,sub)=>`<div class="tile"><b>${v}</b><span>${l}</span>${sub?`<i>${sub}</i>`:""}</div>`;
+  const maxQ=Math.max(1,...D.qs.map(q=>Math.max(q.sub,q.dec)));
+  // grouped bar chart, one y-axis (counts)
+  const W=340,H=170,L=22,B=22,T=8,gw=(W-L)/D.qs.length,bw=Math.min(14,(gw-10)/2), y=v=>T+(H-T-B)*(1-v/maxQ);
+  const step=maxQ<=5?1:maxQ<=10?2:maxQ<=25?5:10, ticks=[]; for(let v=0;v<=maxQ;v+=step) ticks.push(v);
+  const bar=(x,v,cls,fill,qi)=>{ if(!v) return ""; const top=y(v),h=H-B-top,r=Math.min(4,h); return `<path class="bar ${cls}" data-q="${qi}" fill="${fill}" d="M${x},${H-B} V${top+r} q0,-${r} ${r},-${r} h${bw-2*r} q${r},0 ${r},${r} V${H-B} Z"/>`; };
+  const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Submissions and decisions per quarter">
+    ${ticks.map(v=>`<line class="grid" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L-5}" y="${y(v)+3}" text-anchor="end">${v}</text>`).join("")}
+    ${D.qs.map((q,i)=>{ const x0=L+i*gw+(gw-2*bw-2)/2; return `<rect class="bar" data-q="${i}" x="${L+i*gw}" y="${T}" width="${gw}" height="${H-B-T}" fill="transparent"/>`+bar(x0,q.sub,"s","var(--s1)",i)+bar(x0+bw+2,q.dec,"d","var(--s2)",i)+`<text class="ax" x="${L+i*gw+gw/2}" y="${H-6}" text-anchor="middle">${i%2===1||D.qs.length<=6?q.label.replace(/^\d\d/,"’"):""}</text>`; }).join("")}
+  </svg>`;
+  const OUT=["Under review","Rejected","Revision requested","Returned by office","Accepted","Withdrawn"].filter(k=>D.out[k]);
+  const maxO=Math.max(1,...OUT.map(k=>D.out[k]));
+  const jl=statsShowAll?D.journals:D.journals.slice(0,12);
+  return `
+  <div class="row" style="margin-bottom:6px"><button class="ghost" data-go="home">← Dashboard</button></div>
+  <div class="stattiles">
+    ${tile(D.sent.length,"Submissions sent",D.dec.length+" decided")}
+    ${tile(D.accRate!=null?D.accRate+"%":"—","Acceptance rate",D.acc.length+" accepted · "+D.rej.length+" rejected")}
+    ${tile(D.rejDays.length?Math.round(100*D.quick/D.rejDays.length)+"%":"—","Quick rejections",D.quick+" of "+D.rejDays.length+" within 14 days (likely desk)")}
+    ${tile(median(D.reviewed)!=null?median(D.reviewed)+" d":"—","Median after review",D.reviewed.length+" rejections after 14+ days")}
+  </div>
+
+  <h2>Per quarter <small>last 2 years</small></h2>
+  <div class="card chart">
+    <div class="legend"><span><i style="background:var(--s1)"></i>Submitted</span><span><i style="background:var(--s2)"></i>Decisions received</span></div>
+    ${svg}
+    <div class="readout" id="qread">Tap a quarter for its numbers.</div>
+    <details style="margin-top:6px"><summary class="m">Show as table</summary>
+      <table class="tbl"><tr><th>Quarter</th><th class="n">Submitted</th><th class="n">Decisions</th></tr>
+      ${D.qs.slice().reverse().map(q=>`<tr><td>${q.label}</td><td class="n">${q.sub}</td><td class="n">${q.dec}</td></tr>`).join("")}</table></details>
+  </div>
+
+  <h2>Where submissions ended up</h2>
+  <div class="card">
+    <table class="tbl">${OUT.map(k=>`<tr><td style="width:42%"><span class="chip ${stageClass(k)}">${k}</span></td><td><div class="hbar" style="width:${Math.max(2,100*D.out[k]/maxO)}%"></div></td><td class="n" style="width:12%">${D.out[k]}</td></tr>`).join("")}</table>
+  </div>
+
+  <h2>Journals <small>by number of tries</small></h2>
+  <div class="card" style="padding:6px 10px">
+    <table class="tbl"><tr><th>Journal</th><th class="n">Tries</th><th class="n">Median days</th><th class="n">Result</th></tr>
+    ${jl.map(j=>`<tr><td>${esc(j.name)}</td><td class="n">${j.n}</td><td class="n">${j.med??"—"}</td><td class="n">${[j.acc?j.acc+" acc":"",j.rej?j.rej+" rej":"",j.open?j.open+" open":""].filter(Boolean).join(", ")||"—"}</td></tr>`).join("")}</table>
+    ${D.journals.length>12?`<div class="actions" style="margin:8px 0 4px"><button class="link" id="jall">${statsShowAll?"Show fewer":"Show all "+D.journals.length+" journals"}</button></div>`:""}
+    <div class="hint" style="margin:6px 0 4px">Median days = submission to decision, from your own history.</div>
+  </div>
+
+  <h2>Papers <small>most submitted first</small></h2>
+  <div class="card" style="padding:6px 10px">
+    <table class="tbl"><tr><th>Paper</th><th class="n">Sent</th><th class="n">Rej.</th><th class="n">Days since first</th></tr>
+    ${D.papers.map(x=>`<tr data-act="paper" data-id="${x.p.id}" style="cursor:pointer"><td>${esc(x.p.key)}<br><span class="chip ${stageClass(x.i.stage)}" style="margin-top:3px">${esc(x.i.stage)}</span></td><td class="n">${x.i.sent}</td><td class="n">${x.i.rejections}</td><td class="n">${x.age??"—"}</td></tr>`).join("")}</table>
+  </div>`;
+}
+function bindStats(){
+  const D=statData(), r=$("#qread");
+  document.querySelectorAll(".chart .bar").forEach(el=>el.addEventListener("click",()=>{
+    const i=+el.dataset.q, q=D.qs[i];
+    r.innerHTML=`<b>${q.label}</b>: ${q.sub} submitted · ${q.dec} decision${q.dec===1?"":"s"} received`;
+    document.querySelectorAll(".chart path.bar").forEach(b=>b.classList.toggle("dim",+b.dataset.q!==i));
+  }));
+  const ja=$("#jall"); if(ja) ja.onclick=()=>{ statsShowAll=!statsShowAll; render(); };
+}
+
 /* ---------- GitHub sync (token kept separately, never in backups/exports) ---------- */
 const GH_KEY="rdsk.github.v1";
 let GH={repo:"faltu9522/Research-Dashboard",branch:"main",folder:"data",token:"",auto:true,lastSync:"",lastError:""};
@@ -707,7 +875,7 @@ async function ghPull(){
   }catch(err){ alert("Load failed: "+err.message); }
 }
 
-load(); render();
+load(); render(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
 </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 
 A phone app for tracking paper submissions, built from the *Research Dashboard* Excel workbook.
 
-**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~42 KB), open it and allow
+**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~53 KB), open it and allow
 "Install unknown apps" for your browser/file manager when asked.
 
 ## What it does
@@ -15,6 +15,13 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
 - **Quick updates** – *Record decision* (rejected, revision requested, accepted…), *Mark submitted today* on a
   planned journal, *Submit to <next in queue> today* and *Resubmit revision today* on a paper, reorder a paper's
   journal queue, add/edit/delete papers and submissions.
+- **Reminders** – a notification around 9 am when a submission reaches the chase limit (and again at twice
+  it), plus a weekly nudge when nothing has been recorded for 7 days.
+- **✉ Email editor** – on overdue submissions: opens your email app with a polite status enquiry filled in
+  (title, manuscript ID, journal, submission date, days waiting). Add the manuscript ID and editorial office
+  email on the submission; set your sign-off name under *More*.
+- **Stats & insights** – acceptance rate, quick (likely desk) rejections, median time to decision after review,
+  submissions and decisions per quarter, outcomes, per-journal speed from your own history, and per-paper totals.
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 
