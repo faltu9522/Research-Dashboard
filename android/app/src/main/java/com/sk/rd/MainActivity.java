@@ -19,7 +19,13 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -121,6 +127,46 @@ public class MainActivity extends Activity {
             i.putExtra(Intent.EXTRA_SUBJECT, subject);
             i.putExtra(Intent.EXTRA_TEXT, text);
             runOnUiThread(() -> startActivity(Intent.createChooser(i, subject)));
+        }
+
+        /** Calls the GitHub API off the UI thread and reports back via window.rdHttpDone(id, status, body). */
+        @JavascriptInterface
+        public void httpAsync(String id, String method, String url, String token, String body) {
+            new Thread(() -> {
+                int status = 0;
+                String text;
+                try {
+                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                    c.setRequestMethod(method);
+                    c.setConnectTimeout(20000);
+                    c.setReadTimeout(30000);
+                    c.setUseCaches(false);
+                    c.setRequestProperty("Authorization", "Bearer " + token);
+                    c.setRequestProperty("Accept", "application/vnd.github+json");
+                    c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+                    if (body != null && !body.isEmpty()) {
+                        c.setDoOutput(true);
+                        c.setRequestProperty("Content-Type", "application/json");
+                        try (OutputStream os = c.getOutputStream()) {
+                            os.write(body.getBytes(StandardCharsets.UTF_8));
+                        }
+                    }
+                    status = c.getResponseCode();
+                    InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
+                    ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                    if (in != null) {
+                        byte[] b = new byte[16384];
+                        for (int n; (n = in.read(b)) > 0; ) buf.write(b, 0, n);
+                        in.close();
+                    }
+                    text = buf.toString("UTF-8");
+                } catch (Exception e) {
+                    status = 0;
+                    text = "{\"message\":" + JSONObject.quote("Network error: " + e.getMessage()) + "}";
+                }
+                String js = "window.rdHttpDone(" + JSONObject.quote(id) + "," + status + "," + JSONObject.quote(text) + ")";
+                runOnUiThread(() -> web.evaluateJavascript(js, null));
+            }).start();
         }
 
         /** Saves a file to the public Downloads folder and returns a message for the UI. */

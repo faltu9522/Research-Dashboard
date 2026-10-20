@@ -2,7 +2,7 @@
 
 A phone app for tracking paper submissions, built from the *Research Dashboard* Excel workbook.
 
-**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~40 KB), open it and allow
+**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~42 KB), open it and allow
 "Install unknown apps" for your browser/file manager when asked.
 
 ## What it does
@@ -18,7 +18,12 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 
-Data is stored on the phone only. Use *More → Save backup* now and then.
+- **Sync to GitHub** (*More → Sync to GitHub*) – commits `data/Research_Dashboard.xlsx` and
+  `data/rdsk-backup.json` to this repo (branch `main` by default), automatically ~8 s after each change or
+  with *Sync now*. *Load from GitHub* pulls the backup back onto a phone. Needs a fine-grained token limited
+  to this repo with **Contents: Read and write**; the token stays on the phone and is never exported.
+
+Data is stored on the phone; GitHub sync (or *More → Save backup*) keeps a copy off the phone.
 
 ## Rebuilding
 - Seed data from a newer workbook: `python3 tools/excel_to_seed.py Research_Dashboard.xlsx android/app/src/main/assets/seed.js`

@@ -122,6 +122,7 @@ function load(){
 function persist(touch=true){
   if(touch) S.settings.lastUpdated = today();
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
+  if(touch) scheduleAutoSync();
 }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -341,6 +342,8 @@ function viewMore(){
     </div>
     <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Data lives only on this phone, so save a backup now and then (and before uninstalling). Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
   </div>
+  <h2>Sync to GitHub</h2>
+  <div class="card">${ghCard()}</div>
   <h2>Journal login links</h2>
   <div class="card">
     <div class="hint" style="margin-top:0">${Object.keys(S.portals).length} custom link(s) set. Each under-review card opens the journal's submission system; journals without a known link fall back to a web search. Set your own link from any submission's edit screen.</div>
@@ -376,6 +379,10 @@ document.addEventListener("click",e=>{
     case "exportjson": saveFile("RD-SK-backup-"+today()+".json", JSON.stringify(S,null,1), "application/json"); break;
     case "sharejson": shareText(JSON.stringify(S)); break;
     case "import": $("#fileIn").click(); break;
+    case "ghsave": ghSaveSettings(); break;
+    case "ghsync": ghSync(false); break;
+    case "ghpull": ghPull(); break;
+    case "ghforget": if(confirm("Remove the GitHub token from this phone?")){ GH.token=""; ghStore(); render(); } break;
     case "clearportals": if(confirm("Remove all custom journal links?")){ S.portals={}; persist(); render(); } break;
     case "reset": if(confirm("Reset everything to the Excel data? All changes made in the app will be lost.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); persist(false); render(); toast("Reset done"); } break;
   }
@@ -547,7 +554,7 @@ function sheetXml(header, rows, widths, dateCols){
   const body=[header,...rows].map((row,ri)=>`<row r="${ri+1}">${row.map((v,ci)=>ri===0?cell(v,1,ci,false).replace("<c ",'<c s="2" '):cell(v,ri+1,ci,dateCols.includes(ci))).join("")}</row>`).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${body}</sheetData></worksheet>`;
 }
-function exportXlsx(){
+function buildXlsxB64(){
   const pk=id=>(paperById(id)||{}).key||"";
   const pH=["Paper (short name, must be unique)","Current title","Authors","Type","Override (optional)","Stage","Last journal tried","Last decision","Days idle","Next journal in queue","Submissions sent","Rejections","Notes"];
   const pR=S.papers.map(p=>{ const i=paperInfo(p); return [p.key,p.title,p.authors,p.type,p.override,i.stage,i.last?i.last.journal:"",i.lastDec,i.idle??"",i.next?i.next.journal:"",i.sent,i.rejections,p.notes]; });
@@ -563,9 +570,10 @@ function exportXlsx(){
     ["xl/worksheets/sheet1.xml",sheetXml(pH,pR,[40,60,24,16,16,18,36,12,9,36,10,10,60],[7])],
     ["xl/worksheets/sheet2.xml",sheetXml(sH,sR,[40,44,14,18,12,12,7,50,40,40],[4,5])],
   ]);
-  let bin=""; for(let i=0;i<zip.length;i+=0x8000) bin+=String.fromCharCode.apply(null,zip.subarray(i,i+0x8000));
-  saveFile("RD-SK-"+today()+".xlsx", btoa(bin), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true);
+  return bytesToB64(zip);
 }
+function bytesToB64(u){ let bin=""; for(let i=0;i<u.length;i+=0x8000) bin+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(bin); }
+function exportXlsx(){ saveFile("RD-SK-"+today()+".xlsx", buildXlsxB64(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true); }
 async function readWorkbook(buf){ // → {sheetName: rows[][]} (values: string or number)
   const files=await unzip(buf), X=t=>new DOMParser().parseFromString(t,"application/xml");
   const tags=(node,tag)=>Array.from(node.getElementsByTagName(tag));
@@ -606,6 +614,81 @@ function fromWorkbook(wb){
   const subs=[];
   rows(Sub).forEach(r=>{ const k=str(r[0]), j=str(r[1]); if(!k&&!j) return; subs.push({id:uid("s"),paper:add(k),journal:j,rating:str(r[2]),status:str(r[3])||"Planned",submitted:d(r[4]),decided:d(r[5]),notes:str(r[7]),titleUsed:str(r[8])}); });
   return {version:1,settings:{},papers,subs,portals:{}};
+}
+
+/* ---------- GitHub sync (token kept separately, never in backups/exports) ---------- */
+const GH_KEY="rdsk.github.v1";
+let GH={repo:"faltu9522/Research-Dashboard",branch:"main",folder:"data",token:"",auto:true,lastSync:"",lastError:""};
+try{ Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY)||"{}")); }catch(e){}
+function ghStore(){ try{ localStorage.setItem(GH_KEY, JSON.stringify(GH)); }catch(e){} }
+function ghCard(){
+  const on=!!GH.token;
+  return `<div class="hint" style="margin-top:0">Saves <b>${esc(GH.folder)}/Research_Dashboard.xlsx</b> (Papers + Submissions sheets) and <b>${esc(GH.folder)}/rdsk-backup.json</b> to your repo as a commit.
+    ${on?(GH.lastSync?`<br>Last synced: <b>${esc(GH.lastSync)}</b>`:"<br>Not synced yet.")+(GH.lastError?`<br><span style="color:var(--need)">Last error: ${esc(GH.lastError)}</span>`:""):""}</div>
+    <label for="ghrepo">Repository (owner/name)</label><input id="ghrepo" value="${esc(GH.repo)}" autocapitalize="off" autocorrect="off">
+    <div class="two"><div><label for="ghbranch">Branch</label><input id="ghbranch" value="${esc(GH.branch)}" autocapitalize="off"></div>
+    <div><label for="ghfolder">Folder</label><input id="ghfolder" value="${esc(GH.folder)}" autocapitalize="off"></div></div>
+    <label for="ghtoken">Access token ${on?"(saved)":""}</label><input id="ghtoken" type="password" placeholder="${on?"•••••••• (leave blank to keep)":"github_pat_…"}" autocapitalize="off" autocorrect="off">
+    <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="ghauto" style="width:auto" ${GH.auto?"checked":""}> Sync automatically after each change</label>
+    <div class="actions"><button data-act="ghsave">Save settings</button>
+      ${on?`<button class="primary" data-act="ghsync">Sync now ↑</button><button data-act="ghpull">Load from GitHub ↓</button><button class="danger ghost" data-act="ghforget">Remove token</button>`:""}</div>
+    <div class="hint">Token: on github.com → Settings → Developer settings → Fine-grained tokens → Generate. Repository access: <b>only ${esc(GH.repo)}</b>; Permissions → <b>Contents: Read and write</b>. The token stays on this phone and is never included in exports or backups.</div>`;
+}
+function ghSaveSettings(){
+  GH.repo=$("#ghrepo").value.trim().replace(/^https?:\/\/github\.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
+  GH.branch=$("#ghbranch").value.trim()||"main"; GH.folder=$("#ghfolder").value.trim().replace(/^\/|\/$/g,"");
+  const t=$("#ghtoken").value.trim(); if(t) GH.token=t; GH.auto=$("#ghauto").checked; GH.lastError="";
+  ghStore(); render(); toast(GH.token?"Saved. Tap “Sync now” to test.":"Saved. Add a token to enable sync.");
+}
+function ghPath(name){ return (GH.folder?GH.folder+"/":"")+name; }
+// In the app, requests go through native code (no browser CORS rules); in a desktop browser, plain fetch.
+const httpWaiters={}; let httpSeq=0;
+window.rdHttpDone=(id,status,text)=>{ const w=httpWaiters[id]; delete httpWaiters[id]; if(w) w({status,text}); };
+function httpCall(method,url,token,body){
+  if(window.Android && Android.httpAsync) return new Promise(res=>{ const id="h"+(++httpSeq); httpWaiters[id]=res; Android.httpAsync(id,method,url,token,body||""); });
+  return fetch(url,{method,headers:{"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},body:body||undefined,cache:"no-store"})
+    .then(async r=>({status:r.status,text:await r.text()}),e=>({status:0,text:JSON.stringify({message:"Network error: "+e.message})}));
+}
+async function ghApi(method, path, body){
+  const r=await httpCall(method,`https://api.github.com/repos/${GH.repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}`+(method==="GET"?`?ref=${encodeURIComponent(GH.branch)}`:""),GH.token,body?JSON.stringify(body):"");
+  if(method==="GET"&&r.status===404) return null;
+  let j={}; try{ j=JSON.parse(r.text); }catch(e){}
+  if(r.status===0) throw new Error(j.message||"No connection");
+  if(r.status<200||r.status>=300) throw new Error(r.status===401?"Token rejected (401): check or regenerate it":r.status===403||r.status===404?`No write access to ${GH.repo} (${r.status}): check the token's repository and Contents permission`:(j.message||"HTTP "+r.status));
+  return j;
+}
+async function ghPut(name, b64, msg){
+  const path=ghPath(name), cur=await ghApi("GET",path);
+  if(cur && cur.content && cur.content.replace(/\s/g,"")===b64) return false; // unchanged
+  await ghApi("PUT",path,{message:msg, content:b64, branch:GH.branch, sha:cur?cur.sha:undefined});
+  return true;
+}
+let ghBusy=false, ghTimer=null;
+function scheduleAutoSync(){ if(!GH.token||!GH.auto) return; clearTimeout(ghTimer); ghTimer=setTimeout(()=>ghSync(true),8000); }
+async function ghSync(auto){
+  if(!GH.token) return toast("Add a GitHub token first");
+  if(ghBusy){ scheduleAutoSync(); return; }
+  if(!navigator.onLine){ GH.lastError="Offline – will retry after your next change"; ghStore(); if(!auto) toast("You're offline"); return; }
+  ghBusy=true; if(!auto) toast("Syncing…");
+  try{
+    const u8=new TextEncoder().encode(JSON.stringify(S,null,1));
+    const msg="RD SK update "+new Date().toLocaleString();
+    const a=await ghPut("rdsk-backup.json", bytesToB64(u8), msg);
+    const b=await ghPut("Research_Dashboard.xlsx", buildXlsxB64(), msg);
+    GH.lastSync=new Date().toLocaleString(); GH.lastError=""; ghStore();
+    toast(a||b?"Synced to GitHub ✓":"Already up to date ✓");
+  }catch(err){ GH.lastError=err.message; ghStore(); toast("Sync failed: "+err.message); }
+  ghBusy=false; if(tab==="more") render();
+}
+async function ghPull(){
+  try{
+    toast("Loading…");
+    const f=await ghApi("GET",ghPath("rdsk-backup.json")); if(!f) return toast("No backup in the repo yet: tap “Sync now” first");
+    const bin=atob(f.content.replace(/\s/g,"")), next=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));
+    if(!next.papers||!next.subs) throw new Error("Not an RD SK backup");
+    if(!confirm(`Replace the data on this phone with the GitHub copy (${next.papers.length} papers, ${next.subs.length} submissions, last updated ${fmt(next.settings&&next.settings.lastUpdated)})?`)) return;
+    S=next; S.portals=S.portals||{}; persist(false); render(); toast("Loaded from GitHub");
+  }catch(err){ alert("Load failed: "+err.message); }
 }
 
 load(); render();
