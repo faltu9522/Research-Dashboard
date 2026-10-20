@@ -104,7 +104,6 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 
 <script src="seed.js"></script>
 <script src="portals.js"></script>
-<script src="xlsx.full.min.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -503,35 +502,102 @@ function saveFile(name, content, mime, isBase64){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); toast("Downloaded "+name);
 }
 function shareText(t){ if(window.Android && Android.shareText) Android.shareText("RD SK backup", t); else if(navigator.share) navigator.share({text:t}); else toast("Sharing not available"); }
+/* ---------- minimal .xlsx writer/reader (zip + SpreadsheetML), replaces a 900 KB library ---------- */
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipStore(files){ // files: [[name, string]] → Uint8Array (uncompressed zip)
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  for(const [name,text] of files){
+    const nb=enc.encode(name), data=enc.encode(text), crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30)); h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint32(14,crc,true); h.setUint32(18,data.length,true); h.setUint32(22,data.length,true); h.setUint16(26,nb.length,true);
+    const c=new DataView(new ArrayBuffer(46)); c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint32(16,crc,true); c.setUint32(20,data.length,true); c.setUint32(24,data.length,true); c.setUint16(28,nb.length,true); c.setUint32(42,off,true);
+    parts.push(new Uint8Array(h.buffer),nb,data); central.push(new Uint8Array(c.buffer),nb); off+=30+nb.length+data.length;
+  }
+  const csize=central.reduce((a,b)=>a+b.length,0), e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,csize,true); e.setUint32(16,off,true);
+  const all=[...parts,...central,new Uint8Array(e.buffer)], out=new Uint8Array(all.reduce((a,b)=>a+b.length,0)); let p=0; all.forEach(a=>{ out.set(a,p); p+=a.length; }); return out;
+}
+async function unzip(buf){ // → {name: string}
+  const u=new Uint8Array(buf), v=new DataView(buf), out={}, dec=new TextDecoder();
+  let e=u.length-22; while(e>=0 && v.getUint32(e,true)!==0x06054b50) e--; if(e<0) throw new Error("Not an .xlsx file");
+  let p=v.getUint32(e+16,true); const n=v.getUint16(e+10,true);
+  for(let i=0;i<n;i++){
+    const method=v.getUint16(p+10,true), csize=v.getUint32(p+20,true), nl=v.getUint16(p+28,true), xl=v.getUint16(p+30,true), cl=v.getUint16(p+32,true), lo=v.getUint32(p+42,true);
+    const name=dec.decode(u.subarray(p+46,p+46+nl)); p+=46+nl+xl+cl;
+    if(!/\.(xml|rels)$/.test(name)) continue;
+    const start=lo+30+v.getUint16(lo+26,true)+v.getUint16(lo+28,true), raw=u.subarray(start,start+csize);
+    if(method===0) out[name]=dec.decode(raw);
+    else if(method===8){
+      if(typeof DecompressionStream==="undefined") throw new Error("Please update Android System WebView (Play Store) to import .xlsx, or import a .json backup");
+      out[name]=await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+    }
+  }
+  return out;
+}
+const xesc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,"");
+const colName=i=>{ let s=""; i++; while(i){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=(i-m-1)/26; } return s; };
+const serial=iso=>dnum(iso)+25569; // Excel day number
+function sheetXml(header, rows, widths, dateCols){
+  const cell=(v,r,c,isDate)=>{ const ref=colName(c)+r;
+    if(v===""||v==null) return "";
+    if(isDate) return `<c r="${ref}" s="1"><v>${serial(v)}</v></c>`;
+    if(typeof v==="number") return `<c r="${ref}"><v>${v}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`; };
+  const body=[header,...rows].map((row,ri)=>`<row r="${ri+1}">${row.map((v,ci)=>ri===0?cell(v,1,ci,false).replace("<c ",'<c s="2" '):cell(v,ri+1,ci,dateCols.includes(ci))).join("")}</row>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${body}</sheetData></worksheet>`;
+}
 function exportXlsx(){
   const pk=id=>(paperById(id)||{}).key||"";
-  const papers=S.papers.map(p=>{ const i=paperInfo(p); return {"Paper (short name, must be unique)":p.key,"Current title":p.title,"Authors":p.authors,"Type":p.type,"Override (optional)":p.override,"Stage":i.stage,"Last journal tried":i.last?i.last.journal:"","Last decision":i.lastDec,"Days idle":i.idle??"","Next journal in queue":i.next?i.next.journal:"","Submissions sent":i.sent,"Rejections":i.rejections,"Notes":p.notes}; });
-  const subs=S.subs.map(s=>({"Paper":pk(s.paper),"Journal":s.journal,"Rating / index":s.rating,"Status":s.status,"Date submitted":s.submitted,"Date of decision":s.decided,"Days":subDays(s)??"","Notes":s.notes,"Title used (if retitled)":s.titleUsed,"Login link":isOpen(s)?portalFor(s.journal).url:""}));
-  const toDates=(rows,cols)=>rows.map(r=>{ cols.forEach(c=>{ if(r[c]) r[c]=new Date(r[c]+"T00:00:00"); }); return r; });
-  const wb=XLSX.utils.book_new();
-  const ws1=XLSX.utils.json_to_sheet(toDates(papers,["Last decision"]),{dateNF:"d-mmm-yy"});
-  const ws2=XLSX.utils.json_to_sheet(toDates(subs,["Date submitted","Date of decision"]),{dateNF:"d-mmm-yy"});
-  ws1["!cols"]=[{wch:40},{wch:60},{wch:24},{wch:16},{wch:16},{wch:18},{wch:36},{wch:12},{wch:9},{wch:36},{wch:10},{wch:10},{wch:60}];
-  ws2["!cols"]=[{wch:40},{wch:44},{wch:14},{wch:18},{wch:12},{wch:12},{wch:7},{wch:50},{wch:40},{wch:40}];
-  XLSX.utils.book_append_sheet(wb,ws1,"Papers"); XLSX.utils.book_append_sheet(wb,ws2,"Submissions");
-  const b64=XLSX.write(wb,{bookType:"xlsx",type:"base64"});
-  saveFile("RD-SK-"+today()+".xlsx", b64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true);
+  const pH=["Paper (short name, must be unique)","Current title","Authors","Type","Override (optional)","Stage","Last journal tried","Last decision","Days idle","Next journal in queue","Submissions sent","Rejections","Notes"];
+  const pR=S.papers.map(p=>{ const i=paperInfo(p); return [p.key,p.title,p.authors,p.type,p.override,i.stage,i.last?i.last.journal:"",i.lastDec,i.idle??"",i.next?i.next.journal:"",i.sent,i.rejections,p.notes]; });
+  const sH=["Paper","Journal","Rating / index","Status","Date submitted","Date of decision","Days","Notes","Title used (if retitled)","Login link"];
+  const sR=S.subs.map(s=>[pk(s.paper),s.journal,s.rating,s.status,s.submitted,s.decided,subDays(s)??"",s.notes,s.titleUsed,isOpen(s)?portalFor(s.journal).url:""]);
+  const NS='xmlns="http://schemas.openxmlformats.org/', head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const zip=zipStore([
+    ["[Content_Types].xml",`${head}<Types ${NS}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`],
+    ["_rels/.rels",`${head}<Relationships ${NS}package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml",`${head}<workbook ${NS}spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Papers" sheetId="1" r:id="rId1"/><sheet name="Submissions" sheetId="2" r:id="rId2"/></sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels",`${head}<Relationships ${NS}package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml",`${head}<styleSheet ${NS}spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="d-mmm-yy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf numFmtId="164" applyNumberFormat="1"/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>`],
+    ["xl/worksheets/sheet1.xml",sheetXml(pH,pR,[40,60,24,16,16,18,36,12,9,36,10,10,60],[7])],
+    ["xl/worksheets/sheet2.xml",sheetXml(sH,sR,[40,44,14,18,12,12,7,50,40,40],[4,5])],
+  ]);
+  let bin=""; for(let i=0;i<zip.length;i+=0x8000) bin+=String.fromCharCode.apply(null,zip.subarray(i,i+0x8000));
+  saveFile("RD-SK-"+today()+".xlsx", btoa(bin), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true);
+}
+async function readWorkbook(buf){ // → {sheetName: rows[][]} (values: string or number)
+  const files=await unzip(buf), X=t=>new DOMParser().parseFromString(t,"application/xml");
+  const tags=(node,tag)=>Array.from(node.getElementsByTagName(tag));
+  const shared=files["xl/sharedStrings.xml"]?tags(X(files["xl/sharedStrings.xml"]),"si").map(si=>tags(si,"t").map(t=>t.textContent).join("")):[];
+  const rels={}; tags(X(files["xl/_rels/workbook.xml.rels"]||"<x/>"),"Relationship").forEach(r=>rels[r.getAttribute("Id")]=r.getAttribute("Target").replace(/^\/?(xl\/)?/,"xl/"));
+  const out={};
+  tags(X(files["xl/workbook.xml"]||"<x/>"),"sheet").forEach(sh=>{
+    const xml=files[rels[sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id")]]; if(!xml) return;
+    const rows=[];
+    tags(X(xml),"row").forEach(row=>{ const r=+row.getAttribute("r")-1, arr=rows[r]=[];
+      tags(row,"c").forEach(c=>{ const ref=c.getAttribute("r").replace(/\d+/g,""); let ci=0; for(const ch of ref) ci=ci*26+ch.charCodeAt(0)-64; ci--;
+        const t=c.getAttribute("t"), vEl=c.getElementsByTagName("v")[0], v=vEl?vEl.textContent:"";
+        arr[ci]= t==="s"?shared[+v]??"" : t==="inlineStr"?tags(c,"t").map(x=>x.textContent).join("") : t==="str"||t==="b"||t==="e"?v : v===""?"":+v; });
+    });
+    out[sh.getAttribute("name")]=Array.from(rows,r=>r||[]);
+  });
+  return out;
 }
 $("#fileIn").onchange=async e=>{
   const f=e.target.files[0]; e.target.value=""; if(!f) return;
   try{
     let next;
     if(/\.json$/i.test(f.name) || f.type==="application/json"){ next=JSON.parse(await f.text()); if(!next.papers||!next.subs) throw new Error("Not an RD SK backup"); }
-    else next=fromWorkbook(XLSX.read(await f.arrayBuffer(),{cellDates:true}));
+    else next=fromWorkbook(await readWorkbook(await f.arrayBuffer()));
     if(!confirm(`Replace app data with ${next.papers.length} papers and ${next.subs.length} submissions from “${f.name}”?`)) return;
     next.portals=Object.assign({}, S.portals, next.portals||{}); next.settings=Object.assign({}, S.settings, next.settings||{});
     S=next; persist(); render(); toast("Imported");
   }catch(err){ alert("Import failed: "+err.message); }
 };
 function fromWorkbook(wb){
-  const P=wb.Sheets["Papers"], Sub=wb.Sheets["Submissions"]; if(!P||!Sub) throw new Error("Workbook needs ‘Papers’ and ‘Submissions’ sheets");
-  const rows=sh=>XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:""}).slice(1);
-  const d=v=>{ if(v instanceof Date){ const x=new Date(v.getTime()+12*36e5); return x.getUTCFullYear()+"-"+String(x.getUTCMonth()+1).padStart(2,"0")+"-"+String(x.getUTCDate()).padStart(2,"0"); } if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); return ""; };
+  const P=wb["Papers"], Sub=wb["Submissions"]; if(!P||!Sub) throw new Error("Workbook needs ‘Papers’ and ‘Submissions’ sheets");
+  const rows=sh=>sh.slice(1).map(r=>r||[]);
+  const d=v=>{ if(typeof v==="number"&&v>0){ const x=new Date(Math.round(v-25569)*864e5); return x.toISOString().slice(0,10); } if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); return ""; };
   const str=v=>String(v??"").trim();
   const papers=[], byKey={};
   const add=(key,o={})=>{ if(byKey[key]) return byKey[key]; const id=uid("p"); papers.push(Object.assign({id,key,title:"",authors:"",type:"Journal article",override:"",notes:""},o)); byKey[key]=id; return id; };

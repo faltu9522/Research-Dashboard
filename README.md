@@ -2,7 +2,7 @@
 
 A phone app for tracking paper submissions, built from the *Research Dashboard* Excel workbook.
 
-**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+), open it and allow
+**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~40 KB), open it and allow
 "Install unknown apps" for your browser/file manager when asked.
 
 ## What it does
