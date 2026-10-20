@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.sk.rd'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.sk.rd'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // A fixed signing key kept in the repo so every build can be installed over the previous one
+    // without losing data. This is a personal sideloaded app, not a Play Store release.
+    signingConfigs {
+        rdsk {
+            storeFile file('rdsk.keystore')
+            storePassword 'rdsk-keystore'
+            keyAlias 'rdsk'
+            keyPassword 'rdsk-keystore'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.rdsk
+        }
+        debug {
+            signingConfig signingConfigs.rdsk
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

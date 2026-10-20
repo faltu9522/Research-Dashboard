@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RD SK</title>
+<style>
+:root{
+  --bg:#f5f4f0;--card:#ffffff;--ink:#1c1b19;--muted:#6b6862;--line:#e4e1da;
+  --accent:#2f5d8a;--accent-ink:#ffffff;--accent-soft:#e3ecf5;
+  --ur:#2f5d8a;--ur-soft:#e3ecf5;--rev:#b4541a;--rev-soft:#fbe9dc;--need:#a8322f;--need-soft:#f8e2e0;
+  --not:#6b6862;--not-soft:#ecebe7;--acc:#2e7d4f;--acc-soft:#dff1e6;--closed:#8a8780;--closed-soft:#efeeea;
+  --warn:#b07a12;--warn-soft:#fbf1d9;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#151513;--card:#201f1d;--ink:#ecebe7;--muted:#a19e97;--line:#34322e;
+    --accent:#7fb0e0;--accent-ink:#0f1a26;--accent-soft:#1f2c3a;
+    --ur:#7fb0e0;--ur-soft:#1f2c3a;--rev:#f0a06a;--rev-soft:#3a2617;--need:#f08a85;--need-soft:#3a1d1c;
+    --not:#b3b0a9;--not-soft:#2b2a27;--acc:#78cf9b;--acc-soft:#173325;--closed:#8f8c85;--closed-soft:#262522;
+    --warn:#e8bd5c;--warn-soft:#3a2f14;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:76px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:20px;letter-spacing:.2px}
+header .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+main{padding:12px 16px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:22px 0 8px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+h2 small{text-transform:none;letter-spacing:0;font-weight:400}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 10px 9px;text-align:left;color:inherit;font:inherit}
+.tile b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.tile i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
+.card.tap{cursor:pointer}
+.row{display:flex;gap:8px;align-items:center}
+.grow{flex:1;min-width:0}
+.t{font-weight:600;overflow-wrap:anywhere}
+.m{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.chip{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;white-space:nowrap;font-weight:600}
+.s-ur{background:var(--ur-soft);color:var(--ur)}.s-rev{background:var(--rev-soft);color:var(--rev)}
+.s-need{background:var(--need-soft);color:var(--need)}.s-not{background:var(--not-soft);color:var(--not)}
+.s-acc{background:var(--acc-soft);color:var(--acc)}.s-closed{background:var(--closed-soft);color:var(--closed)}
+.s-warn{background:var(--warn-soft);color:var(--warn)}
+.days{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;text-align:right;line-height:1}
+.days small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+button,.btn{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:8px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.ghost{background:transparent}
+button.danger{color:var(--need)}
+button.link{border:0;background:none;color:var(--accent);padding:4px 0;font-size:13px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;border:0;border-radius:0;background:none;padding:10px 0 9px;font-size:11.5px;color:var(--muted)}
+nav button .ic{display:block;font-size:19px;line-height:1.1}
+nav button.on{color:var(--accent);font-weight:600}
+.fab{position:fixed;right:16px;bottom:84px;width:54px;height:54px;border-radius:50%;background:var(--accent);color:var(--accent-ink);border:0;font-size:28px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:6}
+.search{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin-bottom:8px}
+.filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;scrollbar-width:none}
+.filters button{white-space:nowrap;font-size:12.5px;padding:6px 10px;border-radius:999px}
+.filters button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10;display:none}
+.scrim.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:16px 16px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));z-index:11;transform:translateY(105%);transition:transform .2s ease}
+.sheet.open{transform:none}
+.sheet h3{margin:0 0 12px;font-size:17px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+textarea{min-height:70px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.statusgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.statusgrid button{text-align:left}
+.statusgrid button.on{outline:2px solid var(--accent);font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;overflow-wrap:anywhere}
+.toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:13.5px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+</style>
+</head>
+<body>
+<header><h1 id="hTitle">RD SK</h1><div class="sub" id="hSub"></div></header>
+<main id="view"></main>
+<button class="fab" id="fab" aria-label="Add submission">+</button>
+<nav id="nav">
+  <button data-tab="home" class="on"><span class="ic">◧</span>Dashboard</button>
+  <button data-tab="review"><span class="ic">⏳</span>Under review</button>
+  <button data-tab="papers"><span class="ic">▤</span>Papers</button>
+  <button data-tab="subs"><span class="ic">☰</span>Submissions</button>
+  <button data-tab="more"><span class="ic">⋯</span>More</button>
+</nav>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileIn" accept=".json,.xlsx,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+
+<script src="seed.js"></script>
+<script src="portals.js"></script>
+<script src="xlsx.full.min.js"></script>
+<script>
+"use strict";
+const STORE_KEY = "rdsk.state.v1";
+const STATUSES = ["Planned","Under review","Revision requested","Revision resubmitted","Rejected","Returned by office","Accepted","Withdrawn"];
+const OVERRIDES = ["","Closed – rejected","Parked","Published","Withdrawn"];
+const TYPES = ["Journal article","EPW / short piece","Book chapter","Other"];
+const CLOSED_STAGES = ["Parked","Closed – rejected","Withdrawn","Published"];
+
+/* ---------- storage ---------- */
+let S;
+function load(){
+  try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ S = JSON.parse(raw); } }catch(e){}
+  if(!S || !S.papers){ S = JSON.parse(JSON.stringify(window.RD_SEED)); persist(false); }
+  S.portals = S.portals || {}; S.settings = S.settings || {chaseDays:90};
+}
+function persist(touch=true){
+  if(touch) S.settings.lastUpdated = today();
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
+}
+function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/* ---------- dates ---------- */
+function today(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function dnum(s){ if(!s) return null; const [y,m,d]=s.split("-").map(Number); return Date.UTC(y,m-1,d)/864e5; }
+function daysBetween(a,b){ return dnum(b)-dnum(a); }
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmt(s){ if(!s) return "—"; const [y,m,d]=s.split("-"); return (+d)+" "+MON[+m-1]+" "+y; }
+
+/* ---------- calculations (mirror the workbook formulas) ---------- */
+const isSent = s => s.status && s.status!=="Planned";
+const isOpen = s => s.status==="Under review" || s.status==="Revision requested";
+function subsOf(pid){ return S.subs.filter(s=>s.paper===pid); }
+function paperById(id){ return S.papers.find(p=>p.id===id); }
+function paperStage(p){
+  if(p.override) return p.override;
+  const ss = subsOf(p.id);
+  if(ss.some(s=>s.status==="Accepted")) return "Accepted";
+  if(ss.some(s=>s.status==="Revision requested")) return "Revision due";
+  if(ss.some(s=>s.status==="Under review")) return "Under review";
+  if(ss.some(isSent)) return "Needs resubmission";
+  return "Not yet submitted";
+}
+function paperInfo(p){
+  const ss = subsOf(p.id), stage = paperStage(p);
+  let last=null; ss.forEach((s,i)=>{ if(isSent(s)&&s.submitted){ if(!last||s.submitted>=last.submitted) last=s; } });
+  let lastDec=""; ss.forEach(s=>{ if(s.decided && s.decided>lastDec) lastDec=s.decided; });
+  const next = ss.find(s=>s.status==="Planned");
+  const idle = stage==="Needs resubmission" && lastDec ? daysBetween(lastDec,today()) : null;
+  return {stage,last,lastDec,next,idle,sent:ss.filter(isSent).length,rejections:ss.filter(s=>s.status==="Rejected").length,subs:ss};
+}
+function subDays(s){
+  if(!s.submitted || !isSent(s)) return null;
+  return s.decided ? daysBetween(s.submitted,s.decided) : daysBetween(s.submitted,today());
+}
+function stageClass(st){
+  return {"Under review":"s-ur","Revision due":"s-rev","Revision requested":"s-rev","Revision resubmitted":"s-closed","Needs resubmission":"s-need","Rejected":"s-need","Returned by office":"s-warn","Not yet submitted":"s-not","Planned":"s-not","Accepted":"s-acc","Published":"s-acc"}[st] || "s-closed";
+}
+function chaseFlag(days){
+  const c = +S.settings.chaseDays || 90;
+  if(days==null) return "";
+  if(days>=2*c) return '<span class="chip s-need">Overdue: chase editor</span>';
+  if(days>=c) return '<span class="chip s-warn">Check status</span>';
+  return "";
+}
+
+/* ---------- journal portal links ---------- */
+function normJ(n){ return (n||"").toLowerCase().replace(/&/g,"and").replace(/\(.*?\)/g,"").replace(/-a$/,"").replace(/[^a-z0-9]+/g," ").trim(); }
+function portalFor(journal){
+  if(S.portals[journal]) return {url:S.portals[journal], src:"yours"};
+  const n = normJ(journal), map = window.RD_PORTALS||{};
+  if(map[n]) return {url:map[n], src:"built-in"};
+  if(/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(journal)) return {url:"https://"+journal, src:"built-in"};
+  return {url:"https://www.google.com/search?q="+encodeURIComponent(journal.replace(/-A$/,"")+" journal submit manuscript login"), src:"search"};
+}
+function openUrl(u){
+  if(window.Android && Android.openUrl) Android.openUrl(u); else window.open(u,"_blank");
+}
+
+/* ---------- ui helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),2200); }
+let tab="home", subFilter="Under review", paperFilter="Active", query="";
+function setTab(t){ tab=t; document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t)); render(); window.scrollTo(0,0); }
+function openSheet(html){ $("#sheet").innerHTML=html; $("#sheet").classList.add("open"); $("#scrim").classList.add("open"); $("#sheet").scrollTop=0; }
+function closeSheet(){ $("#sheet").classList.remove("open"); $("#scrim").classList.remove("open"); }
+$("#scrim").onclick=closeSheet;
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+$("#fab").onclick=()=>editSub(null);
+window.addEventListener("popstate",()=>{ if($("#sheet").classList.contains("open")) closeSheet(); });
+// Android back button → close sheet first, else go to dashboard, else exit.
+window.rdBack = function(){
+  if($("#sheet").classList.contains("open")){ closeSheet(); return true; }
+  if(tab!=="home"){ setTab("home"); return true; }
+  return false;
+};
+
+function subCard(s, opts={}){
+  const p = paperById(s.paper), d = subDays(s), open = s.status==="Under review"||s.status==="Revision requested";
+  const portal = portalFor(s.journal);
+  let acts = "";
+  if(open){
+    acts = `<div class="actions">
+      <button class="primary" data-act="portal" data-id="${s.id}">Open journal login ↗</button>
+      <button data-act="decide" data-id="${s.id}">Record decision</button></div>`;
+  }else if(s.status==="Planned" && opts.planActions!==false){
+    acts = `<div class="actions"><button data-act="submitnow" data-id="${s.id}">Mark submitted today</button>
+      <button class="ghost" data-act="portal" data-id="${s.id}">Journal site ↗</button></div>`;
+  }
+  return `<div class="card tap" data-act="editsub" data-id="${s.id}">
+    <div class="row"><div class="grow">
+      <div class="t">${esc(s.journal)}${s.rating?` <span class="m">· ${esc(s.rating)}</span>`:""}</div>
+      ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}</div>`}
+      <div class="m">${s.submitted?"Submitted "+fmt(s.submitted):""}${s.decided?" · decided "+fmt(s.decided):""}</div>
+      <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span> ${open?chaseFlag(d):""}
+      ${open&&portal.src==="search"?'<span class="chip s-closed">link: web search</span>':""}</div>
+    </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
+    ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
+    ${acts}</div>`;
+}
+function paperCard(p){
+  const i = paperInfo(p);
+  return `<div class="card tap" data-act="paper" data-id="${p.id}">
+    <div class="row"><div class="grow"><div class="t">${esc(p.key)}</div>
+      <div class="m">${i.last?"Last: "+esc(i.last.journal):"Never sent out"}${i.next?" · Next: "+esc(i.next.journal):""}</div>
+      <div style="margin-top:5px"><span class="chip ${stageClass(i.stage)}">${esc(i.stage)}</span>
+      <span class="m">${i.sent} sent · ${i.rejections} rejected</span></div></div>
+      ${i.idle!=null?`<div class="days" style="color:${i.idle>=180?"var(--need)":i.idle>=60?"var(--warn)":"inherit"}">${i.idle}<small>idle days</small></div>`:""}
+    </div></div>`;
+}
+
+/* ---------- views ---------- */
+function render(){
+  $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
+  $("#fab").style.display = (tab==="more")?"none":"block";
+  const v=$("#view");
+  if(tab==="home") v.innerHTML=viewHome();
+  else if(tab==="review") v.innerHTML=viewReview();
+  else if(tab==="papers") v.innerHTML=viewPapers();
+  else if(tab==="subs") v.innerHTML=viewSubs();
+  else v.innerHTML=viewMore();
+  bindSearch();
+}
+function stats(){
+  const infos = S.papers.map(p=>({p,...paperInfo(p)}));
+  const accepted = S.subs.filter(s=>s.status==="Accepted");
+  const accDays = accepted.map(subDays).filter(d=>d!=null);
+  return {
+    infos,
+    tracked: infos.filter(i=>!CLOSED_STAGES.includes(i.stage)).length,
+    waiting: infos.filter(i=>["Revision due","Needs resubmission","Not yet submitted"].includes(i.stage)).length,
+    under: infos.filter(i=>i.stage==="Under review").length,
+    revdue: infos.filter(i=>i.stage==="Revision due").length,
+    sent: S.subs.filter(isSent).length,
+    rejected: S.subs.filter(s=>s.status==="Rejected").length,
+    accepted: accepted.length,
+    accAvg: accDays.length?Math.round(accDays.reduce((a,b)=>a+b,0)/accDays.length):null,
+    openSubs: S.subs.filter(isOpen),
+  };
+}
+function viewHome(){
+  const st=stats();
+  const waitList = st.infos.filter(i=>["Revision due","Needs resubmission","Not yet submitted"].includes(i.stage))
+    .sort((a,b)=>score(b)-score(a));
+  function score(i){ return ({"Revision due":3000,"Needs resubmission":2000,"Not yet submitted":1000}[i.stage]) + Math.min(i.idle||0,999); }
+  const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
+  const stale = S.settings.lastUpdated ? daysBetween(S.settings.lastUpdated,today()) : null;
+  return `
+  ${stale!=null&&stale>=10?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
+  <div class="tiles">
+    <button class="tile" data-go="papers:Active"><b>${st.tracked}</b><span>Papers tracked</span><i>excl. closed/parked</i></button>
+    <button class="tile" data-go="papers:Waiting on you"><b>${st.waiting}</b><span>Waiting on you</span><i>to (re)submit/revise</i></button>
+    <button class="tile" data-go="review"><b>${st.under}</b><span>Under review</span><i>${st.openSubs.length} open submissions</i></button>
+    <button class="tile" data-go="papers:Revision due"><b>${st.revdue}</b><span>Revisions due</span><i>revise &amp; resubmit</i></button>
+    <button class="tile" data-go="subs:All sent"><b>${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
+    <button class="tile" data-go="subs:Accepted"><b>${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
+  </div>
+  <h2>Under review now <small>longest wait first</small></h2>
+  ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
+  <h2>Waiting on you <small>most urgent first</small></h2>
+  ${waitList.length?waitList.map(i=>paperCard(i.p)).join(""):'<div class="empty">Nothing waiting on you. 🎉</div>'}`;
+}
+function viewReview(){
+  const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
+  return `<div class="hint" style="margin:0 0 10px">Tap <b>Open journal login</b> to go straight to the journal's submission system. Wrong link? Tap the card → “Login link” to set your own.</div>
+  ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
+}
+function matches(txt){ return !query || txt.toLowerCase().includes(query.toLowerCase()); }
+function viewPapers(){
+  const F=["Active","Waiting on you","Under review","Revision due","Needs resubmission","Not yet submitted","Accepted","Closed","All"];
+  let list = S.papers.map(p=>({p,...paperInfo(p)}));
+  list = list.filter(i=>{
+    const st=i.stage;
+    if(paperFilter==="Active") return !CLOSED_STAGES.includes(st);
+    if(paperFilter==="Waiting on you") return ["Revision due","Needs resubmission","Not yet submitted"].includes(st);
+    if(paperFilter==="Closed") return CLOSED_STAGES.includes(st);
+    if(paperFilter==="All") return true;
+    return st===paperFilter;
+  }).filter(i=>matches(i.p.key+" "+i.p.title+" "+i.p.authors));
+  return `<input class="search" id="q" placeholder="Search papers…" value="${esc(query)}">
+  <div class="filters">${F.map(f=>`<button data-pf="${f}" class="${f===paperFilter?"on":""}">${f}</button>`).join("")}</div>
+  ${list.length?list.map(i=>paperCard(i.p)).join(""):'<div class="empty">No papers here.</div>'}
+  <div class="actions"><button data-act="newpaper">+ New paper</button></div>`;
+}
+function viewSubs(){
+  const F=["Under review","Planned","All sent","Rejected","Revision requested","Accepted","All"];
+  let list = S.subs.filter(s=>{
+    if(subFilter==="All") return true;
+    if(subFilter==="All sent") return isSent(s);
+    if(subFilter==="Under review") return isOpen(s);
+    return s.status===subFilter;
+  }).filter(s=>{ const p=paperById(s.paper); return matches(s.journal+" "+(p?p.key:"")+" "+s.notes); });
+  list.sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""));
+  return `<input class="search" id="q" placeholder="Search journal or paper…" value="${esc(query)}">
+  <div class="filters">${F.map(f=>`<button data-sf="${f}" class="${f===subFilter?"on":""}">${f}</button>`).join("")}</div>
+  <div class="m" style="margin-bottom:8px">${list.length} submission${list.length===1?"":"s"}</div>
+  ${list.length?list.map(s=>subCard(s)).join(""):'<div class="empty">No submissions here.</div>'}`;
+}
+function viewMore(){
+  return `
+  <h2>Settings</h2>
+  <div class="card">
+    <label for="chase">Chase editor after (days)</label>
+    <input id="chase" type="number" min="1" value="${esc(S.settings.chaseDays)}">
+    <div class="hint">Under-review submissions older than this are flagged “Check status”; at twice this they're “Overdue”.</div>
+  </div>
+  <h2>Backup &amp; Excel</h2>
+  <div class="card">
+    <div class="actions" style="margin-top:0">
+      <button class="primary" data-act="exportxlsx">Export to Excel (.xlsx)</button>
+      <button data-act="exportjson">Save backup (.json)</button>
+      <button data-act="sharejson">Share backup…</button>
+      <button data-act="import">Import .xlsx or .json</button>
+    </div>
+    <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Data lives only on this phone, so save a backup now and then (and before uninstalling). Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
+  </div>
+  <h2>Journal login links</h2>
+  <div class="card">
+    <div class="hint" style="margin-top:0">${Object.keys(S.portals).length} custom link(s) set. Each under-review card opens the journal's submission system; journals without a known link fall back to a web search. Set your own link from any submission's edit screen.</div>
+    ${Object.keys(S.portals).length?`<div class="actions"><button data-act="clearportals" class="danger">Clear my custom links</button></div>`:""}
+  </div>
+  <h2>Reset</h2>
+  <div class="card"><div class="actions" style="margin-top:0"><button class="danger" data-act="reset">Reset to the Excel data (20 Oct 2026)</button></div>
+  <div class="hint">Discards all changes made in the app.</div></div>
+  <div class="hint" style="text-align:center;margin:20px 0">RD SK · ${S.papers.length} papers · ${S.subs.length} submission rows</div>`;
+}
+function bindSearch(){
+  const q=$("#q"); if(!q) return;
+  q.oninput=()=>{ query=q.value; const pos=q.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(pos,pos); };
+  const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); toast("Saved"); };
+}
+
+/* ---------- click routing ---------- */
+document.addEventListener("click",e=>{
+  const go=e.target.closest("[data-go]");
+  if(go){ const [t,f]=go.dataset.go.split(":"); if(t==="papers"&&f) paperFilter=f; if(t==="subs"&&f) subFilter=f; query=""; setTab(t); return; }
+  const pf=e.target.closest("[data-pf]"); if(pf){ paperFilter=pf.dataset.pf; render(); return; }
+  const sf=e.target.closest("[data-sf]"); if(sf){ subFilter=sf.dataset.sf; render(); return; }
+  const a=e.target.closest("[data-act]"); if(!a) return;
+  const id=a.dataset.id, s=S.subs.find(x=>x.id===id);
+  switch(a.dataset.act){
+    case "portal": e.stopPropagation(); openUrl(portalFor(s.journal).url); break;
+    case "decide": e.stopPropagation(); decide(s); break;
+    case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); persist(); render(); toast("Marked under review · "+s.journal); break;
+    case "editsub": editSub(s); break;
+    case "paper": showPaper(paperById(id)); break;
+    case "newpaper": editPaper(null); break;
+    case "exportxlsx": exportXlsx(); break;
+    case "exportjson": saveFile("RD-SK-backup-"+today()+".json", JSON.stringify(S,null,1), "application/json"); break;
+    case "sharejson": shareText(JSON.stringify(S)); break;
+    case "import": $("#fileIn").click(); break;
+    case "clearportals": if(confirm("Remove all custom journal links?")){ S.portals={}; persist(); render(); } break;
+    case "reset": if(confirm("Reset everything to the Excel data? All changes made in the app will be lost.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); persist(false); render(); toast("Reset done"); } break;
+  }
+});
+
+/* ---------- sheets: decision ---------- */
+function decide(s){
+  const p=paperById(s.paper);
+  const opts=["Rejected","Revision requested","Accepted","Returned by office","Withdrawn","Under review"];
+  let pick=s.status;
+  openSheet(`<h3>Record decision <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="t">${esc(s.journal)}</div><div class="m">${esc(p.key)} · submitted ${fmt(s.submitted)}</div>
+    <label>Decision</label><div class="statusgrid" id="dg">${opts.map(o=>`<button data-o="${o}" class="${o===pick?"on":""}">${o}</button>`).join("")}</div>
+    <label for="dd">Date of decision</label><input type="date" id="dd" value="${s.decided||today()}">
+    <label for="dn">Notes</label><textarea id="dn">${esc(s.notes)}</textarea>
+    <div id="revhint" class="hint"></div>
+    <div class="actions"><button class="primary" id="dsave">Save</button></div>`);
+  const hint=()=>{ $("#revhint").textContent = pick==="Rejected" ? "The paper will move to “Needs resubmission”." + (paperInfo(p).next? " Next in queue: "+paperInfo(p).next.journal : "") : pick==="Revision requested" ? "The paper will show as “Revision due”. When you resubmit, use “Resubmit revision” on the paper." : ""; };
+  hint();
+  $("#dg").onclick=e=>{ const b=e.target.closest("[data-o]"); if(!b) return; pick=b.dataset.o; document.querySelectorAll("#dg button").forEach(x=>x.classList.toggle("on",x===b)); hint(); };
+  $("#dsave").onclick=()=>{
+    s.status=pick; s.decided = pick==="Under review" ? "" : ($("#dd").value||today()); s.notes=$("#dn").value.trim();
+    persist(); closeSheet(); render(); toast("Saved · "+pick);
+  };
+}
+
+/* ---------- sheets: submission edit ---------- */
+function journalOptions(){ return [...new Set(S.subs.map(s=>s.journal).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
+function editSub(s, presetPaper){
+  const isNew=!s;
+  s = s || {id:uid("s"), paper:presetPaper||"", journal:"", rating:"", status:"Under review", submitted:today(), decided:"", notes:"", titleUsed:""};
+  const papers=S.papers.slice().sort((a,b)=>a.key.localeCompare(b.key));
+  const portal = s.journal?portalFor(s.journal):null;
+  openSheet(`<h3>${isNew?"New submission":"Edit submission"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <label for="fp">Paper</label>
+    <select id="fp">${isNew&&!s.paper?'<option value="">— choose paper —</option>':""}${papers.map(p=>`<option value="${p.id}" ${p.id===s.paper?"selected":""}>${esc(p.key)}</option>`).join("")}</select>
+    <label for="fj">Journal</label><input id="fj" list="jl" value="${esc(s.journal)}" autocomplete="off">
+    <datalist id="jl">${journalOptions().map(j=>`<option value="${esc(j)}">`).join("")}</datalist>
+    <div class="two"><div><label for="fr">Rating / index</label><input id="fr" value="${esc(s.rating)}"></div>
+    <div><label for="fs">Status</label><select id="fs">${STATUSES.map(o=>`<option ${o===s.status?"selected":""}>${o}</option>`).join("")}</select></div></div>
+    <div class="two"><div><label for="fe">Date submitted</label><input type="date" id="fe" value="${esc(s.submitted)}"></div>
+    <div><label for="ff">Date of decision</label><input type="date" id="ff" value="${esc(s.decided)}"></div></div>
+    <label for="fn">Notes</label><textarea id="fn">${esc(s.notes)}</textarea>
+    <label for="ft">Title used (if retitled)</label><input id="ft" value="${esc(s.titleUsed)}">
+    <label for="fu">Login link for this journal</label><input id="fu" type="url" placeholder="https://…" value="${esc(S.portals[s.journal]||"")}">
+    <div class="hint" id="fuh">${portal?(portal.src==="yours"?"Using your link.":portal.src==="built-in"?"Built-in: "+esc(portal.url):"No known link yet: opens a web search. Paste the journal's login page here once you find it."):"Leave blank to use the built-in link or a web search."}</div>
+    <div class="actions"><button class="primary" id="fsave">Save</button>
+      ${s.journal?`<button id="fopen">Open journal login ↗</button>`:""}
+      ${isNew?"":`<button class="danger" id="fdel">Delete</button>`}</div>`);
+  if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
+  $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
+  $("#fsave").onclick=()=>{
+    const pid=$("#fp").value, j=$("#fj").value.trim();
+    if(!pid) return toast("Choose a paper"); if(!j) return toast("Enter a journal");
+    Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim(), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim()});
+    const u=$("#fu").value.trim();
+    if(u) S.portals[j]=/^https?:\/\//i.test(u)?u:"https://"+u; else delete S.portals[j];
+    if(isNew) S.subs.push(s);
+    persist(); closeSheet(); render(); toast(isNew?"Added":"Saved");
+  };
+  if($("#fdel")) $("#fdel").onclick=()=>{ if(confirm("Delete this submission row?")){ S.subs=S.subs.filter(x=>x!==s); persist(); closeSheet(); render(); } };
+}
+
+/* ---------- sheets: paper ---------- */
+function showPaper(p){
+  const i=paperInfo(p);
+  const ss=i.subs.slice().sort((a,b)=>{ const ka=a.status==="Planned"?"~":a.submitted||"", kb=b.status==="Planned"?"~":b.submitted||""; return kb.localeCompare(ka); });
+  const planned=i.subs.filter(s=>s.status==="Planned"), done=ss.filter(s=>s.status!=="Planned");
+  const revRow=i.subs.find(s=>s.status==="Revision requested");
+  openSheet(`<h3><span>${esc(p.key)}</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div><span class="chip ${stageClass(i.stage)}">${esc(i.stage)}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
+    <dl class="kv" style="margin-top:10px">
+      <dt>Title</dt><dd>${esc(p.title||"—")}</dd><dt>Authors</dt><dd>${esc(p.authors||"—")}</dd><dt>Type</dt><dd>${esc(p.type)}</dd>
+      <dt>Last tried</dt><dd>${i.last?esc(i.last.journal):"—"}</dd><dt>Last decision</dt><dd>${fmt(i.lastDec)}</dd>
+      <dt>Next in queue</dt><dd>${i.next?esc(i.next.journal):"—"}</dd><dt>Sent</dt><dd>${i.sent} · ${i.rejections} rejected</dd>
+      ${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}
+    </dl>
+    <div class="actions">
+      ${i.next&&i.stage!=="Under review"?`<button class="primary" id="pnext">Submit to ${esc(i.next.journal)} today</button>`:""}
+      ${revRow?`<button class="primary" id="prev">Resubmit revision today</button>`:""}
+      <button id="padd">+ Submission</button><button id="pedit">Edit paper</button></div>
+    <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
+    <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
+      <div style="display:flex;flex-direction:column;gap:4px"><button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">No journals queued.</div>'}`);
+  const sh=$("#sheet");
+  sh.onclick=e=>{
+    const mv=e.target.closest("[data-mv]"); if(!mv) return; e.stopPropagation();
+    const [sid,dir]=mv.dataset.mv.split(":"); movePlanned(p.id,sid,+dir); showPaper(p);
+  };
+  if($("#pnext")) $("#pnext").onclick=()=>{ const n=i.next; n.status="Under review"; n.submitted=today(); persist(); render(); showPaper(p); toast("Submitted to "+n.journal); };
+  if($("#prev")) $("#prev").onclick=()=>{ revRow.status="Revision resubmitted"; if(!revRow.decided) revRow.decided=today();
+    S.subs.push({id:uid("s"),paper:p.id,journal:revRow.journal,rating:revRow.rating,status:"Under review",submitted:today(),decided:"",notes:"Revised version resubmitted",titleUsed:""});
+    persist(); render(); showPaper(p); toast("Revision resubmitted"); };
+  $("#padd").onclick=()=>editSub(null,p.id);
+  $("#pedit").onclick=()=>editPaper(p);
+}
+function movePlanned(pid,sid,dir){
+  const idx=S.subs.map((s,k)=>[s,k]).filter(([s])=>s.paper===pid&&s.status==="Planned").map(([,k])=>k);
+  const pos=idx.findIndex(k=>S.subs[k].id===sid), other=idx[pos+dir]; if(other==null) return;
+  const a=idx[pos]; [S.subs[a],S.subs[other]]=[S.subs[other],S.subs[a]]; persist();
+}
+function editPaper(p){
+  const isNew=!p; p=p||{id:uid("p"),key:"",title:"",authors:"",type:"Journal article",override:"",notes:""};
+  openSheet(`<h3>${isNew?"New paper":"Edit paper"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <label for="pk">Short name (unique)</label><input id="pk" value="${esc(p.key)}">
+    <label for="pt">Current title</label><textarea id="pt">${esc(p.title)}</textarea>
+    <label for="pa">Authors</label><input id="pa" value="${esc(p.authors)}">
+    <div class="two"><div><label for="py">Type</label><select id="py">${TYPES.map(o=>`<option ${o===p.type?"selected":""}>${o}</option>`).join("")}</select></div>
+    <div><label for="po">Override</label><select id="po">${OVERRIDES.map(o=>`<option value="${o}" ${o===p.override?"selected":""}>${o||"(none – auto)"}</option>`).join("")}</select></div></div>
+    <label for="pn">Notes</label><textarea id="pn">${esc(p.notes)}</textarea>
+    <div class="actions"><button class="primary" id="psave">Save</button>${isNew?"":`<button class="danger" id="pdel">Delete paper</button>`}</div>`);
+  $("#psave").onclick=()=>{
+    const k=$("#pk").value.trim(); if(!k) return toast("Short name is required");
+    if(S.papers.some(x=>x!==p&&x.key.toLowerCase()===k.toLowerCase())) return toast("That short name is already used");
+    Object.assign(p,{key:k,title:$("#pt").value.trim(),authors:$("#pa").value.trim(),type:$("#py").value,override:$("#po").value,notes:$("#pn").value.trim()});
+    if(isNew) S.papers.push(p); persist(); render(); showPaper(p);
+  };
+  if($("#pdel")) $("#pdel").onclick=()=>{ const n=subsOf(p.id).length; if(confirm(`Delete “${p.key}” and its ${n} submission row(s)?`)){ S.papers=S.papers.filter(x=>x!==p); S.subs=S.subs.filter(s=>s.paper!==p.id); persist(); closeSheet(); render(); } };
+}
+
+/* ---------- files ---------- */
+function saveFile(name, content, mime, isBase64){
+  if(window.Android && Android.saveFile){ const r=Android.saveFile(name, content, mime, !!isBase64); toast(r); return; }
+  const blob = isBase64 ? new Blob([Uint8Array.from(atob(content),c=>c.charCodeAt(0))],{type:mime}) : new Blob([content],{type:mime});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); toast("Downloaded "+name);
+}
+function shareText(t){ if(window.Android && Android.shareText) Android.shareText("RD SK backup", t); else if(navigator.share) navigator.share({text:t}); else toast("Sharing not available"); }
+function exportXlsx(){
+  const pk=id=>(paperById(id)||{}).key||"";
+  const papers=S.papers.map(p=>{ const i=paperInfo(p); return {"Paper (short name, must be unique)":p.key,"Current title":p.title,"Authors":p.authors,"Type":p.type,"Override (optional)":p.override,"Stage":i.stage,"Last journal tried":i.last?i.last.journal:"","Last decision":i.lastDec,"Days idle":i.idle??"","Next journal in queue":i.next?i.next.journal:"","Submissions sent":i.sent,"Rejections":i.rejections,"Notes":p.notes}; });
+  const subs=S.subs.map(s=>({"Paper":pk(s.paper),"Journal":s.journal,"Rating / index":s.rating,"Status":s.status,"Date submitted":s.submitted,"Date of decision":s.decided,"Days":subDays(s)??"","Notes":s.notes,"Title used (if retitled)":s.titleUsed,"Login link":isOpen(s)?portalFor(s.journal).url:""}));
+  const toDates=(rows,cols)=>rows.map(r=>{ cols.forEach(c=>{ if(r[c]) r[c]=new Date(r[c]+"T00:00:00"); }); return r; });
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.json_to_sheet(toDates(papers,["Last decision"]),{dateNF:"d-mmm-yy"});
+  const ws2=XLSX.utils.json_to_sheet(toDates(subs,["Date submitted","Date of decision"]),{dateNF:"d-mmm-yy"});
+  ws1["!cols"]=[{wch:40},{wch:60},{wch:24},{wch:16},{wch:16},{wch:18},{wch:36},{wch:12},{wch:9},{wch:36},{wch:10},{wch:10},{wch:60}];
+  ws2["!cols"]=[{wch:40},{wch:44},{wch:14},{wch:18},{wch:12},{wch:12},{wch:7},{wch:50},{wch:40},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws1,"Papers"); XLSX.utils.book_append_sheet(wb,ws2,"Submissions");
+  const b64=XLSX.write(wb,{bookType:"xlsx",type:"base64"});
+  saveFile("RD-SK-"+today()+".xlsx", b64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", true);
+}
+$("#fileIn").onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=""; if(!f) return;
+  try{
+    let next;
+    if(/\.json$/i.test(f.name) || f.type==="application/json"){ next=JSON.parse(await f.text()); if(!next.papers||!next.subs) throw new Error("Not an RD SK backup"); }
+    else next=fromWorkbook(XLSX.read(await f.arrayBuffer(),{cellDates:true}));
+    if(!confirm(`Replace app data with ${next.papers.length} papers and ${next.subs.length} submissions from “${f.name}”?`)) return;
+    next.portals=Object.assign({}, S.portals, next.portals||{}); next.settings=Object.assign({}, S.settings, next.settings||{});
+    S=next; persist(); render(); toast("Imported");
+  }catch(err){ alert("Import failed: "+err.message); }
+};
+function fromWorkbook(wb){
+  const P=wb.Sheets["Papers"], Sub=wb.Sheets["Submissions"]; if(!P||!Sub) throw new Error("Workbook needs ‘Papers’ and ‘Submissions’ sheets");
+  const rows=sh=>XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:""}).slice(1);
+  const d=v=>{ if(v instanceof Date){ const x=new Date(v.getTime()+12*36e5); return x.getUTCFullYear()+"-"+String(x.getUTCMonth()+1).padStart(2,"0")+"-"+String(x.getUTCDate()).padStart(2,"0"); } if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); return ""; };
+  const str=v=>String(v??"").trim();
+  const papers=[], byKey={};
+  const add=(key,o={})=>{ if(byKey[key]) return byKey[key]; const id=uid("p"); papers.push(Object.assign({id,key,title:"",authors:"",type:"Journal article",override:"",notes:""},o)); byKey[key]=id; return id; };
+  rows(P).forEach(r=>{ const k=str(r[0]); if(k) add(k,{title:str(r[1]),authors:str(r[2]),type:str(r[3])||"Journal article",override:str(r[4]),notes:str(r[12])}); });
+  const subs=[];
+  rows(Sub).forEach(r=>{ const k=str(r[0]), j=str(r[1]); if(!k&&!j) return; subs.push({id:uid("s"),paper:add(k),journal:j,rating:str(r[2]),status:str(r[3])||"Planned",submitted:d(r[4]),decided:d(r[5]),notes:str(r[7]),titleUsed:str(r[8])}); });
+  return {version:1,settings:{},papers,subs,portals:{}};
+}
+
+load(); render();
+</script>
+</body>
+</html>
