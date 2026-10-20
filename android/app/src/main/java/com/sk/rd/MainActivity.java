@@ -114,7 +114,35 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Opens a URL in the user's web browser itself, skipping apps (like GitHub's) that claim the link. */
+    private void openInBrowser(String url) {
+        Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/"));
+        android.content.pm.ResolveInfo ri = getPackageManager().resolveActivity(probe, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        if (ri != null && ri.activityInfo != null && !"android".equals(ri.activityInfo.packageName)) {
+            i.setPackage(ri.activityInfo.packageName);
+        }
+        try {
+            startActivity(i);
+        } catch (ActivityNotFoundException e) {
+            openExternal(url);
+        }
+    }
+
     private class Bridge {
+        @JavascriptInterface
+        public void openInBrowser(String url) {
+            runOnUiThread(() -> MainActivity.this.openInBrowser(url));
+        }
+
+        @JavascriptInterface
+        public String getClipboard() {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm == null || !cm.hasPrimaryClip() || cm.getPrimaryClip().getItemCount() == 0) return "";
+            CharSequence s = cm.getPrimaryClip().getItemAt(0).coerceToText(MainActivity.this);
+            return s == null ? "" : s.toString();
+        }
+
         @JavascriptInterface
         public void openUrl(String url) {
             runOnUiThread(() -> openExternal(url));

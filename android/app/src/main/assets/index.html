@@ -179,6 +179,7 @@ function portalFor(journal){
   if(/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(journal)) return {url:"https://"+journal, src:"built-in"};
   return {url:"https://www.google.com/search?q="+encodeURIComponent(journal.replace(/-A$/,"")+" journal submit manuscript login"), src:"search"};
 }
+function openBrowser(u){ if(window.Android && Android.openInBrowser) Android.openInBrowser(u); else window.open(u,"_blank"); }
 function openUrl(u){
   if(window.Android && Android.openUrl) Android.openUrl(u); else window.open(u,"_blank");
 }
@@ -380,6 +381,9 @@ document.addEventListener("click",e=>{
     case "sharejson": shareText(JSON.stringify(S)); break;
     case "import": $("#fileIn").click(); break;
     case "ghsave": ghSaveSettings(); break;
+    case "ghpaste": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) { $("#ghtoken").value=c.trim(); toast("Pasted"); } else if(navigator.clipboard) navigator.clipboard.readText().then(t=>{$("#ghtoken").value=t.trim();},()=>toast("Long-press the box and choose Paste")); else toast("Long-press the box and choose Paste"); break; }
+    case "ghnewclassic": openBrowser("https://github.com/settings/tokens/new?scopes=repo&description="+encodeURIComponent("RD SK sync")); break;
+    case "ghnewfine": openBrowser("https://github.com/settings/personal-access-tokens/new?name="+encodeURIComponent("RD SK sync")+"&description="+encodeURIComponent("RD SK app: sync dashboard to "+GH.repo)+"&target_name="+encodeURIComponent(GH.repo.split("/")[0])+"&expires_in=365&contents=write"); break;
     case "ghsync": ghSync(false); break;
     case "ghpull": ghPull(); break;
     case "ghforget": if(confirm("Remove the GitHub token from this phone?")){ GH.token=""; ghStore(); render(); } break;
@@ -628,17 +632,29 @@ function ghCard(){
     <label for="ghrepo">Repository (owner/name)</label><input id="ghrepo" value="${esc(GH.repo)}" autocapitalize="off" autocorrect="off">
     <div class="two"><div><label for="ghbranch">Branch</label><input id="ghbranch" value="${esc(GH.branch)}" autocapitalize="off"></div>
     <div><label for="ghfolder">Folder</label><input id="ghfolder" value="${esc(GH.folder)}" autocapitalize="off"></div></div>
-    <label for="ghtoken">Access token ${on?"(saved)":""}</label><input id="ghtoken" type="password" placeholder="${on?"•••••••• (leave blank to keep)":"github_pat_…"}" autocapitalize="off" autocorrect="off">
+    ${on?"":`<div class="card" style="background:var(--accent-soft);border:0;margin-top:12px">
+      <div class="t">Get a token in 3 steps</div>
+      <div class="m" style="color:var(--ink)">1. Tap the button below. It opens GitHub in your <b>browser</b>, already filled in. Sign in if asked.<br>
+      2. Scroll down, tap <b>Generate token</b>, then <b>copy</b> the token (starts with <code>ghp_</code> or <code>github_pat_</code>).<br>
+      3. Come back here, tap <b>Paste</b>, then <b>Save &amp; test</b>.</div>
+      <div class="actions"><button class="primary" data-act="ghnewclassic">1. Create token on GitHub ↗</button></div>
+      <div class="hint">Page looks wrong or empty? In Chrome tap ⋮ → <b>Desktop site</b>. Prefer a token limited to just this repo? <button class="link" data-act="ghnewfine">Use a fine-grained token instead</button> (on that page choose <b>Only select repositories → ${esc(GH.repo.split("/")[1]||"")}</b>).</div>
+    </div>`}
+    <label for="ghtoken">Access token ${on?"(saved)":""}</label>
+    <div class="row"><input id="ghtoken" class="grow" type="password" placeholder="${on?"•••••••• (leave blank to keep)":"paste token here"}" autocapitalize="off" autocorrect="off"><button data-act="ghpaste">Paste</button></div>
     <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="ghauto" style="width:auto" ${GH.auto?"checked":""}> Sync automatically after each change</label>
-    <div class="actions"><button data-act="ghsave">Save settings</button>
+    <div class="actions"><button class="${on?"":"primary"}" data-act="ghsave">${on?"Save settings":"Save & test"}</button>
       ${on?`<button class="primary" data-act="ghsync">Sync now ↑</button><button data-act="ghpull">Load from GitHub ↓</button><button class="danger ghost" data-act="ghforget">Remove token</button>`:""}</div>
-    <div class="hint">Token: on github.com → Settings → Developer settings → Fine-grained tokens → Generate. Repository access: <b>only ${esc(GH.repo)}</b>; Permissions → <b>Contents: Read and write</b>. The token stays on this phone and is never included in exports or backups.</div>`;
+    <div class="hint">The token stays on this phone and is never included in exports, backups or synced files.</div>`;
 }
 function ghSaveSettings(){
   GH.repo=$("#ghrepo").value.trim().replace(/^https?:\/\/github\.com\//,"").replace(/\.git$/,"").replace(/\/$/,"");
   GH.branch=$("#ghbranch").value.trim()||"main"; GH.folder=$("#ghfolder").value.trim().replace(/^\/|\/$/g,"");
-  const t=$("#ghtoken").value.trim(); if(t) GH.token=t; GH.auto=$("#ghauto").checked; GH.lastError="";
-  ghStore(); render(); toast(GH.token?"Saved. Tap “Sync now” to test.":"Saved. Add a token to enable sync.");
+  const t=$("#ghtoken").value.replace(/\s+/g,"");
+  if(t && !/^(ghp_|github_pat_|gho_)[A-Za-z0-9_]{20,}$/.test(t)) return toast("That doesn't look like a GitHub token (it should start with ghp_ or github_pat_)");
+  const isNew=!!t; if(t) GH.token=t; GH.auto=$("#ghauto").checked; GH.lastError="";
+  ghStore(); render();
+  if(GH.token && isNew) ghSync(false); else toast(GH.token?"Saved":"Saved. Add a token to enable sync.");
 }
 function ghPath(name){ return (GH.folder?GH.folder+"/":"")+name; }
 // In the app, requests go through native code (no browser CORS rules); in a desktop browser, plain fetch.
@@ -676,7 +692,7 @@ async function ghSync(auto){
     const a=await ghPut("rdsk-backup.json", bytesToB64(u8), msg);
     const b=await ghPut("Research_Dashboard.xlsx", buildXlsxB64(), msg);
     GH.lastSync=new Date().toLocaleString(); GH.lastError=""; ghStore();
-    toast(a||b?"Synced to GitHub ✓":"Already up to date ✓");
+    toast(a||b?"Connected ✓ Synced to GitHub":"Connected ✓ Already up to date");
   }catch(err){ GH.lastError=err.message; ghStore(); toast("Sync failed: "+err.message); }
   ghBusy=false; if(tab==="more") render();
 }
