@@ -35,6 +35,7 @@ public class MainActivity extends Activity {
     private static final int PICK_FILE = 1, CHECK_STATUS = 5;
     private WebView web;
     private ValueCallback<Uri[]> pendingChooser;
+    private android.webkit.PermissionRequest pendingCamera;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,6 +66,19 @@ public class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
+            /** Camera for the in-app QR scanner. */
+            @Override
+            public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                runOnUiThread(() -> {
+                    if (checkSelfPermission(android.Manifest.permission.CAMERA) == 0) {
+                        request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    } else {
+                        pendingCamera = request;
+                        requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 4);
+                    }
+                });
+            }
+
             @Override
             public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams params) {
                 if (pendingChooser != null) pendingChooser.onReceiveValue(null);
@@ -100,6 +114,11 @@ public class MainActivity extends Activity {
         if (open != null) {
             intent.removeExtra("open");
             web.evaluateJavascript("window.rdOpen && rdOpen(" + JSONObject.quote(open) + ")", null);
+        }
+        if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null && "rdsk".equals(intent.getData().getScheme())) {
+            String link = intent.getDataString();
+            intent.setAction(null);
+            web.evaluateJavascript("window.rdSharedText && rdSharedText(" + JSONObject.quote(link) + ")", null);
         }
         if (Intent.ACTION_SEND.equals(intent.getAction())) {
             String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
@@ -138,6 +157,11 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == 4 && pendingCamera != null) {
+            if (results.length > 0 && results[0] == 0) pendingCamera.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            else pendingCamera.deny();
+            pendingCamera = null;
+        }
         web.evaluateJavascript("window.rdPermissionsChanged && rdPermissionsChanged()", null);
     }
 

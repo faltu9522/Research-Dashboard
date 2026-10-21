@@ -2,7 +2,7 @@
 
 A phone app for tracking paper submissions, built from the *Research Dashboard* Excel workbook.
 
-**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~60 KB), open it and allow
+**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~120 KB), open it and allow
 "Install unknown apps" for your browser/file manager when asked.
 
 ## What it does
@@ -28,6 +28,10 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   changes. Passwords are never stored by the app.
 - **Update from an email** – share a journal email (or selected text) to RD SK, or tap *Paste an editor's
   email*: the app matches the submission (manuscript ID, journal, title) and guesses the outcome for you to confirm.
+- **📷 Scan QR / add from links** – `excel/RD-SK-New-Submissions.xlsx` (laptop) builds an `rdsk://add?…` link and a
+  QR code for each new submission; scan it in the app, or send the *Send to phone* sheet's links to yourself and
+  Share → RD SK to add many at once. Same paper + journal updates the existing row.
+- **🔗 Set login link** – for journals without a built-in login page, with a *Find it* search helper.
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 

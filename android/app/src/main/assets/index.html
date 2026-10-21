@@ -174,7 +174,7 @@ function paperInfo(p){
 }
 function subDays(s){
   if(!s.submitted || !isSent(s)) return null;
-  return s.decided ? daysBetween(s.submitted,s.decided) : daysBetween(s.submitted,today());
+  return Math.max(0, s.decided ? daysBetween(s.submitted,s.decided) : daysBetween(s.submitted,today()));
 }
 function stageClass(st){
   return {"Under review":"s-ur","Revision due":"s-rev","Revision requested":"s-rev","Revision resubmitted":"s-closed","Needs resubmission":"s-need","Rejected":"s-need","Returned by office":"s-warn","Not yet submitted":"s-not","Planned":"s-not","Accepted":"s-acc","Published":"s-acc"}[st] || "s-closed";
@@ -240,7 +240,7 @@ function subCard(s, opts={}){
       ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}${p&&p.authors?" · "+esc(p.authors):""}</div>`}
       <div class="m">${s.submitted?"Submitted "+fmt(s.submitted):""}${s.decided?" · decided "+fmt(s.decided):""}</div>
       <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span> ${open?chaseFlag(d):""}
-      ${open&&portal.src==="search"?'<span class="chip s-closed">link: web search</span>':""}</div>
+      ${(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
     ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
@@ -314,7 +314,7 @@ function viewHome(){
 function viewReview(){
   const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   return `<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
-  <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an editor's email</button></div>
+  <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an email</button><button data-act="scanqr" style="flex:1">📷 Scan QR</button></div>
   <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app. Sign in by tapping the user ID box and choosing your saved login from Google Password Manager; the app then opens your submitted manuscripts, reads every paper's status (both papers when a journal has two) and moves to the next journal. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
 }
@@ -408,8 +408,10 @@ document.addEventListener("click",e=>{
     case "decide": e.stopPropagation(); decide(s); break;
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
+    case "setlink": e.stopPropagation(); setLinkSheet(s.journal); break;
+    case "scanqr": scanSheet(); break;
     case "ghrepo": openBrowser("https://github.com/"+(GH.repo||"faltu9522/Research-Dashboard")); break;
-    case "pasteemail": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c.trim()) emailSheet(c); else if(navigator.clipboard) navigator.clipboard.readText().then(t=>t.trim()?emailSheet(t):emailSheet(""),()=>emailSheet("")); else emailSheet(""); break; }
+    case "pasteemail": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(/rdsk:\/\/add\?/i.test(c)) addLinksSheet(c); else if(c.trim()) emailSheet(c); else if(navigator.clipboard) navigator.clipboard.readText().then(t=>t.trim()?emailSheet(t):emailSheet(""),()=>emailSheet("")); else emailSheet(""); break; }
     case "testnotif": if(window.Android&&Android.testReminder){ if(!Android.notificationsAllowed()) { askNotifications(true); toast("Allow notifications for RD SK first"); } else { Android.testReminder(); toast("Test notification sent"); } } else toast("Works in the phone app"); break;
     case "asknotif": askNotifications(true); break;
     case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); persist(); render(); toast("Marked under review · "+s.journal); break;
@@ -460,7 +462,7 @@ function editSub(s, presetPaper){
   s = s || {id:uid("s"), paper:presetPaper||"", journal:"", rating:"", status:"Under review", submitted:today(), decided:"", notes:"", titleUsed:""};
   const papers=S.papers.slice().sort((a,b)=>a.key.localeCompare(b.key));
   const portal = s.journal?portalFor(s.journal):null;
-  openSheet(`<h3>${isNew?"New submission":"Edit submission"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+  openSheet(`<h3>${isNew?"New submission":"Edit submission"} <span>${isNew?`<button data-act="scanqr">📷 Scan QR</button> `:""}<button class="ghost" onclick="closeSheet()">✕</button></span></h3>
     <label for="fp">Paper</label>
     <select id="fp">${isNew&&!s.paper?'<option value="">— choose paper —</option>':""}${papers.map(p=>`<option value="${p.id}" ${p.id===s.paper?"selected":""}>${esc(p.key)}</option>`).join("")}</select>
     <label for="fj">Journal</label><input id="fj" list="jl" value="${esc(s.journal)}" autocomplete="off">
@@ -481,6 +483,10 @@ function editSub(s, presetPaper){
       ${!isNew&&s.status==="Under review"?`<button id="fchase">✉ Email editor</button>`:""}
       ${isNew?"":`<button class="danger" id="fdel">Delete</button>`}</div>`);
   if($("#fchase")) $("#fchase").onclick=()=>chaseEmail(s);
+  const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); if(!j) return; const po=portalFor(j);
+    $("#fuh").innerHTML = u?"Using your link.":po.src==="built-in"?"✓ Found automatically: "+esc(po.url):po.src==="yours"?"Using your saved link: "+esc(po.url):`Not known yet: <button class="link" id="ffind">Find it ↗</button>, copy the login page address, then paste it above.`;
+    const f=$("#ffind"); if(f) f.onclick=()=>openBrowser(findLinkUrl(j)); };
+  $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
   $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
   $("#fsave").onclick=()=>{
@@ -797,8 +803,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="1.8", APP_BUILD="21 Oct 2026";
+const APP_VERSION="1.9", APP_BUILD="21 Oct 2026";
 const CHANGELOG=[
+  ["1.9","21 Oct 2026",["📷 QR scanner: scan a code from the laptop Excel file to add submissions","Paste or share RD SK links to add many submissions at once","🔗 Set login link with a Find it helper for journals the app doesn't know","Status check lists journals that still need a login link"]],
   ["1.8","21 Oct 2026",["Status check opens your submitted-manuscripts list by itself and moves to the next journal once every paper is found","Journals with two papers (e.g. Organization) update both","Google Password Manager can fill journal logins in the app's browser","Status history kept for each submission"]],
   ["1.7","21 Oct 2026",["About section with version details and this history"]],
   ["1.6","21 Oct 2026",["Check all statuses on journal sites (sign in yourself; status read from your Author Dashboard)","Update a submission from an editor's email (share or paste)"]],
@@ -836,6 +843,104 @@ function aboutCard(){
   <div class="hint" style="text-align:center;margin:16px 0 24px">RD SK ${esc(ver)} · made for SK's research</div>`;
 }
 
+/* ---------- journal login link helper ---------- */
+function findLinkUrl(j){ return "https://www.google.com/search?q="+encodeURIComponent('"'+j.replace(/-A$/,"")+'" submit manuscript (manuscriptcentral OR editorialmanager OR "submission portal")'); }
+function setLinkSheet(journal){
+  const po=portalFor(journal);
+  openSheet(`<h3>Login link <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="t">${esc(journal)}</div>
+    <div class="m">${po.src==="search"?"No login page known yet.":"Current: "+esc(po.url)}</div>
+    <div class="actions"><button class="primary" id="lfind">1. Find it ↗</button></div>
+    <div class="hint">Opens a search. Open the journal's submission site, copy its address, and come back.<br>ScholarOne sites look like <b>mc.manuscriptcentral.com/…</b>, Editorial Manager like <b>www.editorialmanager.com/…</b></div>
+    <label for="lurl">2. Login page address</label>
+    <div class="row"><input id="lurl" class="grow" type="url" placeholder="https://…" value="${esc(S.portals[journal]||"")}"><button id="lpaste">Paste</button></div>
+    <div class="actions"><button class="primary" id="lsave">Save</button>${S.portals[journal]?`<button class="danger" id="lclear">Remove</button>`:""}</div>`);
+  $("#lfind").onclick=()=>openBrowser(findLinkUrl(journal));
+  $("#lpaste").onclick=()=>{ const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#lurl").value=c.trim(); else toast("Long-press the box and choose Paste"); };
+  $("#lsave").onclick=()=>{ let u=$("#lurl").value.trim(); if(!u) return toast("Paste the address first"); if(!/^https?:\/\//i.test(u)) u="https://"+u;
+    S.portals[journal]=u; persist(false); closeSheet(); render(); toast("Login link saved for "+journal); };
+  if($("#lclear")) $("#lclear").onclick=()=>{ delete S.portals[journal]; persist(false); closeSheet(); render(); };
+}
+
+/* ---------- add submissions from rdsk:// links (QR code, share, paste) ---------- */
+// rdsk://add?p=<paper short name>&j=<journal>&s=<status>&d=<yyyy-mm-dd>&r=<rating>&m=<manuscript id>&n=<notes>&t=<paper title>&a=<authors>&l=<login link>&f=<decision date>
+function parseAddLinks(text){
+  return (String(text).match(/rdsk:\/\/add\?[^\s"'<>]+/gi)||[]).map(u=>{
+    const q=new URLSearchParams(u.slice(u.indexOf("?")+1)), g=k=>(q.get(k)||"").trim();
+    const st=STATUSES.find(x=>x.toLowerCase()===g("s").toLowerCase())||(g("d")?"Under review":"Planned");
+    const date=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)?v:"";
+    return {paper:g("p"), journal:g("j"), status:st, submitted:date(g("d")), decided:date(g("f")), rating:g("r"), msid:g("m"), notes:g("n"), title:g("t"), authors:g("a"), link:g("l")};
+  }).filter(e=>e.paper&&e.journal);
+}
+function findPaper(name){ const k=name.trim().toLowerCase(); return S.papers.find(p=>p.key.toLowerCase()===k)||S.papers.find(p=>p.title&&p.title.toLowerCase()===k); }
+function existingSub(e,p){ return p&&S.subs.find(s=>s.paper===p.id&&((e.msid&&s.msid&&baseId(s.msid)===baseId(e.msid))||(normJ(s.journal)===normJ(e.journal)&&(s.status==="Planned"||s.status===e.status||(isOpen(s)&&e.status!=="Planned"&&s.submitted===e.submitted))))); }
+function addLinksSheet(text){
+  const list=parseAddLinks(text);
+  if(!list.length) return toast("No RD SK entries found in that text");
+  const rows=list.map(e=>{ const p=findPaper(e.paper), ex=existingSub(e,p); return {e,p,ex}; });
+  openSheet(`<h3>Add ${list.length} submission${list.length===1?"":"s"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    ${rows.map((r,i)=>`<label style="display:flex;gap:10px;align-items:flex-start;text-transform:none;letter-spacing:0;color:var(--ink);font-size:14px" class="card">
+      <input type="checkbox" data-i="${i}" checked style="width:auto;margin-top:3px">
+      <span><b>${esc(r.e.journal)}</b>${r.e.rating?` · ${esc(r.e.rating)}`:""}<br><span class="m">${esc(r.e.paper)}${r.p?"":' <span class="chip s-warn">new paper</span>'}</span><br>
+      <span class="chip ${stageClass(r.e.status)}">${esc(r.e.status)}</span> <span class="m">${r.e.submitted?fmt(r.e.submitted):""}${r.e.msid?" · "+esc(r.e.msid):""}</span>
+      ${r.ex?`<br><span class="m">Updates the existing “${esc(r.ex.status)}” row</span>`:""}</span></label>`).join("")}
+    <div class="actions"><button class="primary" id="aadd">Add</button></div>`);
+  $("#aadd").onclick=()=>{
+    let n=0;
+    rows.forEach((r,i)=>{ if(!document.querySelector(`[data-i="${i}"]`).checked) return;
+      const e=r.e; let p=findPaper(e.paper);
+      if(!p){ p={id:uid("p"),key:e.paper,title:e.title,authors:e.authors,type:"Journal article",override:"",notes:""}; S.papers.push(p); }
+      else { if(e.title&&!p.title) p.title=e.title; if(e.authors&&!p.authors) p.authors=e.authors; }
+      const fields={journal:e.journal,status:e.status,submitted:e.submitted,decided:e.decided};
+      if(e.rating) fields.rating=e.rating; if(e.msid) fields.msid=e.msid;
+      const ex=existingSub(e,p);
+      if(ex){ Object.assign(ex,fields); if(e.notes) ex.notes=ex.notes?ex.notes+" | "+e.notes:e.notes; }
+      else S.subs.push(Object.assign({id:uid("s"),paper:p.id,rating:"",notes:e.notes,titleUsed:"",msid:""},fields));
+      if(e.link) S.portals[e.journal]=/^https?:\/\//i.test(e.link)?e.link:"https://"+e.link;
+      n++; });
+    persist(); closeSheet(); subFilter="All"; render(); toast(n+" submission"+(n===1?"":"s")+" added");
+  };
+}
+
+/* ---------- QR scanner (camera, or a photo of the code) ---------- */
+let scanStream=null, scanTimer=null;
+function loadJsQR(){ return window.jsQR?Promise.resolve():new Promise((ok,bad)=>{ const sc=document.createElement("script"); sc.src="jsQR.min.js"; sc.onload=ok; sc.onerror=bad; document.head.appendChild(sc); }); }
+function stopScan(){ clearInterval(scanTimer); scanTimer=null; if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } }
+function gotCode(text){
+  stopScan();
+  if(/rdsk:\/\/add\?/i.test(text)) addLinksSheet(text);
+  else { closeSheet(); alert("This QR code isn't an RD SK entry:\n\n"+text.slice(0,300)); }
+}
+function decodeCanvas(cv){ const ctx=cv.getContext("2d",{willReadFrequently:true}), im=ctx.getImageData(0,0,cv.width,cv.height); const r=window.jsQR&&jsQR(im.data,im.width,im.height,{inversionAttempts:"attemptBoth"}); return r&&r.data; }
+async function scanSheet(){
+  openSheet(`<h3>Scan QR code <button class="ghost" id="qclose">✕</button></h3>
+    <div style="position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:1/1"><video id="qv" playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+      <div style="position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:16px"></div></div>
+    <div class="hint" id="qmsg">Starting camera…</div>
+    <div class="actions"><button id="qphoto">🖼 Scan from a photo / screenshot</button></div>
+    <input type="file" id="qfile" accept="image/*" hidden>
+    <div class="hint">Make QR codes on your laptop with the <b>RD SK New Submissions</b> Excel file.</div>`);
+  $("#qclose").onclick=()=>{ stopScan(); closeSheet(); };
+  $("#scrim").addEventListener("click",stopScan,{once:true});
+  $("#qphoto").onclick=()=>$("#qfile").click();
+  $("#qfile").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; await loadJsQR();
+    const img=new Image(); img.onload=()=>{ const cv=document.createElement("canvas"), k=Math.min(1,1600/Math.max(img.width,img.height)); cv.width=img.width*k; cv.height=img.height*k; cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+      const t=decodeCanvas(cv); if(t) gotCode(t); else toast("No QR code found in that picture"); }; img.src=URL.createObjectURL(f); };
+  try{
+    await loadJsQR();
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+    const v=$("#qv"); v.srcObject=scanStream; await v.play();
+    $("#qmsg").textContent="Point the camera at the QR code.";
+    const det=("BarcodeDetector" in window)?new BarcodeDetector({formats:["qr_code"]}):null, cv=document.createElement("canvas");
+    scanTimer=setInterval(async()=>{
+      if(!v.videoWidth) return;
+      try{ if(det){ const r=await det.detect(v); if(r.length) return gotCode(r[0].rawValue); } }catch(e){}
+      const k=Math.min(1,720/v.videoWidth); cv.width=v.videoWidth*k; cv.height=v.videoHeight*k; cv.getContext("2d",{willReadFrequently:true}).drawImage(v,0,0,cv.width,cv.height);
+      const t=decodeCanvas(cv); if(t) gotCode(t);
+    },300);
+  }catch(err){ $("#qmsg").innerHTML="Camera not available ("+esc(err.message||err.name)+"). Allow camera access for RD SK, or scan from a photo."; }
+}
+
 /* ---------- live status from journal sites ---------- */
 const DECISION_WORDS=/\b(reject|declin|accept|revis|decision (letter|made|sent)|unsubmitted|withdrawn)/i;
 const KNOWN_STATUS=["Awaiting Reviewer Selection","Awaiting Reviewer Invitation","Awaiting Reviewer Assignment","Awaiting Reviewer Scores","Awaiting Reviewer Score","Awaiting AE Recommendation","Awaiting EIC Decision","Awaiting Editor Decision","Awaiting Admin Processing","Awaiting Admin Checklist","Awaiting Decision","Decision in Process","Decision Letter Being Prepared","Required Reviews Completed","Reviews Completed","Under Review","Reviewers Assigned","Reviewer(s) Invited","Reviewers Invited","With Editor","Editor Assigned","Editor Invited","Submitted to Journal","With Journal Administrator","Revise","Major Revision","Minor Revision","Reject","Accept","Unsubmitted","Withdrawn"];
@@ -860,7 +965,7 @@ function checkAllStatuses(){
 window.rdStatusResults=json=>{
   let res={}; try{ res=JSON.parse(json); }catch(e){}
   const report=[], byUrl={};
-  S.subs.filter(isOpen).forEach(s=>{ const po=portalFor(s.journal); if(po.src!=="search") (byUrl[po.url]=byUrl[po.url]||[]).push(s); });
+  S.subs.filter(isOpen).forEach(s=>{ const po=portalFor(s.journal); if(po.src!=="search") (byUrl[po.url]=byUrl[po.url]||[]).push(s); else report.push({s,found:false,nolink:true}); });
   Object.entries(byUrl).forEach(([url,subs])=>{
     const r=res[url];
     if(!r||!r.rows||!r.rows.length){ subs.forEach(s=>report.push({s,found:false,visited:!!r})); return; }
@@ -895,6 +1000,7 @@ window.rdStatusResults=json=>{
     ${report.map(x=>{ const p=paperById(x.s.paper)||{}; return `<div class="card"><div class="t">${esc(x.s.journal)}</div><div class="m">${esc(p.key||"")}</div>
       ${x.found?`<div style="margin-top:6px">🌐 <b>${esc(x.text)}</b> ${x.changed?`<span class="chip s-warn">🔔 was ${esc(x.prev)}</span>`:""}</div>
         ${x.decision?`<div class="actions"><button data-act="decide" data-id="${x.s.id}">Looks like a decision: record it</button></div>`:""}`
+      :x.nolink?`<div class="actions"><button data-act="setlink" data-id="${x.s.id}">🔗 No login link yet: set it</button></div>`
       :`<div class="m" style="margin-top:6px">${x.visited?"Not found on the pages you opened. Open the list of submitted manuscripts and try again.":"Skipped."}</div>`}</div>`; }).join("")}`);
 };
 
@@ -922,7 +1028,7 @@ function matchSubmission(t){
   });
   return {sub:bs>=20?best:null, msid:idm?idm[0]:""};
 }
-window.rdSharedText=t=>{ closeSheet(); setTab("review"); emailSheet(t); };
+window.rdSharedText=t=>{ closeSheet(); if(/rdsk:\/\/add\?/i.test(t)){ setTab("subs"); addLinksSheet(t); return; } setTab("review"); emailSheet(t); };
 function emailSheet(text){
   const m=text?matchSubmission(text):{sub:null,msid:""}, outcome=text?guessOutcome(text):"";
   const subs=S.subs.slice().sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
@@ -937,7 +1043,7 @@ function emailSheet(text){
     <label for="em">Manuscript ID</label><input id="em" value="${esc(m.msid)}">
     <div class="hint">${text?(m.sub?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it."):"Paste the email, then tap Read email again."}</div>
     <div class="actions"><button class="primary" id="esave">Save update</button></div>`);
-  $("#ere").onclick=()=>emailSheet($("#et").value);
+  $("#ere").onclick=()=>{ const v=$("#et").value; if(/rdsk:\/\/add\?/i.test(v)) addLinksSheet(v); else emailSheet(v); };
   $("#esave").onclick=()=>{
     const s=S.subs.find(x=>x.id===$("#es").value); if(!s) return toast("Choose the submission");
     const st=$("#eo").value, d=$("#ed").value||today();
