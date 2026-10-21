@@ -254,6 +254,14 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void copyText(String text) {
+            runOnUiThread(() -> {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("RD SK", text));
+            });
+        }
+
+        @JavascriptInterface
         public String getClipboard() {
             android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (cm == null || !cm.hasPrimaryClip() || cm.getPrimaryClip().getItemCount() == 0) return "";
@@ -275,29 +283,45 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> startActivity(Intent.createChooser(i, subject)));
         }
 
-        /** Calls the GitHub API off the UI thread and reports back via window.rdHttpDone(id, status, body). */
+        /**
+         * Calls the GitHub API or the Google Sheets script off the UI thread and reports back via
+         * window.rdHttpDone(id, status, body). Redirects are followed by hand: Apps Script answers a POST with a
+         * redirect to the result, which must be fetched with GET.
+         */
         @JavascriptInterface
         public void httpAsync(String id, String method, String url, String token, String body) {
             new Thread(() -> {
                 int status = 0;
                 String text;
                 try {
-                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                    c.setRequestMethod(method);
-                    c.setConnectTimeout(20000);
-                    c.setReadTimeout(30000);
-                    c.setUseCaches(false);
-                    c.setRequestProperty("Authorization", "Bearer " + token);
-                    c.setRequestProperty("Accept", "application/vnd.github+json");
-                    c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
-                    if (body != null && !body.isEmpty()) {
-                        c.setDoOutput(true);
-                        c.setRequestProperty("Content-Type", "application/json");
-                        try (OutputStream os = c.getOutputStream()) {
-                            os.write(body.getBytes(StandardCharsets.UTF_8));
+                    HttpURLConnection c = null;
+                    String target = url, verb = method;
+                    for (int hop = 0; hop < 6; hop++) {
+                        c = (HttpURLConnection) new URL(target).openConnection();
+                        c.setInstanceFollowRedirects(false);
+                        c.setRequestMethod(verb);
+                        c.setConnectTimeout(20000);
+                        c.setReadTimeout(60000);
+                        c.setUseCaches(false);
+                        if (token != null && !token.isEmpty()) {
+                            c.setRequestProperty("Authorization", "Bearer " + token);
+                            c.setRequestProperty("Accept", "application/vnd.github+json");
+                            c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
                         }
+                        if (hop == 0 && body != null && !body.isEmpty()) {
+                            c.setDoOutput(true);
+                            c.setRequestProperty("Content-Type", "application/json");
+                            try (OutputStream os = c.getOutputStream()) {
+                                os.write(body.getBytes(StandardCharsets.UTF_8));
+                            }
+                        }
+                        status = c.getResponseCode();
+                        String next = c.getHeaderField("Location");
+                        if (status < 300 || status >= 400 || next == null) break;
+                        target = new URL(new URL(target), next).toString();
+                        if (status != 307 && status != 308) verb = "GET";
+                        c.disconnect();
                     }
-                    status = c.getResponseCode();
                     InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
                     ByteArrayOutputStream buf = new ByteArrayOutputStream();
                     if (in != null) {

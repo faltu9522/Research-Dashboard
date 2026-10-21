@@ -32,6 +32,12 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   QR code for each new submission; scan it in the app, or send the *Send to phone* sheet's links to yourself and
   Share → RD SK to add many at once. Same paper + journal updates the existing row.
 - **🔗 Set login link** – for journals without a built-in login page, with a *Find it* search helper.
+- **Google Sheets sync (two-way)** – put the workbook in Google Sheets, paste `google-sheets/RD-SK-sync.gs` into
+  *Extensions → Apps Script*, deploy it as a web app (Execute as: Me, Access: Anyone) and paste its URL into
+  *More → Google Sheets sync*. The app writes only the input columns (plus Manuscript ID, journal-site status and
+  ID/Updated columns at the right); formulas and the Dashboard tab are untouched. Newest edit wins per row.
+  `android/app/src/main/assets/gscript.js` embeds the same script for the in-app *Copy the script* button
+  (regenerate it if you change the .gs file).
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 

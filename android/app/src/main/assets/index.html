@@ -120,6 +120,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 
 <script src="seed.js"></script>
 <script src="portals.js"></script>
+<script src="gscript.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -140,6 +141,7 @@ function persist(touch=true){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
   if(touch) scheduleAutoSync();
   pushReminders();
+  if(trackChanges()) gsSchedule();
 }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -371,6 +373,8 @@ function viewMore(){
     </div>
     <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Data lives only on this phone, so save a backup now and then (and before uninstalling). Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
   </div>
+  <h2>Google Sheets sync</h2>
+  <div class="card">${gsCard()}</div>
   <h2>Sync to GitHub</h2>
   <div class="card">${ghCard()}</div>
   <h2>Journal login links</h2>
@@ -387,6 +391,7 @@ function viewMore(){
 function bindMore(){
   const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); render(); toast("Saved"); };
   const n=$("#myname"); if(n) n.onchange=()=>{ S.settings.myName=n.value.trim(); persist(false); toast("Saved"); };
+  const ga=$("#gsauto"); if(ga) ga.onchange=()=>{ GS.auto=ga.checked; gsStore(); };
   const r=$("#remind"); if(r) r.onchange=()=>{ S.settings.reminders=r.checked; persist(false); if(r.checked) askNotifications(); render(); };
 }
 function bindSearch(){
@@ -408,6 +413,12 @@ document.addEventListener("click",e=>{
     case "decide": e.stopPropagation(); decide(s); break;
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
+    case "gscopy": if(window.Android&&Android.copyText){ Android.copyText(window.RD_GSCRIPT||""); toast("Script copied"); } else { navigator.clipboard&&navigator.clipboard.writeText(window.RD_GSCRIPT||""); toast("Script copied"); } break;
+    case "gsshare": shareText(window.RD_GSCRIPT||""); break;
+    case "gsconnect": gsConnect(); break;
+    case "gssync": gsSync("normal",true); break;
+    case "gsforget": if(confirm("Disconnect Google Sheets? Your data stays on the phone and in the sheet.")){ GS.url=""; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
+    case "gspaste": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#gsurl").value=c.trim(); else toast("Long-press the box and choose Paste"); break; }
     case "setlink": e.stopPropagation(); setLinkSheet(s.journal); break;
     case "scanqr": scanSheet(); break;
     case "ghrepo": openBrowser("https://github.com/"+(GH.repo||"faltu9522/Research-Dashboard")); break;
@@ -430,7 +441,7 @@ document.addEventListener("click",e=>{
     case "ghpull": ghPull(); break;
     case "ghforget": if(confirm("Remove the GitHub token from this phone?")){ GH.token=""; ghStore(); render(); } break;
     case "clearportals": if(confirm("Remove all custom journal links?")){ S.portals={}; persist(); render(); } break;
-    case "reset": if(confirm("Reset everything to the Excel data? All changes made in the app will be lost.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); persist(false); render(); toast("Reset done"); } break;
+    case "reset": if(confirm("Reset everything to the Excel data? All changes made in the app will be lost.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); trackPaused=true; persist(false); trackPaused=false; baseline(); render(); toast("Reset done"); } break;
   }
 });
 
@@ -656,7 +667,7 @@ $("#fileIn").onchange=async e=>{
     else next=fromWorkbook(await readWorkbook(await f.arrayBuffer()));
     if(!confirm(`Replace app data with ${next.papers.length} papers and ${next.subs.length} submissions from “${f.name}”?`)) return;
     next.portals=Object.assign({}, S.portals, next.portals||{}); next.settings=Object.assign({}, S.settings, next.settings||{});
-    S=next; persist(); render(); toast("Imported");
+    S=next; trackPaused=true; persist(); trackPaused=false; baseline(); if(GS.url){ GS.lastSync=0; gsStore(); } render(); toast("Imported"+(GS.url?" · Google Sheet unchanged until you choose Sync now":""));
   }catch(err){ alert("Import failed: "+err.message); }
 };
 function fromWorkbook(wb){
@@ -803,8 +814,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="1.9", APP_BUILD="21 Oct 2026";
+const APP_VERSION="2.0", APP_BUILD="21 Oct 2026";
 const CHANGELOG=[
+  ["2.0","21 Oct 2026",["Google Sheets sync, both ways: edit on the laptop or the phone and both stay in step","Newest edit wins when the same row changed in both places"]],
   ["1.9","21 Oct 2026",["📷 QR scanner: scan a code from the laptop Excel file to add submissions","Paste or share RD SK links to add many submissions at once","🔗 Set login link with a Find it helper for journals the app doesn't know","Status check lists journals that still need a login link"]],
   ["1.8","21 Oct 2026",["Status check opens your submitted-manuscripts list by itself and moves to the next journal once every paper is found","Journals with two papers (e.g. Organization) update both","Google Password Manager can fill journal logins in the app's browser","Status history kept for each submission"]],
   ["1.7","21 Oct 2026",["About section with version details and this history"]],
@@ -830,6 +842,7 @@ function aboutCard(){
       ${info.android?`<dt>Device</dt><dd>${esc(info.device)} · Android ${esc(info.android)}</dd>`:""}
       ${info.webview?`<dt>WebView</dt><dd>${esc(info.webview)}</dd>`:""}
       <dt>Your data</dt><dd>${S.papers.length} papers · ${S.subs.length} submission rows · last change ${fmt(S.settings.lastUpdated)}</dd>
+      <dt>Google Sheets</dt><dd>${GS.url?(GS.lastText?"synced "+esc(GS.lastText):"connected"):"not set up"}</dd>
       <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
     </dl>
     <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone. It leaves only when you export, share, or sync to your own GitHub repo. Journal passwords are typed into the journals' own pages and never stored by the app; the GitHub token stays on this phone.</div>
@@ -1056,6 +1069,106 @@ function emailSheet(text){
   };
 }
 
+/* ---------- Google Sheets sync (two-way, via the user's own Apps Script web app) ---------- */
+const GS_KEY="rdsk.gsheets.v1";
+let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:""};
+try{ Object.assign(GS, JSON.parse(localStorage.getItem(GS_KEY)||"{}")); }catch(e){}
+function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catch(e){} }
+// change tracking: each paper/submission gets mod = time of its last local change
+let H=null, trackPaused=false, gsEditCount=0;
+const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes]);
+const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:""]);
+function baseline(){ H={}; S.papers.forEach(p=>H[p.id]=sigP(p)); S.subs.forEach(x=>H[x.id]=sigS(x)); }
+function trackChanges(){
+  if(trackPaused) return 0;
+  if(!H){ baseline(); return 0; }
+  const now=Date.now(), seen=new Set(); let n=0;
+  const look=(r,sg)=>{ seen.add(r.id); if(H[r.id]!==sg){ r.mod=now; H[r.id]=sg; n++; } };
+  S.papers.forEach(p=>look(p,sigP(p))); S.subs.forEach(x=>look(x,sigS(x)));
+  Object.keys(H).forEach(id=>{ if(!seen.has(id)){ delete H[id]; if(GS.url&&!GS.deleted.includes(id)) GS.deleted.push(id); n++; } });
+  if(n){ gsEditCount++; if(GS.url) gsStore(); }
+  return n;
+}
+let gsTimer=null, gsBusy=false;
+function gsSchedule(){ if(!GS.url||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
+function gsPayload(mode){
+  const pk=id=>(paperById(id)||{}).key||"";
+  const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
+  const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
+  const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",mod:mode==="overwrite"?now:(x.mod||0)}));
+  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
+    app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:+S.settings.chaseDays||90}};
+}
+async function gsSync(mode,manual){
+  if(!GS.url) return manual&&toast("Connect Google Sheets first");
+  if(gsBusy){ gsSchedule(); return; }
+  gsBusy=true; if(manual) toast("Syncing with Google Sheets…");
+  const startEdits=gsEditCount, startedAt=Date.now(), body=gsPayload(mode), sentDeleted=body.deleted;
+  try{
+    const r=await httpCall("POST",GS.url,"",JSON.stringify(body));
+    let j=null; try{ j=JSON.parse(r.text); }catch(e){}
+    if(!j){ throw new Error(r.status===0?"No connection":/<html/i.test(r.text)?"The script address isn't a working web app (check: Deploy → Web app, access: Anyone)":"Unexpected reply ("+r.status+")"); }
+    if(!j.ok) throw new Error(j.error||"Script error");
+    if(gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
+    gsApply(j);
+    GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
+    GS.lastSync=startedAt; GS.lastText=new Date().toLocaleString(); GS.lastError=""; GS.sheet=j.sheet||GS.sheet; gsStore();
+    if(manual) toast("Synced with “"+(j.sheet||"Google Sheet")+"” ✓");
+  }catch(err){ GS.lastError=err.message; gsStore(); if(manual) toast("Sheets sync failed: "+err.message); }
+  gsBusy=false; render();
+}
+function gsApply(j){
+  const oldS={}; S.subs.forEach(x=>oldS[x.id]=x);
+  const oldByKey={}; S.papers.forEach(p=>oldByKey[p.key]=p);
+  const created=[];
+  const papers=j.papers.map(p=>({id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type||"Journal article",override:p.override,notes:p.notes,syncedKey:p.key}));
+  const byKey={}; papers.forEach(p=>byKey[p.key]=p.id);
+  const subs=j.subs.map(r=>{
+    let pid=byKey[r.paper];
+    if(!pid&&r.paper){ // paper only named in Submissions: keep the phone's details and add it to the Papers tab next sync
+      const o=oldByKey[r.paper]||{}; pid=o.id||uid("p");
+      const np={id:pid,key:r.paper,title:o.title||"",authors:o.authors||"",type:o.type||"Journal article",override:o.override||"",notes:o.notes||""};
+      papers.push(np); created.push(np); byKey[r.paper]=pid; }
+    const o=oldS[r.id]||{};
+    const live=r.live?{text:r.live,at:r.liveAt||today(),prev:o.live&&o.live.text===r.live?o.live.prev||"":(o.live&&o.live.text)||"",changedAt:o.live&&o.live.text===r.live?o.live.changedAt||"":(o.live?today():"")}:undefined;
+    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,live,liveLog:o.liveLog};
+  });
+  S.papers=papers; S.subs=subs;
+  if(j.app){ S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays; }
+  trackPaused=true; persist(false); trackPaused=false; baseline();
+  if(created.length){ const t=Date.now(); created.forEach(p=>{ p.mod=t; delete H[p.id]; }); trackChanges(); gsSchedule(); }
+}
+function gsConnect(){
+  let u=($("#gsurl").value||"").trim();
+  if(!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u)) return toast("Paste the Web app URL (it starts with https://script.google.com/macros/s/…)");
+  openSheet(`<h3>First sync <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m" style="color:var(--ink)">Which copy should win the first time?</div>
+    <div class="card tap" id="gskeep"><div class="t">Keep the Google Sheet's data (recommended)</div><div class="m">Use this if you just uploaded your latest Excel. The phone takes the sheet's papers and submissions; the phone's manuscript IDs and journal statuses are added to the sheet where it has none.</div></div>
+    <div class="card tap" id="gsphone"><div class="t">Use this phone's data</div><div class="m">The phone's papers and submissions are written into the sheet (matching rows are overwritten, missing ones added). Rows only in the sheet stay.</div></div>`);
+  const go=async mode=>{ closeSheet(); GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; gsStore(); baseline(); await gsSync(mode,true); if(!GS.lastError) toast("Connected to “"+(GS.sheet||"Google Sheet")+"” ✓"); };
+  $("#gskeep").onclick=()=>go("link"); $("#gsphone").onclick=()=>go("overwrite");
+}
+function gsCard(){
+  const on=!!GS.url;
+  if(on) return `<div class="m" style="color:var(--ink)">✓ Connected${GS.sheet?` to <b>${esc(GS.sheet)}</b>`:""}. Changes here appear in the sheet within seconds; changes in the sheet arrive when you open the app or tap Sync now.</div>
+    <div class="hint">${GS.lastText?"Last synced: <b>"+esc(GS.lastText)+"</b>":"Not synced yet."}${GS.lastError?`<br><span style="color:var(--need)">Last error: ${esc(GS.lastError)}</span>`:""}</div>
+    <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="gsauto" style="width:auto" ${GS.auto?"checked":""}> Sync automatically</label>
+    <div class="actions"><button class="primary" data-act="gssync">Sync now ⇅</button><button class="danger ghost" data-act="gsforget">Disconnect</button></div>`;
+  return `<div class="m" style="color:var(--ink)">Keep this app and your Research Dashboard Google Sheet in step, both ways. Setup takes about 5 minutes, easiest on a laptop.</div>
+    <ol class="m" style="color:var(--ink);padding-left:20px;margin:10px 0">
+      <li>Upload your latest Research Dashboard Excel to Google Drive, open it, then <b>File → Save as Google Sheets</b>.</li>
+      <li>In the Google Sheet: <b>Extensions → Apps Script</b>. Delete what's there and paste the RD SK script (buttons below, or the <i>RD-SK-sync.gs</i> file), then <b>Save</b>.</li>
+      <li><b>Deploy → New deployment</b> → ⚙ type <b>Web app</b> → Execute as <b>Me</b>, Who has access <b>Anyone</b> → <b>Deploy</b>.</li>
+      <li><b>Authorize access</b> → choose your account → if Google says it “hasn't verified this app”, tap <b>Advanced → Go to … (unsafe)</b> → <b>Allow</b>. (It's your own script, so this is expected.)</li>
+      <li>Copy the <b>Web app URL</b> and paste it here.</li>
+    </ol>
+    <div class="actions"><button data-act="gscopy">Copy the script</button><button data-act="gsshare">Send the script…</button></div>
+    <label for="gsurl">Web app URL</label>
+    <div class="row"><input id="gsurl" class="grow" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off"><button data-act="gspaste">Paste</button></div>
+    <div class="actions"><button class="primary" data-act="gsconnect">Connect</button></div>
+    <div class="hint">The web address is your private key to the sheet: don't share it. Your sheet stays private in your Drive.</div>`;
+}
+
 /* ---------- GitHub sync (token kept separately, never in backups/exports) ---------- */
 const GH_KEY="rdsk.github.v1";
 let GH={repo:"faltu9522/Research-Dashboard",branch:"main",folder:"data",token:"",auto:true,lastSync:"",lastError:""};
@@ -1143,7 +1256,9 @@ async function ghPull(){
   }catch(err){ alert("Load failed: "+err.message); }
 }
 
-load(); render(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
+load(); baseline(); render(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
+if(GS.url&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&GS.url&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
 </script>
 </body>
 </html>
