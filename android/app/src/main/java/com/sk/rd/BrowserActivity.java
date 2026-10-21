@@ -36,7 +36,9 @@ public class BrowserActivity extends Activity {
     private JSONArray targets;
     private final JSONObject results = new JSONObject();
     private int index = 0;
-    private String extractJs = "";
+    private String extractJs = "", navJs = "";
+    private JSONArray clicked = new JSONArray();
+    private boolean advancing = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -44,12 +46,8 @@ public class BrowserActivity extends Activity {
         super.onCreate(savedInstanceState);
         try {
             targets = new JSONArray(getIntent().getStringExtra("targets"));
-            try (InputStream in = getAssets().open("extract.js")) {
-                java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
-                byte[] b = new byte[8192];
-                for (int n; (n = in.read(b)) > 0; ) buf.write(b, 0, n);
-                extractJs = buf.toString("UTF-8");
-            }
+            extractJs = asset("extract.js");
+            navJs = asset("nav.js");
         } catch (Exception e) {
             targets = new JSONArray();
         }
@@ -88,6 +86,8 @@ public class BrowserActivity extends Activity {
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
         s.setUserAgentString(s.getUserAgentString().replace("; wv", ""));
+        // Let the phone's autofill service (e.g. Google Password Manager) offer saved logins on journal sites.
+        if (android.os.Build.VERSION.SDK_INT >= 26) web.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.addJavascriptInterface(new Reporter(), "RDB");
@@ -105,6 +105,15 @@ public class BrowserActivity extends Activity {
         show();
     }
 
+    private String asset(String name) throws java.io.IOException {
+        try (InputStream in = getAssets().open(name)) {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[8192];
+            for (int n; (n = in.read(b)) > 0; ) buf.write(b, 0, n);
+            return buf.toString("UTF-8");
+        }
+    }
+
     private void show() {
         if (index >= targets.length()) {
             finishWithResults();
@@ -112,8 +121,10 @@ public class BrowserActivity extends Activity {
         }
         JSONObject t = targets.optJSONObject(index);
         title.setText((index + 1) + " of " + targets.length() + " · " + t.optString("journal"));
-        info.setText("Sign in if asked, then open your Author Centre / Author Dashboard list of submitted manuscripts. "
-                + "The status is read automatically. Papers here: " + t.optString("papers"));
+        info.setText("Sign in if asked: tap the user ID box and pick your saved login from Google Password Manager. "
+                + "The app then opens your submitted manuscripts and reads the status. Papers: " + t.optString("papers"));
+        clicked = new JSONArray();
+        advancing = false;
         next.setText(index == targets.length() - 1 ? "Finish ✓" : "Next →");
         web.loadUrl(currentUrl());
     }
@@ -124,6 +135,7 @@ public class BrowserActivity extends Activity {
     }
 
     private void advance() {
+        handler.removeCallbacksAndMessages(null);
         CookieManager.getInstance().flush();
         index++;
         show();
@@ -147,8 +159,18 @@ public class BrowserActivity extends Activity {
         else finishWithResults();
     }
 
-    /** Receives what extract.js found on the current page. */
+    /** Receives what extract.js found on the current page, and what nav.js clicked. */
     private class Reporter {
+        @JavascriptInterface
+        public void action(String what) {
+            runOnUiThread(() -> {
+                if (what.startsWith("nav:")) {
+                    clicked.put(what.substring(4));
+                    info.setText("Opening your submitted manuscripts…");
+                }
+            });
+        }
+
         @JavascriptInterface
         public void report(String json) {
             runOnUiThread(() -> {
@@ -159,10 +181,23 @@ public class BrowserActivity extends Activity {
                     if (t == null) return;
                     if (rows != null && rows.length() > 0) {
                         results.put(t.optString("key"), r);
-                        info.setText("✓ Found " + rows.length() + " manuscript" + (rows.length() == 1 ? "" : "s")
-                                + " with a status. Tap " + (index == targets.length() - 1 ? "Finish" : "Next") + ".");
-                    } else if (r.optBoolean("login")) {
-                        info.setText("Sign in (your phone can fill in the password), then open your list of submitted manuscripts.");
+                        int want = Math.max(1, t.optInt("count", 1));
+                        String found = "✓ Found " + rows.length() + " manuscript" + (rows.length() == 1 ? "" : "s") + " with a status";
+                        if (rows.length() >= want && !advancing) {
+                            advancing = true;
+                            info.setText(found + ". Moving on…");
+                            handler.postDelayed(BrowserActivity.this::advance, 2000);
+                        } else if (!advancing) {
+                            info.setText(found + " (expected " + want + "). Open the other list if there is one, or tap "
+                                    + (index == targets.length() - 1 ? "Finish" : "Next") + ".");
+                        }
+                        return;
+                    }
+                    if (!r.optBoolean("login") && !results.has(t.optString("key"))) {
+                        web.evaluateJavascript("(function(){window.__rdp={clicked:" + clicked + "};try{" + navJs + "}catch(e){}})(); void 0;", null);
+                    }
+                    if (r.optBoolean("login")) {
+                        info.setText("Sign in: tap the user ID box and choose your saved login (Google Password Manager). The app takes it from there.");
                     } else if (!results.has(t.optString("key"))) {
                         info.setText("No status table on this page yet. Open your Author Centre → submitted manuscripts, or tap Read this page.");
                     }

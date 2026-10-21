@@ -315,7 +315,7 @@ function viewReview(){
   const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   return `<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
   <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an editor's email</button></div>
-  <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app: you sign in (your phone can fill in passwords), and the status is read from your Author Dashboard. Or share/paste a journal email to update a submission.</div>
+  <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app. Sign in by tapping the user ID box and choosing your saved login from Google Password Manager; the app then opens your submitted manuscripts, reads every paper's status (both papers when a journal has two) and moves to the next journal. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
 }
 function matches(txt){ return !query || txt.toLowerCase().includes(query.toLowerCase()); }
@@ -473,6 +473,7 @@ function editSub(s, presetPaper){
     <label for="ft">Title used (if retitled)</label><input id="ft" value="${esc(s.titleUsed)}">
     <div class="two"><div><label for="fm">Manuscript ID</label><input id="fm" value="${esc(s.msid||"")}" placeholder="e.g. ORG-26-0412" autocapitalize="characters"></div>
     <div><label for="fx">Editorial office email</label><input id="fx" type="email" value="${esc((S.contacts||{})[s.journal]||"")}" placeholder="for chase emails" autocapitalize="off"></div></div>
+    ${s.liveLog&&s.liveLog.length?`<label>Status on journal site</label><div class="m" style="color:var(--ink)">${s.liveLog.slice().reverse().map(x=>`${fmt(x.at)}: <b>${esc(x.text)}</b>`).join("<br>")}${s.live?`<br><span class="m">last checked ${fmt(s.live.at)}</span>`:""}</div>`:""}
     <label for="fu">Login link for this journal</label><input id="fu" type="url" placeholder="https://…" value="${esc(S.portals[s.journal]||"")}">
     <div class="hint" id="fuh">${portal?(portal.src==="yours"?"Using your link.":portal.src==="built-in"?"Built-in: "+esc(portal.url):"No known link yet: opens a web search. Paste the journal's login page here once you find it."):"Leave blank to use the built-in link or a web search."}</div>
     <div class="actions"><button class="primary" id="fsave">Save</button>
@@ -796,8 +797,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="1.7", APP_BUILD="21 Oct 2026";
+const APP_VERSION="1.8", APP_BUILD="21 Oct 2026";
 const CHANGELOG=[
+  ["1.8","21 Oct 2026",["Status check opens your submitted-manuscripts list by itself and moves to the next journal once every paper is found","Journals with two papers (e.g. Organization) update both","Google Password Manager can fill journal logins in the app's browser","Status history kept for each submission"]],
   ["1.7","21 Oct 2026",["About section with version details and this history"]],
   ["1.6","21 Oct 2026",["Check all statuses on journal sites (sign in yourself; status read from your Author Dashboard)","Update a submission from an editor's email (share or paste)"]],
   ["1.5","20 Oct 2026",["Reminders: chase-limit and weekly notifications","✉ Email editor with a ready-written status enquiry","Stats & insights page","Fixed: chase-days setting not saving"]],
@@ -850,33 +852,40 @@ const baseId=id=>(id||"").toUpperCase().replace(/\.R\d+$/,"");
 function checkAllStatuses(){
   const groups={};
   S.subs.filter(isOpen).forEach(s=>{ const po=portalFor(s.journal); if(po.src==="search") return; const g=groups[po.url]=groups[po.url]||{key:po.url,url:po.url,journal:s.journal.replace(/-A$/,""),papers:[]}; g.papers.push((paperById(s.paper)||{}).key||""); });
-  const targets=Object.values(groups).map(g=>({...g,papers:g.papers.join("; ")}));
+  const targets=Object.values(groups).map(g=>({...g,count:g.papers.length,papers:g.papers.join("; ")}));
   if(!targets.length) return toast("No under-review journals with a known login link");
   if(window.Android && Android.checkStatuses) Android.checkStatuses(JSON.stringify(targets));
   else toast("This works in the phone app");
 }
 window.rdStatusResults=json=>{
   let res={}; try{ res=JSON.parse(json); }catch(e){}
-  const report=[];
-  S.subs.filter(isOpen).forEach(s=>{
-    const po=portalFor(s.journal); if(po.src==="search") return;
-    const r=res[po.url], p=paperById(s.paper)||{};
-    if(!r||!r.rows||!r.rows.length){ report.push({s,found:false,visited:!!r}); return; }
-    const siblings=S.subs.filter(x=>isOpen(x)&&portalFor(x.journal).url===po.url);
-    let best=null,bs=0;
-    r.rows.forEach(row=>{
-      let sc=0;
-      if(s.msid&&row.msid&&baseId(s.msid)===baseId(row.msid)) sc+=100;
-      sc+=40*Math.max(overlap(p.title,row.title||row.row),overlap(s.titleUsed,row.title||row.row),overlap(p.key,row.title||row.row));
-      if(r.rows.length===1&&siblings.length===1) sc+=20;
-      if(sc>bs){ bs=sc; best=row; }
+  const report=[], byUrl={};
+  S.subs.filter(isOpen).forEach(s=>{ const po=portalFor(s.journal); if(po.src!=="search") (byUrl[po.url]=byUrl[po.url]||[]).push(s); });
+  Object.entries(byUrl).forEach(([url,subs])=>{
+    const r=res[url];
+    if(!r||!r.rows||!r.rows.length){ subs.forEach(s=>report.push({s,found:false,visited:!!r})); return; }
+    // score every submission/row pair, then assign best pairs first so two papers at one journal each get their own row
+    const pairs=[];
+    subs.forEach(s=>{ const p=paperById(s.paper)||{};
+      r.rows.forEach((row,ri)=>{ const hay=row.title||row.row; let sc=0;
+        if(s.msid&&row.msid&&baseId(s.msid)===baseId(row.msid)) sc+=100;
+        sc+=40*Math.max(overlap(p.title,hay),overlap(s.titleUsed,hay),overlap(p.key,hay));
+        pairs.push({s,ri,sc}); }); });
+    pairs.sort((a,b)=>b.sc-a.sc);
+    const usedS=new Set(), usedR=new Set(), match=new Map();
+    pairs.forEach(x=>{ if(x.sc>=15&&!usedS.has(x.s)&&!usedR.has(x.ri)){ usedS.add(x.s); usedR.add(x.ri); match.set(x.s,r.rows[x.ri]); } });
+    const leftS=subs.filter(s=>!usedS.has(s)), leftR=r.rows.filter((_,i)=>!usedR.has(i));
+    if(leftS.length===1&&leftR.length===1) match.set(leftS[0],leftR[0]); // only one possibility left
+    subs.forEach(s=>{
+      const best=match.get(s);
+      if(!best){ report.push({s,found:false,visited:true}); return; }
+      const text=cleanStatus(best), prev=s.live&&s.live.text, changed=!!prev&&prev!==text;
+      s.live={text, at:today(), prev:changed?prev:(s.live&&s.live.prev)||"", changedAt:changed?today():(s.live&&s.live.changedAt)||""};
+      s.liveLog=s.liveLog||[];
+      if(!s.liveLog.length||s.liveLog[s.liveLog.length-1].text!==text) s.liveLog.push({at:today(),text});
+      if(!s.msid&&best.msid) s.msid=best.msid;
+      report.push({s,found:true,text,changed,prev,decision:DECISION_WORDS.test(text)});
     });
-    if(!best||bs<15){ report.push({s,found:false,visited:true}); return; }
-    const text=cleanStatus(best), prev=s.live&&s.live.text;
-    const changed=prev&&prev!==text;
-    s.live={text, at:today(), prev:changed?prev:(s.live&&s.live.prev)||"", changedAt:changed?today():(s.live&&s.live.changedAt)||""};
-    if(!s.msid&&best.msid) s.msid=best.msid;
-    report.push({s,found:true,text,changed,prev,decision:DECISION_WORDS.test(text)});
   });
   persist(false); render();
   report.sort((a,b)=>(b.found-a.found)||((b.changed||0)-(a.changed||0))||(b.visited-a.visited));
