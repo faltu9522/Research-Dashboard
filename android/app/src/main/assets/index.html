@@ -242,6 +242,7 @@ function subCard(s, opts={}){
       <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span> ${open?chaseFlag(d):""}
       ${open&&portal.src==="search"?'<span class="chip s-closed">link: web search</span>':""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
+    ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
     ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
     ${acts}</div>`;
 }
@@ -312,7 +313,9 @@ function viewHome(){
 }
 function viewReview(){
   const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
-  return `<div class="hint" style="margin:0 0 10px">Tap <b>Open journal login</b> to go straight to the journal's submission system. Wrong link? Tap the card → “Login link” to set your own.</div>
+  return `<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
+  <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an editor's email</button></div>
+  <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app: you sign in (your phone can fill in passwords), and the status is read from your Author Dashboard. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
 }
 function matches(txt){ return !query || txt.toLowerCase().includes(query.toLowerCase()); }
@@ -403,6 +406,8 @@ document.addEventListener("click",e=>{
     case "portal": e.stopPropagation(); openUrl(portalFor(s.journal).url); break;
     case "decide": e.stopPropagation(); decide(s); break;
     case "chase": e.stopPropagation(); chaseEmail(s); break;
+    case "checkall": checkAllStatuses(); break;
+    case "pasteemail": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c.trim()) emailSheet(c); else if(navigator.clipboard) navigator.clipboard.readText().then(t=>t.trim()?emailSheet(t):emailSheet(""),()=>emailSheet("")); else emailSheet(""); break; }
     case "testnotif": if(window.Android&&Android.testReminder){ if(!Android.notificationsAllowed()) { askNotifications(true); toast("Allow notifications for RD SK first"); } else { Android.testReminder(); toast("Test notification sent"); } } else toast("Works in the phone app"); break;
     case "asknotif": askNotifications(true); break;
     case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); persist(); render(); toast("Marked under review · "+s.journal); break;
@@ -786,6 +791,113 @@ function bindStats(){
     document.querySelectorAll(".chart path.bar").forEach(b=>b.classList.toggle("dim",+b.dataset.q!==i));
   }));
   const ja=$("#jall"); if(ja) ja.onclick=()=>{ statsShowAll=!statsShowAll; render(); };
+}
+
+/* ---------- live status from journal sites ---------- */
+const DECISION_WORDS=/\b(reject|declin|accept|revis|decision (letter|made|sent)|unsubmitted|withdrawn)/i;
+const KNOWN_STATUS=["Awaiting Reviewer Selection","Awaiting Reviewer Invitation","Awaiting Reviewer Assignment","Awaiting Reviewer Scores","Awaiting Reviewer Score","Awaiting AE Recommendation","Awaiting EIC Decision","Awaiting Editor Decision","Awaiting Admin Processing","Awaiting Admin Checklist","Awaiting Decision","Decision in Process","Decision Letter Being Prepared","Required Reviews Completed","Reviews Completed","Under Review","Reviewers Assigned","Reviewer(s) Invited","Reviewers Invited","With Editor","Editor Assigned","Editor Invited","Submitted to Journal","With Journal Administrator","Revise","Major Revision","Minor Revision","Reject","Accept","Unsubmitted","Withdrawn"];
+function cleanStatus(row){
+  const raw=row.status.toLowerCase();
+  for(const k of KNOWN_STATUS) if(raw.includes(k.toLowerCase())) return k;
+  const t=row.status.replace(/\b(ADM|EIC|AE|SE|ME|EO|CE|DE):\s*[^•]*?(?=•|$)/g," ").replace(/[•·]/g," ").replace(/\s+/g," ").trim();
+  for(const k of KNOWN_STATUS) if(t.toLowerCase().includes(k.toLowerCase())) return k;
+  return (t||row.status).replace(/\b(view|contact journal|view submission|send e-?mail|action links?)\b.*$/i,"").trim().slice(0,90);
+}
+const words=t=>(t||"").toLowerCase().replace(/[^a-z0-9 ]+/g," ").split(" ").filter(w=>w.length>3);
+function overlap(a,b){ const B=new Set(words(b)); const A=words(a); return A.length?A.filter(w=>B.has(w)).length/A.length:0; }
+const baseId=id=>(id||"").toUpperCase().replace(/\.R\d+$/,"");
+function checkAllStatuses(){
+  const groups={};
+  S.subs.filter(isOpen).forEach(s=>{ const po=portalFor(s.journal); if(po.src==="search") return; const g=groups[po.url]=groups[po.url]||{key:po.url,url:po.url,journal:s.journal.replace(/-A$/,""),papers:[]}; g.papers.push((paperById(s.paper)||{}).key||""); });
+  const targets=Object.values(groups).map(g=>({...g,papers:g.papers.join("; ")}));
+  if(!targets.length) return toast("No under-review journals with a known login link");
+  if(window.Android && Android.checkStatuses) Android.checkStatuses(JSON.stringify(targets));
+  else toast("This works in the phone app");
+}
+window.rdStatusResults=json=>{
+  let res={}; try{ res=JSON.parse(json); }catch(e){}
+  const report=[];
+  S.subs.filter(isOpen).forEach(s=>{
+    const po=portalFor(s.journal); if(po.src==="search") return;
+    const r=res[po.url], p=paperById(s.paper)||{};
+    if(!r||!r.rows||!r.rows.length){ report.push({s,found:false,visited:!!r}); return; }
+    const siblings=S.subs.filter(x=>isOpen(x)&&portalFor(x.journal).url===po.url);
+    let best=null,bs=0;
+    r.rows.forEach(row=>{
+      let sc=0;
+      if(s.msid&&row.msid&&baseId(s.msid)===baseId(row.msid)) sc+=100;
+      sc+=40*Math.max(overlap(p.title,row.title||row.row),overlap(s.titleUsed,row.title||row.row),overlap(p.key,row.title||row.row));
+      if(r.rows.length===1&&siblings.length===1) sc+=20;
+      if(sc>bs){ bs=sc; best=row; }
+    });
+    if(!best||bs<15){ report.push({s,found:false,visited:true}); return; }
+    const text=cleanStatus(best), prev=s.live&&s.live.text;
+    const changed=prev&&prev!==text;
+    s.live={text, at:today(), prev:changed?prev:(s.live&&s.live.prev)||"", changedAt:changed?today():(s.live&&s.live.changedAt)||""};
+    if(!s.msid&&best.msid) s.msid=best.msid;
+    report.push({s,found:true,text,changed,prev,decision:DECISION_WORDS.test(text)});
+  });
+  persist(false); render();
+  report.sort((a,b)=>(b.found-a.found)||((b.changed||0)-(a.changed||0))||(b.visited-a.visited));
+  const ok=report.filter(x=>x.found);
+  openSheet(`<h3>Status check <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m">${ok.length} of ${report.length} submissions updated · ${ok.filter(x=>x.changed).length} changed</div>
+    ${report.map(x=>{ const p=paperById(x.s.paper)||{}; return `<div class="card"><div class="t">${esc(x.s.journal)}</div><div class="m">${esc(p.key||"")}</div>
+      ${x.found?`<div style="margin-top:6px">🌐 <b>${esc(x.text)}</b> ${x.changed?`<span class="chip s-warn">🔔 was ${esc(x.prev)}</span>`:""}</div>
+        ${x.decision?`<div class="actions"><button data-act="decide" data-id="${x.s.id}">Looks like a decision: record it</button></div>`:""}`
+      :`<div class="m" style="margin-top:6px">${x.visited?"Not found on the pages you opened. Open the list of submitted manuscripts and try again.":"Skipped."}</div>`}</div>`; }).join("")}`);
+};
+
+/* ---------- update from an editor's email (shared or pasted) ---------- */
+function guessOutcome(t){
+  const x=t.toLowerCase();
+  if(/pleased to (inform you that .{0,80})?accept|accepted (it )?for publication/.test(x)) return "Accepted";
+  if(/major revisions?\b|minor revisions?\b|revise and resubmit|invit\w* you to (revise|resubmit|submit a revised)|revisions? (are|is) (required|needed)/.test(x)) return "Revision requested";
+  if(/regret|unable to (accept|publish|offer|consider)|not (be )?able to (accept|publish|offer)|decided (not|against)|not suitable|reject|declin|not (be )?(proceeding|taking .{0,20}forward)|will not be considered/.test(x)) return "Rejected";
+  if(/unsubmitted|returned to (you|your)|has been returned|sent back to you|please (address|correct) the following|before (it|we) can (be )?(proceed|consider)/.test(x)) return "Returned by office";
+  if(/withdraw/.test(x)) return "Withdrawn";
+  if(/successfully submitted|received your (manuscript|submission)|has been (sent|assigned) (out )?(for|to) (review|reviewers)|under review|out for review|thank you for (your )?submi/.test(x)) return "Under review";
+  return "";
+}
+function matchSubmission(t){
+  const idm=t.match(/\b[A-Z][A-Z0-9]{1,14}-(?:[A-Z]-)?\d{2,4}-\d{2,6}(?:\.R\d+)?\b/), low=" "+normJ(t)+" ";
+  let best=null,bs=0;
+  S.subs.forEach(s=>{
+    const p=paperById(s.paper)||{}; let sc=0;
+    if(idm&&s.msid&&baseId(s.msid)===baseId(idm[0])) sc+=100;
+    const j=normJ(s.journal); if(j.length>3&&low.includes(" "+j+" ")) sc+=30+j.length/10;
+    sc+=25*Math.max(overlap(p.title,t),overlap(s.titleUsed,t),overlap(p.key,t));
+    if(isOpen(s)) sc+=8; else if(s.status==="Planned") sc+=3;
+    if(sc>bs){ bs=sc; best=s; }
+  });
+  return {sub:bs>=20?best:null, msid:idm?idm[0]:""};
+}
+window.rdSharedText=t=>{ closeSheet(); setTab("review"); emailSheet(t); };
+function emailSheet(text){
+  const m=text?matchSubmission(text):{sub:null,msid:""}, outcome=text?guessOutcome(text):"";
+  const subs=S.subs.slice().sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
+  const firstLine=(text||"").split(/\n/).map(x=>x.trim()).find(x=>x.length>8)||"";
+  openSheet(`<h3>Update from email <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <label for="et">Email text</label><textarea id="et" style="min-height:110px" placeholder="Paste the journal's email here">${esc(text)}</textarea>
+    <div class="actions"><button id="ere">Read email again</button></div>
+    <label for="es">Submission</label>
+    <select id="es"><option value="">— choose —</option>${subs.map(s=>{ const p=paperById(s.paper)||{}; return `<option value="${s.id}" ${m.sub===s?"selected":""}>${esc(s.journal)} · ${esc(p.key||"")} (${esc(s.status)})</option>`; }).join("")}</select>
+    <div class="two"><div><label for="eo">New status</label><select id="eo">${STATUSES.map(o=>`<option ${o===outcome?"selected":""}>${o}</option>`).join("")}</select></div>
+    <div><label for="ed">Date</label><input type="date" id="ed" value="${today()}"></div></div>
+    <label for="em">Manuscript ID</label><input id="em" value="${esc(m.msid)}">
+    <div class="hint">${text?(m.sub?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it."):"Paste the email, then tap Read email again."}</div>
+    <div class="actions"><button class="primary" id="esave">Save update</button></div>`);
+  $("#ere").onclick=()=>emailSheet($("#et").value);
+  $("#esave").onclick=()=>{
+    const s=S.subs.find(x=>x.id===$("#es").value); if(!s) return toast("Choose the submission");
+    const st=$("#eo").value, d=$("#ed").value||today();
+    s.status=st;
+    if(st==="Under review"){ if(!s.submitted) s.submitted=d; s.decided=""; } else if(st!=="Planned") s.decided=d;
+    if($("#em").value.trim()) s.msid=$("#em").value.trim();
+    const note="Email "+fmt(d)+": "+firstLine.slice(0,80);
+    s.notes=s.notes?s.notes+" | "+note:note;
+    persist(); closeSheet(); render(); toast("Updated · "+s.journal+" → "+st);
+  };
 }
 
 /* ---------- GitHub sync (token kept separately, never in backups/exports) ---------- */

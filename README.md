@@ -2,7 +2,7 @@
 
 A phone app for tracking paper submissions, built from the *Research Dashboard* Excel workbook.
 
-**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~53 KB), open it and allow
+**Install:** download [`apk/RD-SK.apk`](apk/RD-SK.apk) on your Android phone (Android 7+, ~60 KB), open it and allow
 "Install unknown apps" for your browser/file manager when asked.
 
 ## What it does
@@ -22,6 +22,12 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   email on the submission; set your sign-off name under *More*.
 - **Stats & insights** – acceptance rate, quick (likely desk) rejections, median time to decision after review,
   submissions and decisions per quarter, outcomes, per-journal speed from your own history, and per-paper totals.
+- **🔄 Check all statuses** (Under review tab) – opens each journal's submission site in an in-app browser;
+  you sign in yourself (the phone's password manager can fill it in) and the app reads the Status column of
+  your Author Dashboard (ScholarOne / Editorial Manager), shows it on each card with the check date, and flags
+  changes. Passwords are never stored by the app.
+- **Update from an email** – share a journal email (or selected text) to RD SK, or tap *Paste an editor's
+  email*: the app matches the submission (manuscript ID, journal, title) and guesses the outcome for you to confirm.
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 

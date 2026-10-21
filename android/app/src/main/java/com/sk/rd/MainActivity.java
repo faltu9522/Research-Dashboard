@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 
 /** Hosts the offline dashboard (assets/index.html) in a WebView; data is kept in the WebView's localStorage. */
 public class MainActivity extends Activity {
-    private static final int PICK_FILE = 1;
+    private static final int PICK_FILE = 1, CHECK_STATUS = 5;
     private WebView web;
     private ValueCallback<Uri[]> pendingChooser;
 
@@ -93,12 +93,23 @@ public class MainActivity extends Activity {
         openFromIntent(intent);
     }
 
-    /** A tapped reminder carries "open" = the tab to show. */
+    /** A tapped reminder carries "open" = the tab to show; text shared from another app (e.g. an editor's email) is parsed by the page. */
     private void openFromIntent(Intent intent) {
-        String open = intent == null ? null : intent.getStringExtra("open");
-        if (open == null) return;
-        intent.removeExtra("open");
-        web.evaluateJavascript("window.rdOpen && rdOpen(" + JSONObject.quote(open) + ")", null);
+        if (intent == null) return;
+        String open = intent.getStringExtra("open");
+        if (open != null) {
+            intent.removeExtra("open");
+            web.evaluateJavascript("window.rdOpen && rdOpen(" + JSONObject.quote(open) + ")", null);
+        }
+        if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+            CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+            intent.setAction(null);
+            String all = (subject != null ? subject + "\n" : "") + (text != null ? text : "");
+            if (!all.trim().isEmpty()) {
+                web.evaluateJavascript("window.rdSharedText && rdSharedText(" + JSONObject.quote(all) + ")", null);
+            }
+        }
     }
 
     @Override
@@ -109,6 +120,11 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == CHECK_STATUS) {
+            String res = data != null ? data.getStringExtra("results") : null;
+            if (res != null) web.evaluateJavascript("window.rdStatusResults && rdStatusResults(" + JSONObject.quote(res) + ")", null);
+            return;
+        }
         if (requestCode == PICK_FILE && pendingChooser != null) {
             Uri[] result = (resultCode == RESULT_OK && data != null && data.getData() != null)
                     ? new Uri[]{data.getData()} : null;
@@ -157,6 +173,13 @@ public class MainActivity extends Activity {
     }
 
     private class Bridge {
+        /** Opens each journal's author page in the in-app browser; results come back via rdStatusResults(). */
+        @JavascriptInterface
+        public void checkStatuses(String targetsJson) {
+            runOnUiThread(() -> startActivityForResult(
+                    new Intent(MainActivity.this, BrowserActivity.class).putExtra("targets", targetsJson), CHECK_STATUS));
+        }
+
         @JavascriptInterface
         public void setReminderData(String json) {
             Reminders.setData(MainActivity.this, json);
