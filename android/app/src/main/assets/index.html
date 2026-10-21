@@ -381,7 +381,8 @@ function viewMore(){
   <h2>Reset</h2>
   <div class="card"><div class="actions" style="margin-top:0"><button class="danger" data-act="reset">Reset to the Excel data (20 Oct 2026)</button></div>
   <div class="hint">Discards all changes made in the app.</div></div>
-  <div class="hint" style="text-align:center;margin:20px 0">RD SK · ${S.papers.length} papers · ${S.subs.length} submission rows</div>`;
+  <h2>About</h2>
+  ${aboutCard()}`;
 }
 function bindMore(){
   const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); render(); toast("Saved"); };
@@ -407,6 +408,7 @@ document.addEventListener("click",e=>{
     case "decide": e.stopPropagation(); decide(s); break;
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
+    case "ghrepo": openBrowser("https://github.com/"+(GH.repo||"faltu9522/Research-Dashboard")); break;
     case "pasteemail": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c.trim()) emailSheet(c); else if(navigator.clipboard) navigator.clipboard.readText().then(t=>t.trim()?emailSheet(t):emailSheet(""),()=>emailSheet("")); else emailSheet(""); break; }
     case "testnotif": if(window.Android&&Android.testReminder){ if(!Android.notificationsAllowed()) { askNotifications(true); toast("Allow notifications for RD SK first"); } else { Android.testReminder(); toast("Test notification sent"); } } else toast("Works in the phone app"); break;
     case "asknotif": askNotifications(true); break;
@@ -791,6 +793,45 @@ function bindStats(){
     document.querySelectorAll(".chart path.bar").forEach(b=>b.classList.toggle("dim",+b.dataset.q!==i));
   }));
   const ja=$("#jall"); if(ja) ja.onclick=()=>{ statsShowAll=!statsShowAll; render(); };
+}
+
+/* ---------- about ---------- */
+const APP_VERSION="1.7", APP_BUILD="21 Oct 2026";
+const CHANGELOG=[
+  ["1.7","21 Oct 2026",["About section with version details and this history"]],
+  ["1.6","21 Oct 2026",["Check all statuses on journal sites (sign in yourself; status read from your Author Dashboard)","Update a submission from an editor's email (share or paste)"]],
+  ["1.5","20 Oct 2026",["Reminders: chase-limit and weekly notifications","✉ Email editor with a ready-written status enquiry","Stats & insights page","Fixed: chase-days setting not saving"]],
+  ["1.4","20 Oct 2026",["Easier GitHub token setup: one-tap link, Paste, Save & test"]],
+  ["1.3","20 Oct 2026",["Sync to GitHub: Excel + backup committed to the repo"]],
+  ["1.2","20 Oct 2026",["Authors shown on every paper; “Add authors” shortcut"]],
+  ["1.1","20 Oct 2026",["Lightweight build: 387 KB → 39 KB, built-in Excel import/export"]],
+  ["1.0","20 Oct 2026",["First release, built from Research_Dashboard.xlsx: dashboard, journal login links, quick updates, Excel/JSON backup"]],
+];
+function aboutCard(){
+  let info={}; try{ if(window.Android&&Android.appInfo) info=JSON.parse(Android.appInfo()); }catch(e){}
+  const dt=ms=>ms?fmt(new Date(ms).toISOString().slice(0,10)):"—";
+  const ver=info.versionName||APP_VERSION;
+  return `<div class="card">
+    <div class="row"><img src="icon.webp" alt="" width="52" height="52" style="border-radius:12px">
+      <div class="grow"><div class="t" style="font-size:18px">RD SK</div><div class="m">Research Dashboard · version ${esc(ver)}</div></div></div>
+    <p class="m" style="color:var(--ink);margin:12px 0 0">Tracks your paper submissions: what's under review and for how long, what's waiting on you, each paper's queue of journals, and every decision. Built from your Research Dashboard workbook.</p>
+    <dl class="kv" style="margin-top:12px">
+      <dt>Version</dt><dd>${esc(ver)}${info.versionCode?` (build ${esc(info.versionCode)})`:""} · ${APP_BUILD}</dd>
+      ${info.installed?`<dt>Installed</dt><dd>${dt(info.installed)}</dd><dt>Last updated</dt><dd>${dt(info.updated)}</dd>`:""}
+      ${info.android?`<dt>Device</dt><dd>${esc(info.device)} · Android ${esc(info.android)}</dd>`:""}
+      ${info.webview?`<dt>WebView</dt><dd>${esc(info.webview)}</dd>`:""}
+      <dt>Your data</dt><dd>${S.papers.length} papers · ${S.subs.length} submission rows · last change ${fmt(S.settings.lastUpdated)}</dd>
+      <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
+    </dl>
+    <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone. It leaves only when you export, share, or sync to your own GitHub repo. Journal passwords are typed into the journals' own pages and never stored by the app; the GitHub token stays on this phone.</div>
+    <div class="actions"><button data-act="ghrepo">Project on GitHub ↗</button></div>
+  </div>
+  <div class="card">
+    <div class="t">What's new</div>
+    ${CHANGELOG.map((c,i)=>`<details ${i===0?"open":""} style="margin-top:8px"><summary><b>${c[0]}</b> <span class="m">· ${c[1]}</span>${c[0]===ver?' <span class="chip s-acc">installed</span>':""}</summary>
+      <ul class="m" style="margin:6px 0 0;padding-left:20px;color:var(--ink)">${c[2].map(x=>`<li>${esc(x)}</li>`).join("")}</ul></details>`).join("")}
+  </div>
+  <div class="hint" style="text-align:center;margin:16px 0 24px">RD SK ${esc(ver)} · made for SK's research</div>`;
 }
 
 /* ---------- live status from journal sites ---------- */

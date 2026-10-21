@@ -204,6 +204,26 @@ public class MainActivity extends Activity {
             Reminders.test(MainActivity.this);
         }
 
+        /** Version and device details for the About section. */
+        @JavascriptInterface
+        public String appInfo() {
+            JSONObject o = new JSONObject();
+            try {
+                android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                o.put("versionName", pi.versionName);
+                o.put("versionCode", Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode);
+                o.put("installed", pi.firstInstallTime);
+                o.put("updated", pi.lastUpdateTime);
+                o.put("android", Build.VERSION.RELEASE);
+                o.put("device", Build.MANUFACTURER + " " + Build.MODEL);
+                if (Build.VERSION.SDK_INT >= 26 && WebView.getCurrentWebViewPackage() != null) {
+                    o.put("webview", WebView.getCurrentWebViewPackage().versionName);
+                }
+            } catch (Exception ignored) {
+            }
+            return o.toString();
+        }
+
         @JavascriptInterface
         public void openInBrowser(String url) {
             runOnUiThread(() -> MainActivity.this.openInBrowser(url));
