@@ -31,7 +31,7 @@ var JOURNAL_COLS = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login l
 var ADD_PAPER = { suggest: 'Suggested next journals', id: 'App ID', updated: 'Updated' };
 var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: 'Status checked', dtype: 'Decision type', id: 'App ID', updated: 'Updated' };
 var EMAILS_SHEET = 'Emails', DECISIONS_SHEET = 'Decisions & reviews', MAIL_LABEL = 'RD-SK';
-var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID'];
+var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID', 'Undo data'];
 var DECISION_HEAD = ['Decision date', 'Paper', 'Journal', 'Decision', 'Decision type', 'Reviews', 'Manuscript ID', 'Decision letter & reviewer comments', 'Gmail link', 'Message ID'];
 var JOURNAL_SENDERS = ['manuscriptcentral.com', 'scholarone.com', 'editorialmanager.com', 'ariessys.com', 'aries-mail.com',
   'tandfonline.com', 'taylorandfrancis.com', 'sagepub.com', 'sagepub.co.uk', 'elsevier.com', 'springernature.com', 'springer.com',
@@ -53,6 +53,7 @@ function onOpen() {
     .addItem('Turn on email import (every 15 min)', 'turnOnEmailImport')
     .addItem('Import journal emails now', 'importEmailsNow')
     .addItem('Turn off email import', 'turnOffEmailImport')
+    .addItem('Repair: undo email changes and re-read emails', 'repairEmailImport')
     .addSeparator()
     .addItem("Get today's research insights now", 'insightsNow')
     .addItem('Turn on daily research insights (7 am)', 'turnOnDailyInsights')
@@ -333,6 +334,7 @@ function processEmails() { importEmails(3); }
 function logSheet(ss, name, head) {
   var sh = ss.getSheetByName(name);
   if (!sh) { sh = ss.insertSheet(name); sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold'); sh.setFrozenRows(1); }
+  else if (sh.getLastColumn() < head.length) sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
   return sh;
 }
 
@@ -371,18 +373,19 @@ function importEmails(days) {
                     msid: S.msid ? str(r[S.msid - 1]) : '', row: r });
       });
       var res = rdParseEmail({ subject: subject, from: from, body: body, date: whenDay }, cand);
-      if (!res.event) return;                                         // not about a manuscript
+      if (!res.event || res.skip) return;                             // not about one of your manuscripts
       var looksJournal = res.msid || /manuscript|submission|decision|your paper/i.test(subject);
       if (!res.sub && !looksJournal) return;
       var link = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.getThread().getId();
-      var action;
+      var action, undoData = '';
       if (res.sub && res.confident) {
-        action = applyEmail(res, res.sub.row, S, sb, whenDay, m.getId());
+        var applied = applyEmail(res, res.sub.row, S, sb, whenDay, m.getId());
+        action = applied.action; undoData = applied.undo ? JSON.stringify(applied.undo) : '';
         if (/^Updated/.test(action)) counts.updated++; else counts.already++;
       } else { action = 'Needs confirmation'; counts.confirm++; }
       var sub = res.sub || {};
       logRows.push([when, from, subject, sub.paper || '', sub.journal || '', res.status || res.event, res.dtype, res.reviews || '', res.msid,
-                    action, link, m.getId()]);
+                    action, link, m.getId(), undoData]);
       if (/Rejected|Revision requested|Accepted|Returned by office/.test(res.event))
         decRows.push([when, sub.paper || '', sub.journal || '', res.event, res.dtype, res.reviews || '', res.msid,
                       body.replace(/\r/g, '').slice(0, 45000), link, m.getId()]);
@@ -401,38 +404,137 @@ function importEmails(days) {
   return { counts: counts, summary: counts.updated + ' updated, ' + counts.already + ' already up to date, ' + counts.confirm + ' to confirm in the app' };
 }
 
-/** Applies one confidently matched email to its Submissions row (never moves a row backwards). */
+/**
+ * Applies one confidently matched email to its Submissions row (never moves a row backwards).
+ * Returns {action, undo}: undo holds the row's App ID and the values before the change (or the ID of a row it added),
+ * so "RD SK → Repair" can put everything back exactly.
+ */
 function applyEmail(res, row, S, sb, whenDay, msgId) {
-  var cur = str(row[S.status - 1]), was = cur, changed = [];
-  var set = function (f, v) { if (S[f] && str(row[S[f] - 1]) !== str(v)) { row[S[f] - 1] = v; changed.push(f); } };
+  var cur = str(row[S.status - 1]), was = cur, changed = [], before = {};
+  var keep = function (f) { if (S[f] && !(f in before)) { var v = row[S[f] - 1]; before[f] = v instanceof Date ? 'd:' + day(v, 'UTC') : str(v); } };
+  var set = function (f, v) { if (S[f] && str(row[S[f] - 1]) !== str(v)) { keep(f); row[S[f] - 1] = v; changed.push(f); } };
+  if (!str(row[S.id - 1])) row[S.id - 1] = Utilities.getUuid();
+  var rowId = str(row[S.id - 1]);
   if (res.msid && S.msid && !str(row[S.msid - 1])) set('msid', res.msid);
+  var decidedDay = day(row[S.decided - 1], 'UTC'), submittedDay = day(row[S.submitted - 1], 'UTC');
   var newRow = function (status) {
     var near = -1; sb.v.forEach(function (r, i) { if (str(r[S.paper - 1]) === str(row[S.paper - 1])) near = i; });
-    var i = freeRow(sb, function (r) { return !str(r[S.paper - 1]) && !str(r[S.journal - 1]); }, near), r = sb.v[i];
+    var i = freeRow(sb, function (r) { return !str(r[S.paper - 1]) && !str(r[S.journal - 1]); }, near), r = sb.v[i], id = Utilities.getUuid();
     r[S.paper - 1] = row[S.paper - 1]; r[S.journal - 1] = row[S.journal - 1]; r[S.status - 1] = status; r[S.submitted - 1] = date(whenDay);
     if (S.msid) r[S.msid - 1] = res.msid || ''; if (S.notes) r[S.notes - 1] = 'From email';
-    r[S.id - 1] = Utilities.getUuid(); r[S.updated - 1] = new Date();
-    return 'Updated: new ' + status + ' row';
+    r[S.id - 1] = id; r[S.updated - 1] = new Date();
+    if (changed.length) row[S.updated - 1] = new Date();
+    return { action: 'Updated: new ' + status + ' row', undo: { id: rowId, before: before, created: id } };
   };
+  // a genuine new submission to the same journal: dated after that journal's decision, with a different manuscript ID
+  var resubmission = decidedDay && whenDay > decidedDay && (!res.msid || !str(row[S.msid - 1]) || rdBaseId(res.msid) !== rdBaseId(row[S.msid - 1]));
   var ev = res.event, order = RD_ORDER;
   if (ev === 'submitted') {
     if (cur === 'Planned') { set('status', 'Under review'); set('submitted', date(whenDay)); }
-    else if (order[cur] >= 2 && day(row[S.submitted - 1], 'UTC') < whenDay) return newRow('Under review');
+    else if (order[cur] >= 2 && resubmission) return newRow('Under review');
   } else if (ev === 'resubmitted') {
-    if (cur === 'Revision requested') { set('status', 'Revision resubmitted'); if (!str(row[S.decided - 1])) set('decided', date(whenDay)); row[S.updated - 1] = new Date(); return newRow('Under review'); }
-    if (cur === 'Returned by office' || order[cur] >= 4) return newRow('Under review');
+    if (cur === 'Revision requested' && (!submittedDay || whenDay > submittedDay)) {
+      set('status', 'Revision resubmitted'); if (!decidedDay) set('decided', date(whenDay)); return newRow('Under review');
+    }
+    if ((cur === 'Returned by office' || order[cur] >= 4) && resubmission) return newRow('Under review');
   } else if (ev === 'under review') {
     if (cur === 'Planned') { set('status', 'Under review'); set('submitted', date(whenDay)); }
     if (S.live && (cur === 'Under review' || cur === 'Planned')) { set('live', 'Sent for review'); set('liveAt', date(whenDay)); }
-  } else if (order[ev] !== undefined) {
-    if (cur === ev) { if (S.decided && !str(row[S.decided - 1])) set('decided', date(whenDay)); }
-    else if (order[ev] > order[cur] || cur === 'Planned') { set('status', ev); set('decided', date(whenDay)); }
-    if (res.dtype) set('dtype', res.dtype + (res.reviews > 1 ? ' (' + res.reviews + ' reviews)' : ''));
+  } else if (order[ev] !== undefined && (!submittedDay || whenDay >= submittedDay)) {
+    if (cur === ev) { if (S.decided && !decidedDay) set('decided', date(whenDay)); }
+    else if (order[ev] > order[cur]) { set('status', ev); set('decided', date(whenDay)); }
+    if (res.dtype && str(row[S.status - 1]) === 'Rejected') set('dtype', res.dtype + (res.reviews > 1 ? ' (' + res.reviews + ' reviews)' : ''));
   }
-  if (!changed.length) return 'Already up to date';
+  if (!changed.length) return { action: 'Already up to date', undo: null };
   row[S.updated - 1] = new Date();
-  if (!str(row[S.id - 1])) row[S.id - 1] = Utilities.getUuid();
-  return 'Updated: ' + (str(row[S.status - 1]) !== was ? was + ' → ' + str(row[S.status - 1]) : changed.join(', '));
+  return { action: 'Updated: ' + (str(row[S.status - 1]) !== was ? was + ' → ' + str(row[S.status - 1]) : changed.join(', ')),
+           undo: { id: rowId, before: before } };
+}
+
+/** Puts back every change the email import made (exactly, from the Undo data; older entries by their description),
+ *  clears the email log except the emails you confirmed or dismissed in the app, and reads the emails again. */
+function repairEmailImport() {
+  var ui = SpreadsheetApp.getUi();
+  if (ui.alert('Repair email import', 'This undoes every change the email import made to Submissions, then reads your journal ' +
+      'emails again with the stricter rules (anything unclear will wait for you in the app). Emails you already confirmed ' +
+      'or dismissed in the app are kept. Continue?', ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  var r = undoEmailChanges();
+  var again = importEmails(400);
+  ui.alert('Repair finished', r.undone + ' change(s) undone' + (r.unsure ? ', ' + r.unsure + ' could not be matched (listed on the Emails tab)' : '') +
+    '.\n\nRe-read: ' + again.summary + '.\n\nNow open RD SK and tap More → Google Sheets sync → Sync now.', ui.ButtonSet.OK);
+}
+
+function undoEmailChanges() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  var undone = 0, unsure = [], keepRows = [];
+  try {
+    var ss = SpreadsheetApp.getActive(), subsSh = ss.getSheetByName('Submissions'), S = cols(subsSh, SUB_COLS, ADD_SUB), sb = block(subsSh, S);
+    var el = logSheet(ss, EMAILS_SHEET, EMAIL_HEAD);
+    var log = el.getLastRow() > 1 ? el.getRange(2, 1, el.getLastRow() - 1, EMAIL_HEAD.length).getValues() : [];
+    var byId = {}; sb.v.forEach(function (r, i) { if (str(r[S.id - 1])) byId[str(r[S.id - 1])] = i; });
+    var touch = function (r) { r[S.updated - 1] = new Date(); undone++; };
+    var clearRow = function (r) { ['paper', 'journal', 'rating', 'status', 'submitted', 'decided', 'notes', 'titleUsed', 'msid', 'live', 'liveAt', 'dtype', 'id']
+      .forEach(function (f) { if (S[f]) r[S[f] - 1] = ''; }); r[S.updated - 1] = ''; undone++; };
+    var dayOf = function (v) { return day(v, 'UTC'); };
+    var near = function (a, b) { return a && b && Math.abs((Date.parse(a) - Date.parse(b)) / 864e5) <= 1; };
+    // newest first, so later changes are undone before earlier ones
+    log.slice().reverse().forEach(function (e) {
+      var action = str(e[9]);
+      if (/^(Confirmed|Dismissed) in the app/.test(action)) { keepRows.push(e); return; }
+      if (!/^Updated/.test(action)) return;
+      var undo = null; try { undo = str(e[12]) ? JSON.parse(str(e[12])) : null; } catch (x) {}
+      if (undo) {
+        if (undo.created && byId[undo.created] !== undefined) clearRow(sb.v[byId[undo.created]]);
+        var i = byId[undo.id];
+        if (i !== undefined && undo.before) {
+          Object.keys(undo.before).forEach(function (f) { var v = undo.before[f]; sb.v[i][S[f] - 1] = /^d:/.test(v) ? date(v.slice(2)) : v; });
+          if (Object.keys(undo.before).length) touch(sb.v[i]);
+        }
+        return;
+      }
+      // entries written before Undo data existed: undo from the description
+      var paper = str(e[3]), journal = str(e[4]), when = dayOf(e[0]) || str(e[0]).slice(0, 10), msid = str(e[8]);
+      var rows = sb.v.filter(function (r) { return str(r[S.paper - 1]) === paper && str(r[S.journal - 1]) === journal; });
+      var m = action.match(/^Updated: (.+?) → (.+)$/), done = false;
+      if (/^Updated: new /.test(action)) {
+        rows.filter(function (r) { return str(r[S.notes - 1]) === 'From email' && near(dayOf(r[S.submitted - 1]), when); }).slice(0, 1)
+          .forEach(function (r) { clearRow(r); done = true; });
+        rows.filter(function (r) { return str(r[S.status - 1]) === 'Revision resubmitted' && near(dayOf(r[S.decided - 1]), when); }).slice(0, 1)
+          .forEach(function (r) { r[S.status - 1] = 'Revision requested'; r[S.decided - 1] = ''; touch(r); });
+      } else if (m) {
+        var from = m[1], to = m[2];
+        var hit = rows.filter(function (r) { return str(r[S.status - 1]) === to && (to === 'Under review' ? near(dayOf(r[S.submitted - 1]), when) : near(dayOf(r[S.decided - 1]), when)); });
+        if (!hit.length) hit = rows.filter(function (r) { return str(r[S.status - 1]) === to; }).slice(0, rows.filter(function (r) { return str(r[S.status - 1]) === to; }).length === 1 ? 1 : 0);
+        hit.slice(0, 1).forEach(function (r) {
+          r[S.status - 1] = from;
+          if (from === 'Planned' || from === 'Under review') { r[S.decided - 1] = ''; if (S.dtype) r[S.dtype - 1] = ''; }
+          if (from === 'Planned') r[S.submitted - 1] = '';
+          if (S.msid && msid && str(r[S.msid - 1]) === msid) r[S.msid - 1] = '';
+          if (S.live && str(r[S.live - 1]) === 'Sent for review') { r[S.live - 1] = ''; r[S.liveAt - 1] = ''; }
+          touch(r); done = true;
+        });
+      } else { // field-only update: take back what the email put in
+        rows.forEach(function (r) {
+          if (S.msid && msid && str(r[S.msid - 1]) === msid) { r[S.msid - 1] = ''; done = true; }
+          if (S.dtype && str(e[6]) && str(r[S.dtype - 1]).indexOf(str(e[6])) === 0) { r[S.dtype - 1] = ''; done = true; }
+          if (S.live && str(r[S.live - 1]) === 'Sent for review' && near(dayOf(r[S.liveAt - 1]), when)) { r[S.live - 1] = ''; r[S.liveAt - 1] = ''; done = true; }
+          if (done) touch(r);
+        });
+      }
+      if (!done) unsure.push(e);
+    });
+    save(subsSh, sb);
+    // keep only the emails you decided on in the app (and list the ones that couldn't be undone), then re-read the rest
+    var rest = keepRows.concat(unsure.map(function (e) { var c = e.slice(); c[9] = 'Could not undo: please check this row'; return c; }));
+    el.getRange(2, 1, Math.max(el.getLastRow() - 1, 1), EMAIL_HEAD.length).clearContent();
+    if (rest.length) el.getRange(2, 1, rest.length, EMAIL_HEAD.length).setValues(rest);
+    var dl = ss.getSheetByName(DECISIONS_SHEET);
+    if (dl && dl.getLastRow() > 1) dl.getRange(2, 1, dl.getLastRow() - 1, DECISION_HEAD.length).clearContent();
+  } finally {
+    lock.releaseLock();
+  }
+  return { undone: undone, unsure: unsure.length };
 }
 
 /** Emails waiting for the app; `resolved` = [{id, action}] from the app marks them done. */
@@ -791,88 +893,124 @@ function rdTip(it, p, shared) {
 //
 // rdParseEmail({subject, from, body, date}, subs) -> {
 //   event: "submitted" | "resubmitted" | "under review" | "Rejected" | "Revision requested" | "Accepted" | "Returned by office" | "Withdrawn" | "",
-//   status, dtype ("Desk rejection" | "Rejected after review" | ""), reviews, msid, sub, score, confident, reasons[] }
+//   status, dtype ("Desk rejection" | "Rejected after review" | ""), reviews, msid, sub, score, confident, reasons[], skip }
 //   subs: [{id, paper, title, titleUsed, journal, status, submitted, msid}]  (paper = short name, title = full title)
+//
+// Built to err on the side of "please confirm": a status only changes on its own when the email clearly names the paper.
 
 var RD_MSID = /\b[A-Z][A-Z0-9&]{1,14}(?:-[A-Z]{1,2})?(?:-\d{2,6}){2,3}(?:\.R\d+)?\b/;
 var RD_ORDER = { "Planned": 0, "Under review": 1, "Returned by office": 2, "Revision requested": 2, "Revision resubmitted": 3,
   "Rejected": 4, "Accepted": 4, "Withdrawn": 4 };
+var RD_DECISIONS = { "Rejected": 1, "Accepted": 1, "Revision requested": 1, "Returned by office": 1, "Withdrawn": 1 };
 
 function rdEmailNorm(s) {
   return " " + String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[‘’'`"“”]/g, "").replace(/[^a-z0-9]+/g, " ").trim() + " ";
 }
 function rdEmailWords(s) {
-  var stop = { the: 1, and: 1, "for": 1, from: 1, with: 1, into: 1, that: 1, this: 1, their: 1, what: 1, whose: 1, when: 1 };
+  var stop = { the: 1, and: 1, "for": 1, from: 1, with: 1, into: 1, that: 1, this: 1, their: 1, what: 1, whose: 1, when: 1,
+    toward: 1, towards: 1, between: 1, through: 1, within: 1, journal: 1, paper: 1, study: 1, analysis: 1, review: 1,
+    organizational: 1, organization: 1, communication: 1, management: 1, social: 1, critical: 1, theory: 1, ethics: 1 };
   return rdEmailNorm(s).split(" ").filter(function (w) { return w.length > 3 && !stop[w]; });
 }
+/** Share of the paper's distinctive title words found in the text (common field words don't count). */
 function rdEmailOverlap(a, text) {
-  var A = rdEmailWords(a);
-  if (!A.length) return 0;
+  var A = rdEmailWords(a).filter(function (w, i, arr) { return arr.indexOf(w) === i; });
+  if (A.length < 2) return 0;
   var T = rdEmailNorm(text), hit = 0;
   A.forEach(function (w) { if (T.indexOf(" " + w + " ") >= 0) hit++; });
   return hit / A.length;
 }
 function rdBaseId(id) { return String(id || "").toUpperCase().replace(/\.R\d+$/, ""); }
 
-/** What the email says happened. Decisions are checked before acknowledgements (a rejection also says "thank you for submitting"). */
-function rdEmailEvent(text) {
-  var x = String(text || "").toLowerCase().replace(/\s+/g, " ");
-  if (/pleased to (inform you that .{0,120})?accept|(has|have) been accepted for publication|accepted (it )?for publication in|decision (is|was) to accept/.test(x)) return "Accepted";
-  if (/major revisions?\b|minor revisions?\b|revise and resubmit|r\s?&\s?r\b|invit\w* you to (revise|resubmit|submit a revised)|(would|will) be (happy|pleased|glad) to (see|consider|receive) a revised|revisions? (are|is) (required|needed|necessary)|decision (is|was) (a )?(major|minor) revision/.test(x)) return "Revision requested";
-  if (/regret|unable to (accept|publish|offer|consider)|not (be )?able to (accept|publish|offer|consider)|decided (not|against) (to )?(publish|accept|proceed|pursue|send)|cannot (be )?(accept|publish|consider)|not suitable for (publication|the journal|this journal)|reject|declin(e|ed) (your|the|this) (manuscript|paper|submission)|will not be (considered|published|proceeding)|not (be )?(proceeding|moving forward|taking (it|your (manuscript|paper)) forward)/.test(x)) return "Rejected";
-  if (/unsubmitted|(has been|is being) returned to (you|your)|sent back to you|returned (to you )?for (correction|changes|revision of (format|formatting))|before (it|we|your manuscript) can (be )?(proceed|consider|sent)|technical check|please (address|correct) the following/.test(x)) return "Returned by office";
-  if (/withdrawn|withdrawal of (your|the) (manuscript|submission)/.test(x)) return "Withdrawn";
-  if (/revised (manuscript|version|paper|submission)|revision (has been|was) (successfully )?(submitted|received)/.test(x) && /(successfully )?(submitted|received)|thank you for (submitting|your)/.test(x)) return "resubmitted";
-  if (/(sent|send) (it |your manuscript |the manuscript )?(out )?(for|to) (external |peer )?review|under (peer )?review|reviewers? (have been|has been) (invited|assigned|contacted|selected)|out for review|assigned to (an |the )?(editor|associate editor)/.test(x)) return "under review";
-  if (/successfully submitted|been (successfully )?(submitted|received)|received your (manuscript|submission|paper)|thank you for (submitting|your submission)|acknowledg\w+ (the )?receipt|submission (has been )?received|confirm(ing|s)? (the )?(receipt|submission)/.test(x)) return "submitted";
+/** The email's own text: drops quoted replies (keeps a forwarded email, which is what you want read). */
+function rdEmailOwnText(body) {
+  var t = String(body || "").replace(/\r/g, "");
+  var cut = t.search(/^\s*(On .{5,160}wrote:|-{2,}\s*Original Message\s*-{2,}|>{1,}\s)/m);
+  return cut > 40 ? t.slice(0, cut) : t;
+}
+
+/** Sentences that state something, not boilerplate rules ("papers that ... may be rejected", "if you decline ..."). */
+function rdEmailFactual(text) {
+  return String(text || "").replace(/\n\s*\n/g, ". ").replace(/\s+/g, " ").replace(/([.!?])\s+/g, "$1\n").split("\n").filter(function (s) {
+    return !/\b(if|may|might|could|should|unless|whether|policy|policies|guidelines?|instructions|percent|%|typically|usually|generally|please note|papers that|manuscripts that|submissions that|articles that|those that|any (paper|manuscript|submission)s?)\b/i.test(s);
+  }).join(" ").toLowerCase();
+}
+
+/** What the email says happened. Strong decision phrases only, in factual sentences; acknowledgements otherwise. */
+function rdEmailEvent(text, subject) {
+  var raw = String(text || "").toLowerCase().replace(/\s+/g, " "), x = rdEmailFactual(text), subj = String(subject || "").toLowerCase();
+  if (/(pleased|delighted|happy) to (inform you that .{0,140})?accept (your|the|this)|(has|have) been accepted for publication|accepted (it )?for publication in|decision (is|was|:)\s*(to )?accept\b|final acceptance of your/.test(x)) return "Accepted";
+  if (/(decision|recommendation)\s*(is|was|:)\s*(a\s*)?(major|minor) revision|(major|minor) revisions? (are|is) (required|needed|necessary|requested)|reviewers? (recommend|have recommended|suggest) (major|minor) revision|revise and resubmit|invit\w* you to (revise|resubmit|submit a revised)|(would|will) be (happy|pleased|glad) to (see|consider|receive) a revised|your manuscript (requires|needs) (major|minor) revision/.test(x)) return "Revision requested";
+  if (/regret to (inform|advise|tell|let you know)|unable to (accept|publish|offer|consider|proceed with) (your|this|the|it\b)|not (be )?able to (accept|publish|offer|consider|proceed with) (your|this|the|it\b)|(did|does) not pass (the )?(editorial|initial) (screening|assessment|check)|decided (not to (publish|accept|proceed|pursue|send|consider|take)|to reject|against (publication|publishing|accepting))|(must|have to|will have to|am obliged to|regretfully) decline (your|this|the)|declin(e|ed) (your|this|the) (manuscript|paper|submission|article) for publication|reject(ed)? (your|this|the) (manuscript|paper|submission|article)|your (manuscript|paper|submission|article) (has been|was|is) (rejected|declined|not accepted)|decision\s*(on your manuscript\s*)?(is|was|:)\s*(to\s*)?reject|cannot (accept|publish|consider) (your|this|the)|will not be (considering|considered|published|proceeding) (it |your |this |the )?(further|for publication|for review)|not (be )?(proceeding|moving forward|taking (it|your (manuscript|paper)) forward) with (your|this|the)/.test(x)) return "Rejected";
+  if (/(manuscript|submission|paper) (has been|was|is being) (unsubmitted|returned to you|sent back to you)|unsubmitted (your|the) (manuscript|submission)|returned (to you )?for (correction|changes|revision of (format|formatting))|please (address|correct) the following (issues|points|items) (and|before) resubmit/.test(x) || /unsubmitted|returned to author|technical check (failed|result)/.test(subj)) return "Returned by office";
+  if (/(your|the) (manuscript|submission) (has been|was) withdrawn|confirm(ing)? (the )?withdrawal of (your|the) (manuscript|submission)/.test(x)) return "Withdrawn";
+  if (/revised (manuscript|version|paper|submission)|revision (has been|was) (successfully )?(submitted|received)/.test(raw) && /(successfully )?(submitted|received)|thank you for (submitting|your)/.test(raw)) return "resubmitted";
+  if (/(has|have) been (sent|send) (out )?(for|to) (external |peer )?review|(sent|send) (it |your manuscript |the manuscript )?out for (external |peer )?review|reviewers? (have been|has been) (invited|assigned|contacted|selected) (for|to)|now under (peer )?review/.test(x)) return "under review";
+  if (/successfully submitted|been (successfully )?(submitted|received)|received your (manuscript|submission|paper)|thank you for (submitting|your submission)|acknowledg\w+ (the )?receipt|submission (has been )?received|confirm(ing|s)? (the )?(receipt|submission)/.test(raw) ||
+      /(submission|manuscript).{0,40}(received|submitted|confirmation|acknowledg)|acknowledg/.test(subj)) return "submitted";
   return "";
 }
 
 /** Desk rejection vs rejection after review, and how many reviewer reports are in the email. */
 function rdEmailReviews(text) {
-  var t = String(text || ""), x = t.toLowerCase().replace(/\s+/g, " "), n = 0, m, re = /\b(?:reviewer|referee)\s*(?:#|no\.?|number)?\s*:?\s*(\d{1,2})\b/gi;
-  while ((m = re.exec(t))) n = Math.max(n, +m[1]);
-  if (!n && /(reviewer|referee)s?'?\s*(comments|reports?|reviews?)\b/i.test(t)) n = 1;
-  var desk = /without (sending it |being sent )?(out )?(for )?(external |peer )?review|not (be )?sent (it )?(out )?for (external |peer )?review|decided not to send|not send (it|your (manuscript|paper)) (out )?(for|to) (external |peer )?review|editorial (screening|assessment|review|pre-?screening)|desk[- ]?reject|initial (screening|assessment|evaluation)|outside (the )?(aims and )?scope|not a (good )?fit for|does not fit (the|within)/.test(x);
-  return { reviews: n, desk: desk && !n, reviewed: n > 0 || /reviewers? (have|has) (now )?(commented|reviewed|completed|returned)|comments from the reviewers|reviewers'? (comments|reports)/.test(x) };
+  var t = String(text || ""), x = rdEmailFactual(t), n = 0, m, re = /\b(?:reviewer|referee)\s*(?:#|no\.?|number)?\s*:?\s*(\d{1,2})\b/gi;
+  while ((m = re.exec(t))) if (+m[1] < 10) n = Math.max(n, +m[1]);
+  if (!n && /(reviewer|referee)s?'?\s*(comments|reports?)\s*(to (the )?author|:)/i.test(t)) n = 1;
+  var desk = /without (sending it |being sent )?(out )?(for )?(external |peer )?review|not (be )?sent (it )?(out )?for (external |peer )?review|decided not to send|not send (it|your (manuscript|paper)) (out )?(for|to) (external |peer )?review|desk[- ]?reject|outside (the )?(aims and )?scope of|not a (good )?fit (for|with) (the|this|our)|does not fit (the|within)/.test(x);
+  return { reviews: n, desk: desk && !n, reviewed: n > 0 || /reviewers? (have|has) (now )?(commented|reviewed|completed|returned)|comments from the reviewers|reviewers'? (comments|reports) (are|is) (below|attached|included)/.test(x) };
+}
+
+/** Journal names that occur in the text; a name inside a longer matching name (Organization ⊂ Organization Theory) is dropped. */
+function rdJournalHits(text, journals) {
+  var hits = journals.filter(function (j) { return j.length > 5 && text.indexOf(j) >= 0; });
+  return hits.filter(function (j) { return !hits.some(function (k) { return k !== j && k.indexOf(j) >= 0; }); });
 }
 
 function rdParseEmail(mail, subs) {
-  var subject = mail.subject || "", from = mail.from || "", body = mail.body || "";
-  var all = subject + "\n" + from + "\n" + body;
-  var event = rdEmailEvent(subject + "\n" + body);
+  var subject = mail.subject || "", from = mail.from || "", body = rdEmailOwnText(mail.body);
+  // emails about reviewing other people's work are not about your submissions
+  var skip = /invitation to review|invite you to review|review (the|a|this) manuscript|thank you for (your )?review|reviewer (invitation|reminder|report|assignment)|as a reviewer|review (is|was) (overdue|due)|your review (of|for)/i.test(subject + "\n" + body.slice(0, 1200));
+  var event = skip ? "" : rdEmailEvent(subject + "\n" + body, subject);
   var idm = (subject.match(RD_MSID) || body.match(RD_MSID) || [""])[0];
   var rv = rdEmailReviews(body);
-  var head = rdEmailNorm(subject + " " + from + " " + body.slice(0, 1500));
-  var best = null, bestScore = 0, second = 0, reasons = [];
+  var top = rdEmailNorm(subject + " " + from), head = rdEmailNorm(body.slice(0, 2500));
+  var names = {};
+  (subs || []).forEach(function (s) { names[rdEmailNorm(String(s.journal || "").replace(/-A$/, "").replace(/\(.*?\)/g, ""))] = 1; });
+  var nameList = Object.keys(names), topHits = rdJournalHits(top, nameList), headHits = rdJournalHits(head, nameList);
+  var titleText = subject + "\n" + body.slice(0, 4000);
+  var best = null, bestScore = 0, reasons = [], bestOv = 0, scores = [];
   (subs || []).forEach(function (s) {
     var sc = 0, why = [];
-    if (idm && s.msid && rdBaseId(s.msid) === rdBaseId(idm)) { sc += 100; why.push("manuscript ID"); }
+    var idMatch = idm && s.msid && rdBaseId(s.msid) === rdBaseId(idm);
+    if (idMatch) { sc += 100; why.push("manuscript ID"); }
     var j = rdEmailNorm(String(s.journal || "").replace(/-A$/, "").replace(/\(.*?\)/g, ""));
-    var jHit = j.length > 4 && head.indexOf(j) >= 0;
-    if (jHit) { sc += 30 + j.length / 20; why.push("journal"); }
-    var ov = Math.max(rdEmailOverlap(s.title, all), rdEmailOverlap(s.titleUsed, all), rdEmailOverlap(s.paper, all));
-    if (ov >= 0.3) { sc += 40 * ov; why.push("title " + Math.round(ov * 100) + "%"); }
+    if (topHits.indexOf(j) >= 0) { sc += 30; why.push("journal"); } else if (headHits.indexOf(j) >= 0) { sc += 12; why.push("journal in text"); }
+    var ov = Math.max(rdEmailOverlap(s.title, titleText), rdEmailOverlap(s.titleUsed, titleText), rdEmailOverlap(s.paper, titleText));
+    if (ov >= 0.5) { sc += 50 * ov; why.push("title " + Math.round(ov * 100) + "%"); }
     var open = s.status === "Under review" || s.status === "Revision requested" || s.status === "Returned by office";
     // the attempt from the email's time: submitted on/before the email, the closer the better
     if (mail.date && s.submitted) {
       var gap = (Date.parse(mail.date) - Date.parse(s.submitted)) / 864e5;
-      sc += gap < -2 ? -15 : 6 - Math.min(gap, 600) / 120;
+      sc += gap < -2 ? -25 : 6 - Math.min(gap, 600) / 120;
     }
-    if (event === "submitted" && s.status === "Planned") sc += 8;
-    else if (event === "resubmitted" && (s.status === "Revision requested" || s.status === "Returned by office")) sc += 10;
-    else if (event && event !== "submitted" && open) sc += 8;
-    if (sc > bestScore) { second = bestScore; bestScore = sc; best = s; reasons = why; } else if (sc > second) second = sc;
+    if (event === "submitted" && s.status === "Planned") sc += 6;
+    else if (event === "resubmitted" && (s.status === "Revision requested" || s.status === "Returned by office")) sc += 8;
+    else if ((RD_DECISIONS[event] || event === "under review") && open) sc += 6;
+    scores.push({ s: s, sc: sc });
+    if (sc > bestScore) { bestScore = sc; best = s; reasons = why; bestOv = ov; }
   });
-  // Confident: manuscript ID, or journal + clear title, or journal alone when it's the only live candidate there.
-  var confident = !!best && !!event && (bestScore >= 100 ||
-    (reasons.indexOf("journal") >= 0 && reasons.some(function (r) { return /^title [5-9]\d|^title 100/.test(r); })) ||
-    (reasons.indexOf("journal") >= 0 && bestScore - second >= 25 && bestScore >= 38));
+  // the closest rival is the best-scoring row of a different paper (another attempt of the same paper is not a rival)
+  var second = 0;
+  scores.forEach(function (x) { if (best && x.s.paper !== best.paper && x.sc > second) second = x.sc; });
+  var hasId = reasons.indexOf("manuscript ID") >= 0, hasJournal = reasons.indexOf("journal") >= 0 || reasons.indexOf("journal in text") >= 0;
+  // A decision changes a row on its own only with the manuscript ID, or the journal plus most of the paper's title, and no close rival.
+  var confident = !!best && !!event && !skip && (hasId ||
+    (hasJournal && bestOv >= (RD_DECISIONS[event] ? 0.6 : 0.5) && bestScore - second >= 15));
   var status = { "submitted": "Under review", "resubmitted": "Under review", "under review": "Under review" }[event] || event;
   var dtype = "";
   if (event === "Rejected") dtype = rv.desk ? "Desk rejection" : rv.reviewed ? "Rejected after review" : "";
-  return { event: event, status: status, dtype: dtype, reviews: rv.reviews, msid: idm, sub: bestScore >= 20 ? best : null,
-           score: bestScore, confident: confident, reasons: reasons };
+  return { event: event, status: status, dtype: dtype, reviews: rv.reviews, msid: idm, sub: bestScore >= 30 ? best : null,
+           score: bestScore, confident: confident, reasons: reasons, skip: skip };
 }
 // ==== end emailparse.js ====
 
