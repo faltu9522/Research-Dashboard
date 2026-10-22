@@ -68,9 +68,19 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   with *Sync now*. *Load from GitHub* pulls the backup back onto a phone. Needs a fine-grained token limited
   to this repo with **Contents: Read and write**; the token stays on the phone and is never exported.
 
+- **Replace all data** (sheet menu *RD SK → Replace all papers and submissions with the Sheet 2 record*) – wipes
+  Papers and Submissions and writes the clean record in `data/current-data.json` (made from Sheet 2 of
+  SK_Research_Updates_2026.xlsx). Journals, ABDC list, email log, insights, settings, triggers and the web-app link
+  stay. Phones on v2.8+ drop their old copy on the next sync; emails received before the replace change nothing.
+
 Data is stored on the phone; GitHub sync (or *More → Save backup*) keeps a copy off the phone.
 
 ## Rebuilding
+- Clean record from a new tracker: `python3 tools/sheet2_import.py SK_Research_Updates_2026.xlsx data/current-data.json`
+  (yellow + date = under review, yellow without date = planned, red = earlier attempt, other journals = shortlist in
+  the paper's notes), then `python3 tools/build_master.py android/app/src/main/assets/seed.js data/current-data.json
+  ABDC-JQL-2025.xlsx android/app/src/main/assets/portals.js excel/RD-SK-Master.xlsx android/app/src/main/assets/seed.js`
+  and `python3 tools/make_gscript.py`.
 - Seed data from a newer workbook: `python3 tools/excel_to_seed.py Research_Dashboard.xlsx android/app/src/main/assets/seed.js`
   (seed data is only used on first launch or after *Reset*; to load a new workbook on the phone use *Import*).
 - Build: `cd android && ./gradlew assembleRelease` (needs the Android SDK), or run the *Build RD SK APK* GitHub

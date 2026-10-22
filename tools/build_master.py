@@ -1,5 +1,8 @@
 """Build the RD SK master workbook (for Google Sheets) and the app's seed data.
 
+With data/current-data.json (made from Sheet 2 by tools/sheet2_import.py) as the second argument, that file is the
+whole record: papers and submissions come only from it.
+
 Combines the app's full submission history (seed.js), the user's SK_Research_Updates_2026.xlsx (latest papers and
 journals) and the official ABDC Journal Quality List (2025 ratings, 2022 for journals that dropped off).
 
@@ -102,6 +105,13 @@ def load_abdc(path):
 
 def main(seed_path, _new_sheet, abdc_path, portals_path, out_xlsx, out_seed):
     seed = json.loads(open(seed_path, encoding="utf-8").read().split("=", 1)[1].rstrip().rstrip(";"))
+    if _new_sheet.endswith(".json"):
+        cur = json.load(open(_new_sheet, encoding="utf-8"))
+        papers = {p["id"]: dict(p) for p in cur["papers"]}
+        subs = [dict(s) for s in cur["subs"]]
+        seed["settings"]["lastUpdated"] = cur["asOf"]
+        build(seed, papers, subs, [p["id"] for p in cur["papers"]], abdc_path, portals_path, out_xlsx, out_seed)
+        return
     papers = {p["id"]: dict(p) for p in seed["papers"]}
     subs = [dict(s) for s in seed["subs"]]
     key_to_id = {p["key"]: p["id"] for p in papers.values()}
@@ -155,7 +165,11 @@ def main(seed_path, _new_sheet, abdc_path, portals_path, out_xlsx, out_seed):
             p["id"] = new
     papers = {p["id"]: p for p in papers.values()}
     key_to_id = {p["key"]: p["id"] for p in papers.values()}
+    order = [key_to_id[k] for k in ORDER] + [pid for pid in papers if papers[pid]["key"] not in ORDER]
+    build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed)
 
+
+def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed):
     # ABDC ratings and login links per journal
     r25, r22, abdc_full = load_abdc(abdc_path)
     portals = dict(re.findall(r'^\s*"([^"]+)":\s*"([^"]+)"', open(portals_path, encoding="utf-8").read(), re.M))
@@ -203,7 +217,6 @@ def main(seed_path, _new_sheet, abdc_path, portals_path, out_xlsx, out_seed):
                 ("Date submitted", 13), ("Date of decision", 13), ("Days", 7), ("Notes", 40), ("Title used", 26),
                 ("Manuscript ID", 16), ("Status on journal site", 24), ("Status checked", 13), ("App ID", 10), ("Updated", 16),
                 ("ur rank", 6), ("paper|status", 6)])
-    order = [key_to_id[k] for k in ORDER] + [pid for pid in papers if papers[pid]["key"] not in ORDER]
 
     def put_formulas(r):
         ws.cell(r, 3, f'=IF(B{r}="","",IFERROR(VLOOKUP(B{r},Journals!$A:$B,2,FALSE),IFERROR(VLOOKUP(B{r},\'ABDC list\'!$A:$B,2,FALSE),"")))')

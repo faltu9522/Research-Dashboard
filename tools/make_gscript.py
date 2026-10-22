@@ -1,4 +1,4 @@
-"""Copy the app's suggest.js and emailparse.js into google-sheets/RD-SK-sync.gs and regenerate the app's embedded copy (gscript.js).
+"""Copy the app's shared scripts and data/current-data.json into google-sheets/RD-SK-sync.gs and regenerate the app's embedded copy (gscript.js).
 
 Usage: python3 tools/make_gscript.py
 """
@@ -19,6 +19,10 @@ for name in ("suggest.js", "emailparse.js", "watchlist.js", "insights.js"):
     start, end = "// ==== %s (copied from the app by tools/make_gscript.py; edit it there) ====" % name, "// ==== end %s ====" % name
     assert start in src, name
     src = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: start + "\n" + code.strip() + "\n" + end, src, flags=re.S)
+start, end = "// ==== current-data.json (copied from data/ by tools/make_gscript.py; made by tools/sheet2_import.py) ====", "// ==== end current-data.json ===="
+data = json.dumps(json.load(open("data/current-data.json", encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
+assert start in src
+src = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: start + "\nvar RD_CURRENT = " + data + ";\n" + end, src, flags=re.S)
 open(GS, "w", encoding="utf-8").write(src)
 open(EMBED, "w", encoding="utf-8").write("// Generated from google-sheets/RD-SK-sync.gs by tools/make_gscript.py.\nwindow.RD_GSCRIPT = "
                                          + json.dumps(src, ensure_ascii=False) + ";\n")

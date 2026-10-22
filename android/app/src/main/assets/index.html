@@ -848,8 +848,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.7", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.8", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.8","22 Oct 2026",["Data replaced with the clean Sheet 2 record (one entry per paper, current submissions and planned journals; old titles removed)","When the sheet's data is replaced (sheet menu RD SK → Replace all…), the phone drops its old copy on the next sync instead of sending it back"]],
   ["2.7","22 Oct 2026",["Email import reads only emails from 1 Oct 2026 onwards; submissions decided before then are never changed"]],
   ["2.6","22 Oct 2026",["Fixed: journal emails could mark under-review papers as rejected (acknowledgement boilerplate, reviewer emails and similar journal names were misread)","Stricter email reader: status changes only when the email clearly names the paper; anything unclear waits for you","Sheet menu: RD SK → Repair undoes all email-import changes and re-reads the emails; every change can now be undone exactly"]],
   ["2.5","22 Oct 2026",["Free Gemini option for written next-study ideas (set in the sheet's RD SK menu)","RD SK is now open source (MIT License)"]],
@@ -1187,7 +1188,7 @@ function restoreFromLink(t){
   restoreFrom(u);
 }
 async function restoreFrom(u){
-  GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; gsStore(); baseline();
+  GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; GS.epoch=""; gsStore(); baseline();
   toast("Loading your data from Google Sheets…");
   await gsSync("link",false);
   if(GS.lastError){ alert("Couldn't load from the sheet: "+GS.lastError); return; }
@@ -1235,7 +1236,7 @@ function gsPayload(mode){
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
   const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
-  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
+  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
       settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false}}};
 }
@@ -1249,7 +1250,12 @@ async function gsSync(mode,manual){
     let j=null; try{ j=JSON.parse(r.text); }catch(e){}
     if(!j){ throw new Error(r.status===0?"No connection":/<html/i.test(r.text)?"The script address isn't a working web app (check: Deploy → Web app, access: Anyone)":"Unexpected reply ("+r.status+")"); }
     if(!j.ok) throw new Error(j.error||"Script error");
-    if(gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
+    const fresh=j.epoch!==undefined&&(j.epoch||"")!==(GS.epoch||"");
+    if(fresh){ // the sheet's data was replaced: its copy wins, the phone's old changes and deletions are dropped
+      if(GS.lastSync&&mode==="normal") toast("Your Google Sheet's data was replaced: the phone now shows the new record");
+      GS.epoch=j.epoch||""; GS.deleted=[]; GS.emailDecisions=[]; GS.resolved=[]; GS.lastSync=startedAt; gsStore();
+    }
+    if(!fresh&&gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
     gsApply(j);
     GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
     GS.savedInsights=(GS.savedInsights||[]).filter(d=>!(body.savedInsights||[]).includes(d));
@@ -1293,7 +1299,7 @@ function gsConnect(){
     <div class="m" style="color:var(--ink)">Which copy should win the first time?</div>
     <div class="card tap" id="gskeep"><div class="t">Keep the Google Sheet's data (recommended)</div><div class="m">Use this if you just uploaded your latest Excel. The phone takes the sheet's papers and submissions; the phone's manuscript IDs and journal statuses are added to the sheet where it has none.</div></div>
     <div class="card tap" id="gsphone"><div class="t">Use this phone's data</div><div class="m">The phone's papers and submissions are written into the sheet (matching rows are overwritten, missing ones added). Rows only in the sheet stay.</div></div>`);
-  const go=async mode=>{ closeSheet(); GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; gsStore(); baseline(); await gsSync(mode,true); if(!GS.lastError) toast("Connected to “"+(GS.sheet||"Google Sheet")+"” ✓"); };
+  const go=async mode=>{ closeSheet(); GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; GS.epoch=""; gsStore(); baseline(); await gsSync(mode,true); if(!GS.lastError) toast("Connected to “"+(GS.sheet||"Google Sheet")+"” ✓"); };
   $("#gskeep").onclick=()=>go("link"); $("#gsphone").onclick=()=>go("overwrite");
 }
 function gsCard(){
