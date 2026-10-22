@@ -39,6 +39,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="rdsk" android:host="add" />
+                <data android:scheme="rdsk" android:host="connect" />
             </intent-filter>
             <intent-filter android:label="Update RD SK">
                 <action android:name="android.intent.action.SEND" />

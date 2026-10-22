@@ -136,7 +136,7 @@ const CLOSED_STAGES = ["Parked","Closed – rejected","Withdrawn","Published"];
 let S;
 function load(){
   try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ S = JSON.parse(raw); } }catch(e){}
-  if(!S || !S.papers){ S = JSON.parse(JSON.stringify(window.RD_SEED)); persist(false); }
+  if(!S || !S.papers){ S = JSON.parse(JSON.stringify(window.RD_SEED)); S.settings.fresh=true; persist(false); }
   S.portals = S.portals || {}; S.settings = S.settings || {chaseDays:90};
 }
 function persist(touch=true){
@@ -275,7 +275,7 @@ function render(){
   else if(tab==="stats") v.innerHTML=viewStats();
   else if(tab==="insights") v.innerHTML=viewInsights();
   else v.innerHTML=viewMore();
-  bindSearch(); bindMore(); if(tab==="stats") bindStats();
+  bindSearch(); bindMore(); bindWelcome(); if(tab==="stats") bindStats();
 }
 function stats(){
   const infos = S.papers.map(p=>({p,...paperInfo(p)}));
@@ -302,8 +302,9 @@ function viewHome(){
   const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   const stale = S.settings.lastUpdated ? daysBetween(S.settings.lastUpdated,today()) : null;
   return `
+  ${welcomeCard()}
   ${pendingBanner()}
-  ${stale!=null&&stale>=10?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
+  ${stale!=null&&stale>=10&&!S.settings.fresh?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
   <div class="tiles">
     <button class="tile" data-go="papers:Active"><b>${st.tracked}</b><span>Papers tracked</span><i>excl. closed/parked</i></button>
     <button class="tile" data-go="papers:Waiting on you"><b>${st.waiting}</b><span>Waiting on you</span><i>to (re)submit/revise</i></button>
@@ -426,6 +427,8 @@ document.addEventListener("click",e=>{
     case "gscopy": if(window.Android&&Android.copyText){ Android.copyText(window.RD_GSCRIPT||""); toast("Script copied"); } else { navigator.clipboard&&navigator.clipboard.writeText(window.RD_GSCRIPT||""); toast("Script copied"); } break;
     case "gsshare": shareText(window.RD_GSCRIPT||""); break;
     case "gsconnect": gsConnect(); break;
+    case "gscopylink": if(window.Android&&Android.copyText){ Android.copyText(restoreLink()); toast("Restore link copied"); } else toast(restoreLink()); break;
+    case "gssharelink": shareText("RD SK restore link (tap on your phone after reinstalling RD SK; keep private):\n"+restoreLink()); break;
     case "gssync": gsSync("normal",true); break;
     case "gsforget": if(confirm("Disconnect Google Sheets? Your data stays on the phone and in the sheet.")){ GS.url=""; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
     case "gspaste": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#gsurl").value=c.trim(); else toast("Long-press the box and choose Paste"); break; }
@@ -845,8 +848,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.3", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.4", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.4","22 Oct 2026",["Restore link: after a reinstall or on a new phone, one tap loads everything from your Google Sheet","Your sign-off name and reminder setting are kept in the sheet too"]],
   ["2.3","22 Oct 2026",["💡 Research insights: 5 recently published papers a day from ABDC/FT50 and your target journals, matched to your papers, with DOIs and a next-study idea","Optional Claude-written gap ideas (your own API key, set in the sheet)","Save ideas you want to keep"]],
   ["2.2","22 Oct 2026",["Journal emails from Gmail update your sheet and the app automatically (via the Google Sheet script)","Desk rejection vs rejection after review, and reviewer counts, recorded per decision","Unclear emails wait for you under “Journal emails to confirm”","Paste/share an email uses the same reader as the sheet"]],
   ["2.1","22 Oct 2026",["Master data from SK_Research_Updates_2026 (3 new papers, new queued journals, authors)","ABDC 2025 ratings built in (official list, current to Sept 2026) and shown on every journal","Suggested next journals for each paper, and a “What next?” prompt after a rejection","Journal box suggests names from the ABDC list","Works with the RD SK Master Google Sheet (columns found by name)"]],
@@ -1086,7 +1090,7 @@ window.rdStatusResults=json=>{
 
 /* ---------- update from an editor's email (shared or pasted) ---------- */
 function parseSubs(){ return S.subs.map(x=>{ const p=paperById(x.paper)||{}; return {id:x.id,paper:p.key||"",title:p.title||"",titleUsed:x.titleUsed,journal:x.journal,status:x.status,submitted:x.submitted,msid:x.msid||""}; }); }
-window.rdSharedText=t=>{ closeSheet(); if(/rdsk:\/\/add\?/i.test(t)){ setTab("subs"); addLinksSheet(t); return; } setTab("review"); emailSheet(t); };
+window.rdSharedText=t=>{ closeSheet(); if(/rdsk:\/\/connect\?/i.test(t)){ restoreFromLink(t); return; } if(/rdsk:\/\/add\?/i.test(t)){ setTab("subs"); addLinksSheet(t); return; } setTab("review"); emailSheet(t); };
 function emailSheet(text, pend){
   const r=text?rdParseEmail({subject:pend?pend.subject:"",from:pend?pend.from:"",body:text,date:pend?pend.date:today()},parseSubs()):{sub:null,msid:"",status:"",dtype:"",reviews:0};
   const match=r.sub?S.subs.find(x=>x.id===r.sub.id):null, outcome=r.status||"";
@@ -1169,6 +1173,37 @@ function viewInsights(){
     <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Next-study ideas are prompts to think with: always read the paper and check the literature before building on them.</div>`;
 }
 
+/* ---------- restore on a new phone / after reinstalling ---------- */
+function restoreLink(){ return "rdsk://connect?url="+encodeURIComponent(GS.url); }
+function restoreFromLink(t){
+  const m=t.match(/rdsk:\/\/connect\?url=([^\s"'<>]+)/i); if(!m) return;
+  let u=""; try{ u=decodeURIComponent(m[1]); }catch(e){}
+  if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) return toast("That restore link isn't valid");
+  if(GS.url===u) return toast("Already connected to this sheet");
+  restoreFrom(u);
+}
+async function restoreFrom(u){
+  GS.url=u; GS.lastSync=0; GS.deleted=[]; GS.lastError=""; gsStore(); baseline();
+  toast("Loading your data from Google Sheets…");
+  await gsSync("link",false);
+  if(GS.lastError){ alert("Couldn't load from the sheet: "+GS.lastError); return; }
+  delete S.settings.fresh; persist(false); setTab("home"); toast("Restored from “"+(GS.sheet||"Google Sheet")+"” ✓");
+}
+function welcomeCard(){
+  if(!S.settings.fresh||GS.url) return "";
+  return `<div class="card" style="border:2px solid var(--accent)"><div class="t">👋 New install? Restore your data</div>
+    <div class="m" style="color:var(--ink);margin-top:4px">Tap your <b>RD SK restore link</b> (the rdsk://connect… link you saved in your email or notes), or paste your Google Sheet's web-app URL here.</div>
+    <div class="row" style="margin-top:8px"><input id="wurl" class="grow" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off"><button id="wpaste">Paste</button></div>
+    <div class="actions"><button class="primary" id="wgo">Restore from Google Sheet</button><button class="ghost" id="wskip">Start with the built-in data</button></div></div>`;
+}
+function bindWelcome(){
+  if(!$("#wgo")) return;
+  $("#wpaste").onclick=()=>{ const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#wurl").value=c.trim(); else toast("Long-press the box and choose Paste"); };
+  $("#wgo").onclick=()=>{ let v=$("#wurl").value.trim(); const m=v.match(/rdsk:\/\/connect\?url=(\S+)/); if(m) try{ v=decodeURIComponent(m[1]); }catch(e){}
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(v)) return toast("Paste the web-app URL (https://script.google.com/macros/s/…/exec)"); restoreFrom(v); };
+  $("#wskip").onclick=()=>{ delete S.settings.fresh; persist(false); render(); };
+}
+
 /* ---------- Google Sheets sync (two-way, via the user's own Apps Script web app) ---------- */
 const GS_KEY="rdsk.gsheets.v1";
 let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:""};
@@ -1197,7 +1232,8 @@ function gsPayload(mode){
   const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
   return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
-    app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:+S.settings.chaseDays||90}};
+    app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
+      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false}}};
 }
 async function gsSync(mode,manual){
   if(!GS.url) return manual&&toast("Connect Google Sheets first");
@@ -1239,7 +1275,8 @@ function gsApply(j){
   S.papers=papers; S.subs=subs;
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
   if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
-  if(j.app){ if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays; }
+  if(j.app){ if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
+    if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
   if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
   if(created.length){ const t=Date.now(); created.forEach(p=>{ p.mod=t; delete H[p.id]; }); trackChanges(); gsSchedule(); }
@@ -1247,6 +1284,7 @@ function gsApply(j){
 function gsConnect(){
   let u=($("#gsurl").value||"").trim();
   if(!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u)) return toast("Paste the Web app URL (it starts with https://script.google.com/macros/s/…)");
+  if(S.settings.fresh) return restoreFrom(u);
   openSheet(`<h3>First sync <button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="m" style="color:var(--ink)">Which copy should win the first time?</div>
     <div class="card tap" id="gskeep"><div class="t">Keep the Google Sheet's data (recommended)</div><div class="m">Use this if you just uploaded your latest Excel. The phone takes the sheet's papers and submissions; the phone's manuscript IDs and journal statuses are added to the sheet where it has none.</div></div>
@@ -1259,7 +1297,10 @@ function gsCard(){
   if(on) return `<div class="m" style="color:var(--ink)">✓ Connected${GS.sheet?` to <b>${esc(GS.sheet)}</b>`:""}. Changes here appear in the sheet within seconds; changes in the sheet arrive when you open the app or tap Sync now.</div>
     <div class="hint">${GS.lastText?"Last synced: <b>"+esc(GS.lastText)+"</b>":"Not synced yet."}${GS.lastError?`<br><span style="color:var(--need)">Last error: ${esc(GS.lastError)}</span>`:""}</div>
     <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="gsauto" style="width:auto" ${GS.auto?"checked":""}> Sync automatically</label>
-    <div class="actions"><button class="primary" data-act="gssync">Sync now ⇅</button><button class="danger ghost" data-act="gsforget">Disconnect</button></div>`;
+    <div class="actions"><button class="primary" data-act="gssync">Sync now ⇅</button><button class="danger ghost" data-act="gsforget">Disconnect</button></div>
+    <div class="card" style="background:var(--accent-soft);border:0;margin-top:12px"><div class="t">Restore link (for a new phone or a reinstall)</div>
+      <div class="m" style="color:var(--ink)">Save this link somewhere safe, e.g. email it to yourself. After reinstalling RD SK, tap it and all your data loads from the sheet. Keep it private: it opens your sheet.</div>
+      <div class="actions"><button data-act="gscopylink">Copy restore link</button><button data-act="gssharelink">Send it to myself…</button></div></div>`;
   return `<div class="m" style="color:var(--ink)">Keep this app and your Research Dashboard Google Sheet in step, both ways. Setup takes about 5 minutes, easiest on a laptop.</div>
     <ol class="m" style="color:var(--ink);padding-left:20px;margin:10px 0">
       <li>Upload your latest Research Dashboard Excel to Google Drive, open it, then <b>File → Save as Google Sheets</b>.</li>

@@ -266,6 +266,7 @@ function appData(ss, incoming) {
   if (incoming) {
     ['portals', 'contacts'].forEach(function (k) { if (incoming[k]) cur[k] = Object.assign({}, cur[k] || {}, incoming[k]); });
     if (incoming.chaseDays) cur.chaseDays = incoming.chaseDays;
+    if (incoming.settings) cur.settings = Object.assign({}, cur.settings || {}, incoming.settings);
     if (J && J.journal) { // mirror links and emails onto the Journals tab
       var jb = block(js, J), at = {};
       jb.v.forEach(function (r, i) { if (str(r[J.journal - 1])) at[norm(r[J.journal - 1])] = i; });
