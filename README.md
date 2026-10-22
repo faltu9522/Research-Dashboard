@@ -50,6 +50,12 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   `<you>+rdsk@gmail.com`) with `assets/emailparse.js` (shared with the app), updates confidently matched
   submissions (status, dates, manuscript ID, desk vs after-review, reviewer count), logs every email on the *Emails*
   tab and decision letters with reviewer comments on *Decisions & reviews*; unclear ones wait in the app.
+- **💡 Research insights** – in the sheet: menu *RD SK → Turn on daily research insights*. Every morning the script
+  pulls the last 5 weeks of articles from ~320 journals (`assets/watchlist.js`: ABDC A*/A/B in the user's areas, relevant
+  FT50, and every journal the user has used; built by `tools/build_watchlist.py`) via the Crossref API, ranks them against
+  the user's papers (`assets/insights.js`) and writes 5 to the *Research insights* tab with DOI, why it matters and a
+  next-study idea. With *Set Claude API key* the script asks `claude-opus-5-5` to choose the 5 from a shortlist of 15 and
+  write the ideas (structured JSON output, `fallbacks: "default"`); any failure falls back to the built-in ideas.
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 

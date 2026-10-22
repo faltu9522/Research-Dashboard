@@ -48,6 +48,11 @@ function onOpen() {
     .addItem('Turn on email import (every 15 min)', 'turnOnEmailImport')
     .addItem('Import journal emails now', 'importEmailsNow')
     .addItem('Turn off email import', 'turnOffEmailImport')
+    .addSeparator()
+    .addItem("Get today's research insights now", 'insightsNow')
+    .addItem('Turn on daily research insights (7 am)', 'turnOnDailyInsights')
+    .addItem('Turn off daily research insights', 'turnOffDailyInsights')
+    .addItem('Set Claude API key for written gap ideas (optional)', 'setClaudeKey')
     .addToUi();
 }
 
@@ -169,10 +174,11 @@ function handle(body) {
     // 4. Per-journal data (Journals tab) and app settings; emails waiting for confirmation in the app.
     var app = appData(ss, body.app);
     var pending = emailQueue(ss, body.resolved || []);
+    var insights = insightRows(ss, body.savedInsights || []);
 
     // 5. Send everything back.
     return {
-      ok: true, now: Date.now(), sheet: ss.getName(), app: app, pending: pending,
+      ok: true, now: Date.now(), sheet: ss.getName(), app: app, pending: pending, insights: insights,
       papers: pb.v.filter(function (r) { return str(g(r, P, 'key')); }).map(function (r) {
         return { id: str(g(r, P, 'id')), key: str(g(r, P, 'key')), title: str(g(r, P, 'title')), authors: str(g(r, P, 'authors')),
                  type: str(g(r, P, 'type')), override: str(g(r, P, 'override')), notes: str(g(r, P, 'notes')) };
@@ -452,6 +458,266 @@ function applyEmailDecisions(list, sb, S, ss) {
   list.forEach(function (x) { v.forEach(function (r) { if (str(r[9]) === x.id) { r[1] = x.paper || r[1]; r[2] = x.journal || r[2]; r[3] = x.status || r[3]; r[4] = x.dtype || r[4]; } }); });
   rg.setValues(v);
 }
+
+// ---------- daily research insights (Crossref + the watch list; optional Claude-written ideas) ----------
+var INSIGHTS_SHEET = 'Research insights';
+var INSIGHT_HEAD = ['Date', '#', 'Title', 'Authors', 'Journal', 'ABDC', 'FT50', 'Published', 'DOI', 'Related paper', 'Why relevant',
+  'Next-study idea', 'Abstract', 'Idea by', 'Saved'];
+
+function turnOnDailyInsights() {
+  turnOffDailyInsights(true);
+  ScriptApp.newTrigger('dailyInsights').timeBased().everyDays(1).atHour(7).create();
+  var r = runInsights();
+  SpreadsheetApp.getActive().toast('Daily insights are on (about 7 am). ' + r.summary, 'RD SK', 12);
+}
+function turnOffDailyInsights(quiet) {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyInsights') ScriptApp.deleteTrigger(t); });
+  if (quiet !== true) SpreadsheetApp.getActive().toast('Daily insights are off.', 'RD SK');
+}
+function insightsNow() { SpreadsheetApp.getActive().toast(runInsights().summary, 'RD SK', 12); }
+function dailyInsights() { runInsights(); }
+
+function setClaudeKey() {
+  var ui = SpreadsheetApp.getUi();
+  var r = ui.prompt('Claude API key (optional)', 'Paste a key from console.anthropic.com (starts with sk-ant-). It is stored in this ' +
+    "script's private properties and used once a day to write the next-study ideas. Leave empty to remove it.", ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var key = r.getResponseText().trim(), props = PropertiesService.getScriptProperties();
+  if (key) props.setProperty('CLAUDE_API_KEY', key); else props.deleteProperty('CLAUDE_API_KEY');
+  ui.alert(key ? 'Saved. Tomorrow\'s insights (or "Get today\'s research insights now") will use Claude-written ideas.' : 'Key removed.');
+}
+
+/** Fetches recent papers from the watch list, ranks them against your papers and writes today's insights. */
+function runInsights() {
+  var ss = SpreadsheetApp.getActive(), tz = ss.getSpreadsheetTimeZone(), me = Session.getEffectiveUser().getEmail();
+  var ps = ss.getSheetByName('Papers'), P = cols(ps, PAPER_COLS, ADD_PAPER), pb = block(ps, P);
+  var papers = pb.v.filter(function (r) { return str(r[P.key - 1]) && !str(P.override ? r[P.override - 1] : ''); })
+    .map(function (r) { return { key: str(r[P.key - 1]), title: P.title ? str(r[P.title - 1]) : '' }; });
+  var sh = logSheet(ss, INSIGHTS_SHEET, INSIGHT_HEAD), seen = {};
+  if (sh.getLastRow() > 1) sh.getRange(2, 9, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { seen[str(r[0]).replace(/^https?:\/\/doi\.org\//, '').toLowerCase()] = 1; });
+  var from = Utilities.formatDate(new Date(Date.now() - 35 * 864e5), tz, 'yyyy-MM-dd'), items = [], failed = 0;
+  var get = function (list) {
+    return UrlFetchApp.fetchAll(list.map(function (j) { return { url: rdCrossrefUrl(j.issn[0], from, me), muteHttpExceptions: true }; }));
+  };
+  for (var i = 0; i < RD_WATCH.length; i += 5) {
+    var batch = RD_WATCH.slice(i, i + 5), res = get(batch);
+    res.forEach(function (r, k) {
+      if (r.getResponseCode() !== 200) { Utilities.sleep(800); r = get([batch[k]])[0]; }
+      if (r.getResponseCode() !== 200) { failed++; return; }
+      try { items = items.concat(rdCrossrefItems(JSON.parse(r.getContentText()), batch[k])); } catch (e) { failed++; }
+    });
+  }
+  var key = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
+  var picked = rdRankInsights(items, papers, seen, key ? 15 : 5), by = 'RD SK';
+  if (key && picked.length) {
+    var ai = claudeIdeas(key, picked, papers);
+    if (ai) { picked = ai; by = 'Claude'; } else picked = picked.slice(0, 5);
+  }
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var rows = picked.map(function (x, n) {
+    return [today, n + 1, x.title, x.authors, x.journal, x.abdc, x.ft50 ? 'FT50' : '', x.published, 'https://doi.org/' + x.doi, x.paper,
+            x.why, x.tip, String(x.abstract || '').slice(0, 3000), by, ''];
+  });
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, INSIGHT_HEAD.length).setValues(rows);
+  return { count: rows.length, summary: rows.length + ' insights from ' + items.length + ' recent papers in ' + (RD_WATCH.length - failed) +
+           ' journals' + (by === 'Claude' ? ' (ideas written by Claude)' : '') + '.' };
+}
+
+/** Claude picks the 5 most useful of the shortlist and writes why it matters and a concrete next study. Null on any problem. */
+function claudeIdeas(key, shortlist, papers) {
+  var schema = { type: 'object', additionalProperties: false, required: ['insights'], properties: { insights: { type: 'array', items: {
+    type: 'object', additionalProperties: false, required: ['doi', 'related_paper', 'why_relevant', 'next_study'],
+    properties: { doi: { type: 'string' }, related_paper: { type: 'string' }, why_relevant: { type: 'string' }, next_study: { type: 'string' } } } } } };
+  var prompt = 'You are helping an academic in communication, discourse and organization studies (continental philosophy, critical ' +
+    'discourse analysis, AI-mediated communication, ethics) stay current and find research gaps.\n\nTheir papers (short name: title):\n' +
+    papers.map(function (p) { return '- ' + p.key + ': ' + (p.title || p.key); }).join('\n') +
+    '\n\nRecently published candidates:\n' + shortlist.map(function (x) {
+      return 'DOI ' + x.doi + ' | ' + x.journal + (x.abdc ? ' (ABDC ' + x.abdc + ')' : '') + ' | ' + x.title + '\nAbstract: ' + (x.abstract || '(none)').slice(0, 1200);
+    }).join('\n\n') +
+    '\n\nPick the 5 candidates most useful for their next papers (prefer variety across their papers). For each give: doi (exactly as ' +
+    'given); related_paper (one short name from their list); why_relevant (1-2 sentences on what the study found or argues and how it ' +
+    'connects to that paper); next_study (2-3 sentences: a specific, feasible study they could write next that fills a gap this paper ' +
+    'leaves open, with research question, method and setting). Be concrete; do not invent findings beyond the abstract.';
+  try {
+    var r = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
+      payload: JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 16000, fallbacks: 'default',
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: schema } },
+        messages: [{ role: 'user', content: prompt }] }) });
+    if (r.getResponseCode() !== 200) return null;
+    var msg = JSON.parse(r.getContentText());
+    if (msg.stop_reason === 'refusal') return null;
+    var text = (msg.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+    var out = JSON.parse(text).insights, byDoi = {};
+    shortlist.forEach(function (x) { byDoi[x.doi] = x; });
+    var picked = out.filter(function (o) { return byDoi[String(o.doi).toLowerCase()]; }).slice(0, 5).map(function (o) {
+      var x = byDoi[String(o.doi).toLowerCase()], y = {};
+      Object.keys(x).forEach(function (k) { y[k] = x[k]; });
+      y.paper = o.related_paper; y.why = o.why_relevant; y.tip = o.next_study;
+      return y;
+    });
+    return picked.length >= 3 ? picked : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** The last 14 days of insights for the app; `saved` = DOIs starred in the app. */
+function insightRows(ss, saved) {
+  var sh = ss.getSheetByName(INSIGHTS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var rg = sh.getRange(2, 1, sh.getLastRow() - 1, INSIGHT_HEAD.length), v = rg.getValues(), star = {}, dirty = false;
+  saved.forEach(function (d) { star[String(d).toLowerCase()] = 1; });
+  var since = Date.now() - 14 * 864e5, tz = ss.getSpreadsheetTimeZone(), out = [];
+  v.forEach(function (r) {
+    var doi = str(r[8]).replace(/^https?:\/\/doi\.org\//, '').toLowerCase();
+    if (star[doi] && str(r[14]) !== 'Yes') { r[14] = 'Yes'; dirty = true; }
+    var d = r[0] instanceof Date ? r[0] : new Date(Date.parse(str(r[0])));
+    if (d.getTime() < since && str(r[14]) !== 'Yes') return;
+    out.push({ date: day(r[0], tz) || str(r[0]), rank: +r[1] || 0, title: str(r[2]), authors: str(r[3]), journal: str(r[4]), abdc: str(r[5]),
+               ft50: !!str(r[6]), published: day(r[7], tz) || str(r[7]), doi: doi, paper: str(r[9]), why: str(r[10]), tip: str(r[11]),
+               abstract: str(r[12]).slice(0, 1500), by: str(r[13]), saved: str(r[14]) === 'Yes' });
+  });
+  if (dirty) rg.setValues(v);
+  return out.slice(-60);
+}
+
+// ==== watchlist.js (copied from the app by tools/make_gscript.py; edit it there) ====
+// Journals scanned for daily research insights (built by tools/build_watchlist.py).
+var RD_WATCH = [{"name":"Academy of Management Review","abdc":"A*","ft50":true,"mine":true,"issn":["0363-7425","1930-3807"]},{"name":"Human Relations","abdc":"A*","ft50":true,"mine":true,"issn":["0018-7267","1741-282X"]},{"name":"Journal of Business Ethics","abdc":"A","ft50":true,"mine":true,"issn":["0167-4544","1573-0697"]},{"name":"Journal of Management Studies","abdc":"A*","ft50":true,"mine":true,"issn":["0022-2380","1467-6486"]},{"name":"MIT Sloan Management Review","abdc":"A","ft50":true,"mine":true,"issn":["1532-9194","1532-8937"]},{"name":"Organization Studies","abdc":"A*","ft50":true,"mine":true,"issn":["0170-8406","1741-3044"]},{"name":"Alternatives: global, local, political","abdc":"A","ft50":false,"mine":true,"issn":["0304-3754","2163-3150"]},{"name":"Angelaki","abdc":"","ft50":false,"mine":true,"issn":["0969-725X","1469-2899"]},{"name":"Applied Linguistics","abdc":"","ft50":false,"mine":true,"issn":["0142-6001","1477-450X"]},{"name":"Applied Linguistics Review","abdc":"","ft50":false,"mine":true,"issn":["1868-6303","1868-6311"]},{"name":"Asian Journal of Communication","abdc":"","ft50":false,"mine":true,"issn":["0129-2986","1742-0911"]},{"name":"Asian Journal of Philosophy","abdc":"","ft50":false,"mine":true,"issn":["2731-4642"]},{"name":"Business Ethics Quarterly","abdc":"A","ft50":false,"mine":true,"issn":["1052-150X","2153-3326"]},{"name":"Business Information Review","abdc":"","ft50":false,"mine":true,"issn":["0266-3821","1741-6450"]},{"name":"Communication and Critical/Cultural Studies","abdc":"","ft50":false,"mine":true,"issn":["1479-1420","1479-4233"]},{"name":"Communication Methods and Measures","abdc":"","ft50":false,"mine":true,"issn":["1931-2458","1931-2466"]},{"name":"Communication Monographs","abdc":"","ft50":false,"mine":true,"issn":["0363-7751","1479-5787"]},{"name":"Communication Research","abdc":"A","ft50":false,"mine":true,"issn":["0093-6502","1552-3810"]},{"name":"Communication Theory","abdc":"A","ft50":false,"mine":true,"issn":["1050-3293","1468-2885"]},{"name":"Communications: The European Journal of Communication Research","abdc":"","ft50":false,"mine":true,"issn":["0341-2059","1613-4087"]},{"name":"Comparative and Continental Philosophy","abdc":"","ft50":false,"mine":true,"issn":["1757-0638","1757-0646"]},{"name":"Contemporary Sociology","abdc":"C","ft50":false,"mine":true,"issn":["0094-3061","1939-8638"]},{"name":"Continental Philosophy Review","abdc":"","ft50":false,"mine":true,"issn":["1387-2842","1573-1103"]},{"name":"Corporate Communications: An International Journal","abdc":"","ft50":false,"mine":true,"issn":["1356-3289","1758-6046"]},{"name":"Critical Asian Studies","abdc":"B","ft50":false,"mine":true,"issn":["1467-2715","1472-6033"]},{"name":"Critical Discourse Studies","abdc":"B","ft50":false,"mine":true,"issn":["1740-5904","1740-5912"]},{"name":"Critical Horizons","abdc":"","ft50":false,"mine":true,"issn":["1440-9917","1568-5160"]},{"name":"Critical Quarterly (Wiley)","abdc":"","ft50":false,"mine":true,"issn":["0011-1562","1467-8705"]},{"name":"Culture and Organization","abdc":"B","ft50":false,"mine":true,"issn":["1475-9551","1477-2760"]},{"name":"Discourse & Communication","abdc":"A","ft50":false,"mine":true,"issn":["1750-4813","1750-4821"]},{"name":"Discourse & Society","abdc":"A","ft50":false,"mine":true,"issn":["0957-9265","1460-3624"]},{"name":"Discourse Studies","abdc":"A","ft50":false,"mine":true,"issn":["1461-4456","1461-7080"]},{"name":"Eidos: A Journal for Philosophy of Culture","abdc":"","ft50":false,"mine":true,"issn":["1692-8857","2011-7477"]},{"name":"Employee Relations","abdc":"A","ft50":false,"mine":true,"issn":["0142-5455","1758-7069"]},{"name":"Ethics and Information Technology","abdc":"B","ft50":false,"mine":true,"issn":["1388-1957","1572-8439"]},{"name":"Ethics: an international journal of social, political, and legal philosophy","abdc":"A","ft50":false,"mine":true,"issn":["0014-1704","1539-297X"]},{"name":"Ethos","abdc":"","ft50":false,"mine":true,"issn":["0091-2131","1548-1352"]},{"name":"European Journal of Communication","abdc":"B","ft50":false,"mine":true,"issn":["0267-3231","1460-3705"]},{"name":"European Journal of Cultural Studies (Sage)","abdc":"","ft50":false,"mine":true,"issn":["1367-5494","1460-3551"]},{"name":"Foresight","abdc":"C","ft50":false,"mine":true,"issn":["1463-6689","1465-9832"]},{"name":"Global Knowledge, Memory and Communication","abdc":"B","ft50":false,"mine":true,"issn":["2514-9342","2514-9350"]},{"name":"Global Philosophy","abdc":"","ft50":false,"mine":true,"issn":["2948-152X","2948-1538"]},{"name":"Group & Organization Management","abdc":"A","ft50":false,"mine":true,"issn":["1059-6011","1552-3993"]},{"name":"History & Memory","abdc":"","ft50":false,"mine":true,"issn":["0935-560X","1527-1994"]},{"name":"History and Theory","abdc":"","ft50":false,"mine":true,"issn":["0018-2656","1468-2303"]},{"name":"History of European Ideas","abdc":"","ft50":false,"mine":true,"issn":["0191-6599","1873-541X"]},{"name":"Human Studies","abdc":"","ft50":false,"mine":true,"issn":["0163-8548","1572-851X"]},{"name":"IEEE Transactions on Engineering Management","abdc":"A","ft50":false,"mine":true,"issn":["1558-0040","0018-9391"]},{"name":"Industrial and Commercial Training","abdc":"","ft50":false,"mine":true,"issn":["0019-7858","1758-5767"]},{"name":"Information and Organization","abdc":"A*","ft50":false,"mine":true,"issn":["1471-7727","1873-7919"]},{"name":"Information Discovery and Delivery","abdc":"C","ft50":false,"mine":true,"issn":["2398-6247","2398-6255"]},{"name":"Information, Communication & Society","abdc":"A","ft50":false,"mine":true,"issn":["1369-118X","1468-4462"]},{"name":"INQUIRY: An Interdisciplinary Journal of Philosophy","abdc":"","ft50":false,"mine":true,"issn":["0020-174X","0020-174X"]},{"name":"International Journal of Educational Management","abdc":"B","ft50":false,"mine":true,"issn":["0951-354X","1758-6518"]},{"name":"International Journal of Information Management","abdc":"A","ft50":false,"mine":true,"issn":["0268-4012","1873-4707"]},{"name":"International Journal of Public Sector Management","abdc":"B","ft50":false,"mine":true,"issn":["0951-3558","1758-6666"]},{"name":"International Journal of Social Research Methodology","abdc":"B","ft50":false,"mine":true,"issn":["1364-5579","1464-5300"]},{"name":"International Journal of Strategic Communication","abdc":"B","ft50":false,"mine":true,"issn":["1553-118X","1553-1198"]},{"name":"Journal for Cultural Research","abdc":"","ft50":false,"mine":true,"issn":["1479-7585","1740-1666"]},{"name":"Journal of African Business","abdc":"C","ft50":false,"mine":true,"issn":["1522-8916","1522-9076"]},{"name":"Journal of Applied Communication Research","abdc":"","ft50":false,"mine":true,"issn":["0090-9882","1479-5752"]},{"name":"Journal of Communication","abdc":"A","ft50":false,"mine":true,"issn":["0021-9916","1460-2466"]},{"name":"Journal of Communication Management","abdc":"B","ft50":false,"mine":true,"issn":["1363-254X","1478-0852"]},{"name":"Journal of Contemporary European Studies","abdc":"","ft50":false,"mine":true,"issn":["1478-2804","1478-2790"]},{"name":"Journal of Information Communication and Ethics in Society","abdc":"B","ft50":false,"mine":true,"issn":["1477-996X","1758-8871"]},{"name":"Journal of Knowledge Management","abdc":"A","ft50":false,"mine":true,"issn":["1367-3270","1758-7484"]},{"name":"Journal of Leadership and Organizational Studies","abdc":"A","ft50":false,"mine":true,"issn":["1548-0518","1939-7089"]},{"name":"Journal of Management Inquiry","abdc":"A","ft50":false,"mine":true,"issn":["1056-4926","1552-6542"]},{"name":"Journal of Markets & Morality","abdc":"B","ft50":false,"mine":true,"issn":["1098-1217","1944-7841"]},{"name":"Journal of Organizational Effectiveness: People and Performance (JOEPP)","abdc":"","ft50":false,"mine":true,"issn":["2051-6614","2051-6622"]},{"name":"Journal of Philosophical Research (pdcnet.org/jpr)","abdc":"","ft50":false,"mine":true,"issn":["1053-8364"]},{"name":"Journal of Social Issues","abdc":"A","ft50":false,"mine":true,"issn":["0022-4537","1540-4560"]},{"name":"Journal of Social Philosophy","abdc":"","ft50":false,"mine":true,"issn":["0047-2786","1467-9833"]},{"name":"Journal of the British Society for Phenomenology (JBSP)","abdc":"","ft50":false,"mine":true,"issn":["0007-1773","2332-0486"]},{"name":"Journal of the Philosophy of History","abdc":"","ft50":false,"mine":true,"issn":["1872-261X","1872-2636"]},{"name":"Knowledge Management Research and Practice","abdc":"A","ft50":false,"mine":true,"issn":["1477-8238","1477-8246"]},{"name":"Language & Communication","abdc":"B","ft50":false,"mine":true,"issn":["0271-5309","1873-3395"]},{"name":"Leadership","abdc":"B","ft50":false,"mine":true,"issn":["1742-7150","1742-7169"]},{"name":"Management Communication Quarterly","abdc":"B","ft50":false,"mine":true,"issn":["0893-3189","1552-6798"]},{"name":"Media Culture and Society","abdc":"B","ft50":false,"mine":true,"issn":["0163-4437","1460-3675"]},{"name":"Memory Studies","abdc":"","ft50":false,"mine":true,"issn":["1750-6980","1750-6999"]},{"name":"Mortality (Death and Dying), T&F","abdc":"","ft50":false,"mine":true,"issn":["1357-6275","1469-9885"]},{"name":"New Technology, Work & Employment","abdc":"A","ft50":false,"mine":true,"issn":["0268-1072","1468-005X"]},{"name":"Orbis Litterarum","abdc":"","ft50":false,"mine":true,"issn":["0105-7510","1600-0730"]},{"name":"Organization","abdc":"A","ft50":false,"mine":true,"issn":["1350-5084","1461-7323"]},{"name":"Organization Theory","abdc":"A","ft50":false,"mine":true,"issn":["2631-7877"]},{"name":"Organization: the critical journal of organization, theory and society","abdc":"","ft50":false,"mine":true,"issn":["1350-5084","1461-7323"]},{"name":"Oxford Literary Review","abdc":"","ft50":false,"mine":true,"issn":["0305-1498","1757-1634"]},{"name":"Personnel Review","abdc":"A","ft50":false,"mine":true,"issn":["0048-3486","1758-6933"]},{"name":"Philosophical Explorations","abdc":"","ft50":false,"mine":true,"issn":["1386-9795","1741-5918"]},{"name":"Philosophy & Public Affairs","abdc":"A","ft50":false,"mine":true,"issn":["0048-3915","1088-4963"]},{"name":"Philosophy & Social Criticism","abdc":"","ft50":false,"mine":true,"issn":["0191-4537","1461-734X"]},{"name":"Philosophy of the Social Sciences","abdc":"B","ft50":false,"mine":true,"issn":["0048-3931","1552-7441"]},{"name":"Poetics","abdc":"","ft50":false,"mine":true,"issn":["0304-422X"]},{"name":"Political Communication","abdc":"A","ft50":false,"mine":true,"issn":["1058-4609","1091-7675"]},{"name":"Public Management Review","abdc":"A","ft50":false,"mine":true,"issn":["1471-9037","1471-9045"]},{"name":"Public Personnel Management","abdc":"B","ft50":false,"mine":true,"issn":["0091-0260","1945-7421"]},{"name":"Qualitative Inquiry","abdc":"","ft50":false,"mine":true,"issn":["1077-8004","1552-7565"]},{"name":"Qualitative Research in Organizations and Management","abdc":"B","ft50":false,"mine":true,"issn":["1746-5648","1746-5656"]},{"name":"R&D Management","abdc":"A","ft50":false,"mine":true,"issn":["0033-6807","1467-9310"]},{"name":"Research in Phenomenology","abdc":"","ft50":false,"mine":true,"issn":["0085-5553","1569-1640"]},{"name":"Research in the Sociology of Organizations","abdc":"B","ft50":false,"mine":true,"issn":["0733-558X"]},{"name":"Research on Language and Social Interaction","abdc":"","ft50":false,"mine":true,"issn":["0835-1813","1532-7973"]},{"name":"Rethinking History","abdc":"","ft50":false,"mine":true,"issn":["1364-2529","1470-1154"]},{"name":"Review of Public Personnel Administration","abdc":"B","ft50":false,"mine":true,"issn":["0734-371X","1552-759X"]},{"name":"Scientometrics","abdc":"A","ft50":false,"mine":true,"issn":["0138-9130","1588-2861"]},{"name":"Security Dialogue","abdc":"A","ft50":false,"mine":true,"issn":["0967-0106","1460-3640"]},{"name":"Security Studies","abdc":"B","ft50":false,"mine":true,"issn":["0963-6412","1556-1852"]},{"name":"Social Movement Studies","abdc":"","ft50":false,"mine":true,"issn":["1474-2837","1474-2829"]},{"name":"Social Science & Medicine","abdc":"A","ft50":false,"mine":true,"issn":["0277-9536","1873-5347"]},{"name":"Social Science Information","abdc":"C","ft50":false,"mine":true,"issn":["0539-0184","1461-7412"]},{"name":"Social Semiotics","abdc":"","ft50":false,"mine":true,"issn":["1035-0330","1470-1219"]},{"name":"Sociological Inquiry","abdc":"A","ft50":false,"mine":true,"issn":["1475-682X"]},{"name":"Speech Communication","abdc":"","ft50":false,"mine":true,"issn":["0167-6393"]},{"name":"Strategic HR Review","abdc":"","ft50":false,"mine":true,"issn":["1475-4398","1475-4398"]},{"name":"Studies in East European Thought","abdc":"","ft50":false,"mine":true,"issn":["0925-9392","1573-0948"]},{"name":"Technological Forecasting and Social Change","abdc":"A","ft50":false,"mine":true,"issn":["0040-1625","1873-5509"]},{"name":"Technology Analysis and Strategic Management","abdc":"B","ft50":false,"mine":true,"issn":["0953-7325","1465-3990"]},{"name":"Technology in Society","abdc":"C","ft50":false,"mine":true,"issn":["0160-791X","1879-3274"]},{"name":"The Journal of Peasant Studies","abdc":"","ft50":false,"mine":true,"issn":["0306-6150","1743-9361"]},{"name":"The Leadership Quarterly","abdc":"A*","ft50":false,"mine":true,"issn":["1048-9843","1873-3409"]},{"name":"The Social Science Journal","abdc":"C","ft50":false,"mine":true,"issn":["0362-3319","1873-5355"]},{"name":"The Sociological Review","abdc":"A","ft50":false,"mine":true,"issn":["0038-0261","1467-954X"]},{"name":"The Southern Journal of Philosophy","abdc":"","ft50":false,"mine":true,"issn":["0038-4283","2041-6962"]},{"name":"Theoria","abdc":"","ft50":false,"mine":true,"issn":["1755-2567","0040-5825"]},{"name":"Theory, Culture and Society","abdc":"","ft50":false,"mine":true,"issn":["0263-2764","1460-3616"]},{"name":"Time and Society","abdc":"B","ft50":false,"mine":true,"issn":["0961-463X","1461-7463"]},{"name":"VINE Journal of Information and Knowledge Management Systems","abdc":"B","ft50":false,"mine":true,"issn":["2059-5891"]},{"name":"Academy of Management Journal","abdc":"A*","ft50":true,"mine":false,"issn":["0001-4273","1948-0989"]},{"name":"Administrative Science Quarterly","abdc":"A*","ft50":true,"mine":false,"issn":["0001-8392","1930-3815"]},{"name":"Entrepreneurship Theory and Practice","abdc":"A*","ft50":true,"mine":false,"issn":["1042-2587","1540-6520"]},{"name":"Harvard Business Review","abdc":"A","ft50":true,"mine":false,"issn":["0017-8012"]},{"name":"Human Resource Management (US)","abdc":"A*","ft50":true,"mine":false,"issn":["0090-4848","1099-050X"]},{"name":"Information Systems Research","abdc":"A*","ft50":true,"mine":false,"issn":["1047-7047","1526-5536"]},{"name":"Journal of Applied Psychology","abdc":"A*","ft50":true,"mine":false,"issn":["0021-9010","1939-1854"]},{"name":"Journal of Consumer Psychology","abdc":"A*","ft50":true,"mine":false,"issn":["1057-7408","1532-7663"]},{"name":"Journal of Consumer Research","abdc":"A*","ft50":true,"mine":false,"issn":["0093-5301","1537-5277"]},{"name":"Journal of International Business Studies","abdc":"A*","ft50":true,"mine":false,"issn":["0047-2506","1478-6990"]},{"name":"Journal of Management","abdc":"A*","ft50":true,"mine":false,"issn":["0149-2063","1557-1211"]},{"name":"Journal of Management Information Systems","abdc":"A*","ft50":true,"mine":false,"issn":["0742-1222","1557-928X"]},{"name":"Journal of Marketing","abdc":"A*","ft50":true,"mine":false,"issn":["0022-2429","1547-7185"]},{"name":"Journal of Marketing Research","abdc":"A*","ft50":true,"mine":false,"issn":["0022-2437","1547-7193"]},{"name":"Journal of the Academy of Marketing Science","abdc":"A*","ft50":true,"mine":false,"issn":["0092-0703","1552-7824"]},{"name":"Marketing Science","abdc":"A*","ft50":true,"mine":false,"issn":["0732-2399","1526-548X"]},{"name":"MIS Quarterly","abdc":"A*","ft50":true,"mine":false,"issn":["0276-7783","2162-9730"]},{"name":"Organization Science","abdc":"A*","ft50":true,"mine":false,"issn":["1047-7039","1526-5455"]},{"name":"Organizational Behavior and Human Decision Processes","abdc":"A*","ft50":true,"mine":false,"issn":["0749-5978","1095-9920"]},{"name":"Research Policy","abdc":"A*","ft50":true,"mine":false,"issn":["0048-7333","1873-7625"]},{"name":"Strategic Management Journal","abdc":"A*","ft50":true,"mine":false,"issn":["0143-2095","1097-0266"]},{"name":"Academy of Marketing Studies Journal","abdc":"B","ft50":false,"mine":false,"issn":["1095-6298","1528-2678"]},{"name":"Accounting, Organizations and Society","abdc":"A*","ft50":false,"mine":false,"issn":["0361-3682","1873-6289"]},{"name":"Agricultural Economics","abdc":"A","ft50":false,"mine":false,"issn":["0169-5150","1574-0862"]},{"name":"American Journal of Agricultural Economics","abdc":"A*","ft50":false,"mine":false,"issn":["0002-9092","1467-8276"]},{"name":"American Journal of Political Science","abdc":"A*","ft50":false,"mine":false,"issn":["0092-5853","1540-5907"]},{"name":"American Journal of Sociology","abdc":"A*","ft50":false,"mine":false,"issn":["0002-9602","1537-5390"]},{"name":"American Political Science Review","abdc":"A*","ft50":false,"mine":false,"issn":["0003-0554","1537-5943"]},{"name":"American Sociological Review","abdc":"A*","ft50":false,"mine":false,"issn":["0003-1224","1939-8271"]},{"name":"Annual Review of Organizational Psychology and Organizational Behavior","abdc":"A*","ft50":false,"mine":false,"issn":["2327-0616"]},{"name":"Annual Review of Sociology","abdc":"A*","ft50":false,"mine":false,"issn":["0360-0572","1545-2115"]},{"name":"Asia Pacific Journal of Marketing and Logistics","abdc":"A","ft50":false,"mine":false,"issn":["1355-5855","1758-4248"]},{"name":"Australasian Marketing Journal","abdc":"A","ft50":false,"mine":false,"issn":["1441-3582","1839-3349"]},{"name":"Australian Journal of Political Science","abdc":"A","ft50":false,"mine":false,"issn":["1036-1146","1363-030X"]},{"name":"Australian Journal of Public Administration","abdc":"A","ft50":false,"mine":false,"issn":["0313-6647","1467-8500"]},{"name":"British Journal of Political Science","abdc":"A*","ft50":false,"mine":false,"issn":["0007-1234","1469-2112"]},{"name":"British Journal of Sociology","abdc":"A","ft50":false,"mine":false,"issn":["0007-1315","1468-4446"]},{"name":"Business Ethics, the Environment & Responsibility","abdc":"B","ft50":false,"mine":false,"issn":["0962-8770","1467-8608"]},{"name":"Canadian Journal of Agricultural Economics / Revue Canadienne d Agroeconomie","abdc":"A","ft50":false,"mine":false,"issn":["0008-3976","1744-7976"]},{"name":"Communication & Sport","abdc":"B","ft50":false,"mine":false,"issn":["2167-4809","2167-4795"]},{"name":"Communications in Statistics: Theory and Methods","abdc":"B","ft50":false,"mine":false,"issn":["0361-0926","1532-415X"]},{"name":"Communications of the Association for Information Systems","abdc":"A","ft50":false,"mine":false,"issn":["1529-3181"]},{"name":"Comparative Political Studies","abdc":"A","ft50":false,"mine":false,"issn":["0010-4140","1552-3829"]},{"name":"Comparative Politics","abdc":"A","ft50":false,"mine":false,"issn":["0010-4159","2151-6227"]},{"name":"Competition and Consumer Law Journal","abdc":"A","ft50":false,"mine":false,"issn":["1039-5598"]},{"name":"Corporate Communications","abdc":"B","ft50":false,"mine":false,"issn":["1356-3289","1758-6046"]},{"name":"Critical Finance Review","abdc":"A*","ft50":false,"mine":false,"issn":["2164-5744","2164-5760"]},{"name":"Critical Perspectives on Accounting","abdc":"A","ft50":false,"mine":false,"issn":["1045-2354","1095-9955"]},{"name":"Economic Development and Cultural Change","abdc":"A","ft50":false,"mine":false,"issn":["0013-0079","1539-2988"]},{"name":"Economics & Politics","abdc":"A","ft50":false,"mine":false,"issn":["0954-1985","1468-0343"]},{"name":"Economics and Philosophy","abdc":"A","ft50":false,"mine":false,"issn":["0266-2671","1474-0028"]},{"name":"Educational Management Administration & Leadership","abdc":"B","ft50":false,"mine":false,"issn":["1741-1432","1741-1440"]},{"name":"European Business Organization Law Review","abdc":"B","ft50":false,"mine":false,"issn":["1566-7529","1741-6205"]},{"name":"European Journal of Marketing","abdc":"A*","ft50":false,"mine":false,"issn":["0309-0566","1758-7123"]},{"name":"European Journal of Political Economy","abdc":"A","ft50":false,"mine":false,"issn":["0176-2680","1873-5703"]},{"name":"European Journal of Political Research","abdc":"A","ft50":false,"mine":false,"issn":["0304-4130","1475-6765"]},{"name":"European Journal of Work and Organizational Psychology","abdc":"A","ft50":false,"mine":false,"issn":["1359-432X","1464-0643"]},{"name":"European Review of Agricultural Economics","abdc":"A","ft50":false,"mine":false,"issn":["0165-1587","1464-3618"]},{"name":"Gender, Work and Organization","abdc":"A","ft50":false,"mine":false,"issn":["0968-6673","1468-0432"]},{"name":"Health Communication","abdc":"B","ft50":false,"mine":false,"issn":["1041-0236","1532-7027"]},{"name":"Health Marketing Quarterly","abdc":"B","ft50":false,"mine":false,"issn":["0735-9683","1545-0864"]},{"name":"History of Political Economy","abdc":"A","ft50":false,"mine":false,"issn":["0018-2702","1527-1919"]},{"name":"IEEE Transactions on Professional Communication","abdc":"B","ft50":false,"mine":false,"issn":["0361-1434","1558-1500"]},{"name":"Industrial and Organizational Psychology: perspectives on science & practice","abdc":"B","ft50":false,"mine":false,"issn":["1754-9426","1754-9434"]},{"name":"Industrial Marketing Management","abdc":"A*","ft50":false,"mine":false,"issn":["0019-8501","1873-2062"]},{"name":"Information and Communications Technology Law","abdc":"B","ft50":false,"mine":false,"issn":["1360-0834","1469-8404"]},{"name":"Innovation: Organization & Management","abdc":"B","ft50":false,"mine":false,"issn":["1447-9338","2204-0226"]},{"name":"International Environmental Agreements: Politics, Law and Economics","abdc":"A","ft50":false,"mine":false,"issn":["1567-9764","1573-1553"]},{"name":"International Journal of Advertising","abdc":"A","ft50":false,"mine":false,"issn":["0265-0487","1759-3948"]},{"name":"International Journal of Bank Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0265-2323","1758-5937"]},{"name":"International Journal of Consumer Studies","abdc":"A","ft50":false,"mine":false,"issn":["1470-6423","1470-6431"]},{"name":"International Journal of Cultural Policy","abdc":"A","ft50":false,"mine":false,"issn":["1028-6632","1477-2833"]},{"name":"International Journal of Industrial Organization","abdc":"A*","ft50":false,"mine":false,"issn":["0167-7187","1873-7986"]},{"name":"International Journal of Organizational Analysis","abdc":"B","ft50":false,"mine":false,"issn":["1934-8835","1758-8561"]},{"name":"International Journal of Research in Marketing","abdc":"A*","ft50":false,"mine":false,"issn":["0167-8116","1873-8001"]},{"name":"International Journal of Sport Communication","abdc":"B","ft50":false,"mine":false,"issn":["1936-3915","1936-3907"]},{"name":"International Journal of Sports Management and Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1475-8962","1740-2808"]},{"name":"International Journal of Sports Marketing and Sponsorship","abdc":"B","ft50":false,"mine":false,"issn":["1464-6668","2515-7841"]},{"name":"International Journal of Work Organisation and Emotion","abdc":"B","ft50":false,"mine":false,"issn":["1740-8938","1740-8946"]},{"name":"International Marketing Review","abdc":"A","ft50":false,"mine":false,"issn":["0265-1335","1758-6763"]},{"name":"International Organization","abdc":"B","ft50":false,"mine":false,"issn":["0020-8183","1531-5088"]},{"name":"International Review on Public and Nonprofit Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1865-1984","1865-1992"]},{"name":"International Studies of Management & Organization","abdc":"B","ft50":false,"mine":false,"issn":["0020-8825","1558-0911"]},{"name":"Journal of Accounting & Organizational Change","abdc":"B","ft50":false,"mine":false,"issn":["1832-5912","1839-5473"]},{"name":"Journal of Advertising","abdc":"A","ft50":false,"mine":false,"issn":["0091-3367","1557-7805"]},{"name":"Journal of Advertising Research","abdc":"A","ft50":false,"mine":false,"issn":["0021-8499","1740-1909"]},{"name":"Journal of Agricultural and Resource Economics","abdc":"A","ft50":false,"mine":false,"issn":["1068-5502","2327-8285"]},{"name":"Journal of Agricultural Economics","abdc":"A","ft50":false,"mine":false,"issn":["0021-857X","1477-9552"]},{"name":"Journal of Business & Industrial Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0885-8624","2052-1189"]},{"name":"Journal of Business-to-Business Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1051-712X","1547-0628"]},{"name":"Journal of Consumer Affairs","abdc":"A","ft50":false,"mine":false,"issn":["0022-0078","1745-6606"]},{"name":"Journal of Consumer Behaviour","abdc":"A","ft50":false,"mine":false,"issn":["1472-0817","1479-1838"]},{"name":"Journal of Consumer Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0736-3761","2052-1200"]},{"name":"Journal of Cross-Cultural Psychology","abdc":"A","ft50":false,"mine":false,"issn":["0022-0221","1552-5422"]},{"name":"Journal of Cultural Economics","abdc":"A","ft50":false,"mine":false,"issn":["0885-2545","1573-6997"]},{"name":"Journal of Current Issues and Research in Advertising","abdc":"B","ft50":false,"mine":false,"issn":["1064-1734","2164-7313"]},{"name":"Journal of Destination Marketing & Management","abdc":"A","ft50":false,"mine":false,"issn":["2212-571X","2212-5752"]},{"name":"Journal of Economic Behavior and Organization","abdc":"A*","ft50":false,"mine":false,"issn":["0167-2681","1879-1751"]},{"name":"Journal of Electronic Commerce in Organizations","abdc":"B","ft50":false,"mine":false,"issn":["1539-2937","1539-2929"]},{"name":"Journal of Experimental Psychology: learning, memory, and cognition","abdc":"A","ft50":false,"mine":false,"issn":["0278-7393","1939-1285"]},{"name":"Journal of Fashion Marketing and Management","abdc":"B","ft50":false,"mine":false,"issn":["1361-2026","1758-7433"]},{"name":"Journal of Financial Services Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1363-0539","1479-1846"]},{"name":"Journal of Food Products Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1045-4446","1540-4102"]},{"name":"Journal of Global Fashion Marketing","abdc":"B","ft50":false,"mine":false,"issn":["2093-2685","2325-4483"]},{"name":"Journal of Global Marketing","abdc":"B","ft50":false,"mine":false,"issn":["0891-1762","1528-6975"]},{"name":"Journal of Global Scholars of Marketing Science","abdc":"B","ft50":false,"mine":false,"issn":["2163-9159","2163-9167"]},{"name":"Journal of Health Politics, Policy and Law","abdc":"A","ft50":false,"mine":false,"issn":["0361-6878","1527-1927"]},{"name":"Journal of Health, Organization and Management","abdc":"B","ft50":false,"mine":false,"issn":["1477-7266","1758-7247"]},{"name":"Journal of Historical Research in Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1755-750X","1755-7518"]},{"name":"Journal of Hospitality Marketing and Management","abdc":"A","ft50":false,"mine":false,"issn":["1936-8623","1936-8631"]},{"name":"Journal of Interactive Advertising","abdc":"B","ft50":false,"mine":false,"issn":["1525-2019"]},{"name":"Journal of Interactive Marketing","abdc":"A","ft50":false,"mine":false,"issn":["1094-9968","1520-6653"]},{"name":"Journal of International Consumer Marketing","abdc":"B","ft50":false,"mine":false,"issn":["0896-1530","1528-7068"]},{"name":"Journal of International Food and Agribusiness Marketing","abdc":"B","ft50":false,"mine":false,"issn":["0897-4438","1528-6983"]},{"name":"Journal of International Marketing","abdc":"A","ft50":false,"mine":false,"issn":["1069-031X","1547-7215"]},{"name":"Journal of Islamic Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1759-0833","1759-0841"]},{"name":"Journal of Law, Economics and Organization","abdc":"A","ft50":false,"mine":false,"issn":["8756-6222","1465-7341"]},{"name":"Journal of Macromarketing","abdc":"A","ft50":false,"mine":false,"issn":["0276-1467","1552-6534"]},{"name":"Journal of Management & Organization","abdc":"A","ft50":false,"mine":false,"issn":["1833-3672","1839-3527"]},{"name":"Journal of Marketing Communications","abdc":"B","ft50":false,"mine":false,"issn":["1352-7266","1466-4445"]},{"name":"Journal of Marketing Education","abdc":"B","ft50":false,"mine":false,"issn":["0273-4753","1552-6550"]},{"name":"Journal of Marketing for Higher Education","abdc":"B","ft50":false,"mine":false,"issn":["0884-1241","1540-7144"]},{"name":"Journal of Marketing Management","abdc":"A","ft50":false,"mine":false,"issn":["0267-257X","1472-1376"]},{"name":"Journal of Marketing Theory and Practice","abdc":"B","ft50":false,"mine":false,"issn":["1069-6679","1944-7175"]},{"name":"Journal of Nonprofit & Public Sector Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1049-5142","1540-6997"]},{"name":"Journal of Occupational and Organizational Psychology","abdc":"A*","ft50":false,"mine":false,"issn":["0963-1798","2044-8325"]},{"name":"Journal of Organizational and End User Computing","abdc":"B","ft50":false,"mine":false,"issn":["1546-2234","1546-5012"]},{"name":"Journal of Organizational Behavior","abdc":"A*","ft50":false,"mine":false,"issn":["0894-3796","1099-1379"]},{"name":"Journal of Organizational Behavior Management","abdc":"B","ft50":false,"mine":false,"issn":["0160-8061","1540-8604"]},{"name":"Journal of Organizational Change Management","abdc":"B","ft50":false,"mine":false,"issn":["0953-4814","1758-7816"]},{"name":"Journal of Organizational Computing and Electronic Commerce","abdc":"A","ft50":false,"mine":false,"issn":["1091-9392","1532-7744"]},{"name":"Journal of Organizational Effectiveness","abdc":"B","ft50":false,"mine":false,"issn":["2051-6614","2051-6622"]},{"name":"Journal of Political Economy","abdc":"A*","ft50":false,"mine":false,"issn":["0022-3808","1537-534X"]},{"name":"Journal of Political Economy: Macroeconomics","abdc":"A","ft50":false,"mine":false,"issn":["2832-9341","2832-935X"]},{"name":"Journal of Political Economy: Microeconomics","abdc":"A","ft50":false,"mine":false,"issn":["2832-9368","2832-9376"]},{"name":"Journal of Political Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1537-7857","1537-7865"]},{"name":"Journal of Professions and Organization","abdc":"A","ft50":false,"mine":false,"issn":["2051-8803","2051-8811"]},{"name":"Journal of Public Administration Research and Theory","abdc":"A","ft50":false,"mine":false,"issn":["1053-1858","1477-9803"]},{"name":"Journal of Public Policy and Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0743-9156","1547-7207"]},{"name":"Journal of Relationship Marketing","abdc":"B","ft50":false,"mine":false,"issn":["1533-2667","1533-2675"]},{"name":"Journal of Research in Interactive Marketing","abdc":"B","ft50":false,"mine":false,"issn":["2040-7122","2040-7130"]},{"name":"Journal of Research in Marketing and Entrepreneurship","abdc":"B","ft50":false,"mine":false,"issn":["1471-5201","1471-521X"]},{"name":"Journal of Retailing and Consumer Services","abdc":"A","ft50":false,"mine":false,"issn":["0969-6989","1873-1384"]},{"name":"Journal of Services Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0887-6045","2054-1651"]},{"name":"Journal of Social Marketing","abdc":"B","ft50":false,"mine":false,"issn":["2042-6763","2042-6771"]},{"name":"Journal of Strategic Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0965-254X","1466-4488"]},{"name":"Journal of Travel & Tourism Marketing","abdc":"A","ft50":false,"mine":false,"issn":["1054-8408","1540-7306"]},{"name":"Journal of Vacation Marketing","abdc":"A","ft50":false,"mine":false,"issn":["1356-7667","1479-1870"]},{"name":"Leadership & Organization Development Journal","abdc":"B","ft50":false,"mine":false,"issn":["0143-7739","1472-5347"]},{"name":"Management and Organization Review","abdc":"A","ft50":false,"mine":false,"issn":["1740-8776","1740-8784"]},{"name":"Marketing Intelligence & Planning","abdc":"A","ft50":false,"mine":false,"issn":["0263-4503","1758-8049"]},{"name":"Marketing Letters","abdc":"A","ft50":false,"mine":false,"issn":["0923-0645","1573-059X"]},{"name":"Marketing Theory","abdc":"A","ft50":false,"mine":false,"issn":["1470-5931","1741-301X"]},{"name":"New Political Economy","abdc":"A","ft50":false,"mine":false,"issn":["1356-3467","1469-9923"]},{"name":"Nonprofit Management and Leadership","abdc":"B","ft50":false,"mine":false,"issn":["1048-6682","1542-7854"]},{"name":"Organization & Environment","abdc":"A","ft50":false,"mine":false,"issn":["1086-0266","1552-7417"]},{"name":"Organization Management Journal","abdc":"B","ft50":false,"mine":false,"issn":["1541-6518"]},{"name":"Organizational Dynamics","abdc":"A","ft50":false,"mine":false,"issn":["0090-2616","1873-3530"]},{"name":"Organizational Psychology Review","abdc":"A","ft50":false,"mine":false,"issn":["2041-3866","2041-3874"]},{"name":"Organizational Research Methods","abdc":"A*","ft50":false,"mine":false,"issn":["1094-4281","1552-7425"]},{"name":"Policy and Politics: an international journal","abdc":"A","ft50":false,"mine":false,"issn":["0305-5736","1470-8442"]},{"name":"Political Science Quarterly","abdc":"A","ft50":false,"mine":false,"issn":["1538-165X"]},{"name":"Politics and Gender","abdc":"A","ft50":false,"mine":false,"issn":["1743-923X","1743-9248"]},{"name":"Psychology & Marketing","abdc":"A","ft50":false,"mine":false,"issn":["0742-6046","1520-6793"]},{"name":"Public Administration and Development","abdc":"A","ft50":false,"mine":false,"issn":["0271-2075","1099-162X"]},{"name":"Public Administration Quarterly","abdc":"A","ft50":false,"mine":false,"issn":["0734-9149","2327-4433"]},{"name":"Public Administration Review","abdc":"A","ft50":false,"mine":false,"issn":["0033-3352","1540-6210"]},{"name":"Public Administration: an international journal","abdc":"A","ft50":false,"mine":false,"issn":["0033-3298","1467-9299"]},{"name":"Public Relations Review","abdc":"A","ft50":false,"mine":false,"issn":["0363-8111","1873-4537"]},{"name":"Qualitative Research in Accounting and Management","abdc":"A","ft50":false,"mine":false,"issn":["1176-6093","1758-7654"]},{"name":"Quantitative Marketing and Economics","abdc":"A","ft50":false,"mine":false,"issn":["1570-7156","1573-711X"]},{"name":"Research in Organizational Behavior","abdc":"A","ft50":false,"mine":false,"issn":["0191-3085"]},{"name":"Research on Professional Responsibility and Ethics in Accounting","abdc":"B","ft50":false,"mine":false,"issn":["1574-0765"]},{"name":"Review of Industrial Organization","abdc":"A","ft50":false,"mine":false,"issn":["0889-938X","1573-7160"]},{"name":"Review of International Political Economy","abdc":"A","ft50":false,"mine":false,"issn":["0969-2290","1466-4526"]},{"name":"Science Communication","abdc":"A","ft50":false,"mine":false,"issn":["1075-5470","1552-8545"]},{"name":"Scottish Journal of Political Economy","abdc":"A","ft50":false,"mine":false,"issn":["0036-9292","1467-9485"]},{"name":"Services Marketing Quarterly","abdc":"B","ft50":false,"mine":false,"issn":["1533-2969","1533-2977"]},{"name":"Social Marketing Quarterly","abdc":"B","ft50":false,"mine":false,"issn":["1524-5004","1539-4093"]},{"name":"Sociological Methodology","abdc":"A","ft50":false,"mine":false,"issn":["0081-1750","1467-9531"]},{"name":"Sociological Theory","abdc":"A","ft50":false,"mine":false,"issn":["0735-2751","1467-9558"]},{"name":"Sociology","abdc":"A*","ft50":false,"mine":false,"issn":["0038-0385","1469-8684"]},{"name":"Sociology of Sport Journal","abdc":"A","ft50":false,"mine":false,"issn":["0741-1235","1543-2785"]},{"name":"Spanish Journal of Marketing – ESIC","abdc":"B","ft50":false,"mine":false,"issn":["2444-9709"]},{"name":"Sport Marketing Quarterly","abdc":"B","ft50":false,"mine":false,"issn":["1061-6934","1557-2528"]},{"name":"Strategic Organization","abdc":"A","ft50":false,"mine":false,"issn":["1476-1270","1741-315X"]},{"name":"The Australian Journal of Agricultural and Resource Economics","abdc":"A","ft50":false,"mine":false,"issn":["1364-985X","1467-8489"]},{"name":"Voluntas: International Journal of Voluntary and Non-Profit Organizations","abdc":"B","ft50":false,"mine":false,"issn":["0957-8765","1573-7888"]},{"name":"Work & Stress: An international Journal of Work, Health and Organisations","abdc":"A","ft50":false,"mine":false,"issn":["0267-8373","1464-5335"]},{"name":"Work, Employment and Society","abdc":"A","ft50":false,"mine":false,"issn":["0950-0170","1469-8722"]},{"name":"World Politics","abdc":"A","ft50":false,"mine":false,"issn":["0043-8871","1086-3338"]},{"name":"Written Communication","abdc":"B","ft50":false,"mine":false,"issn":["0741-0883","1552-8472"]}];
+// ==== end watchlist.js ====
+
+// ==== insights.js (copied from the app by tools/make_gscript.py; edit it there) ====
+// Daily research insights: rank recently published papers (Crossref) against the user's own papers and suggest a next study.
+// Used by the Google Sheet script (and testable in node), so plain ES5 with no browser APIs.
+//
+// rdCrossrefUrl(issn, fromDate, mailto)        -> Crossref API URL for that journal's recent articles
+// rdCrossrefItems(json, journal)               -> [{doi, title, authors, journal, abdc, ft50, mine, published, abstract}]
+// rdRankInsights(items, papers, seenDois, n)   -> top n items with {score, paper (best-matching paper key), why, tip}
+//   papers: [{key, title}]
+
+var RD_STOP_I = ("the of and for in on a an to with from by into as at is are was were be this that these those its their our we " +
+  "how what why when who whose which not no new study studies paper article research analysis approach role case evidence " +
+  "using use toward towards between through within among across beyond after over under about via based theory theoretical " +
+  "empirical review perspective perspectives implications insights understanding exploring examining effects effect impact " +
+  "do does can may might more less than also both one two three first").split(" ");
+var RD_STOP_SET = {};
+RD_STOP_I.forEach(function (w) { RD_STOP_SET[w] = 1; });
+
+// Extra vocabulary per theme, so a paper about "voice" or "mourning" can still meet a "silence" or "grief" paper.
+var RD_THEMES = [
+  ["silence", "silencing", "voice", "speaking", "unsaid", "absence"], ["death", "dying", "mortality", "finitude", "mourning", "grief", "grieving"],
+  ["blanchot", "derrida", "heidegger", "levinas", "foucault", "deconstruction", "phenomenology", "hauntology", "spectral"],
+  ["discourse", "discursive", "critical discourse", "rhetoric", "narrative", "framing", "language"],
+  ["generative", "artificial intelligence", "chatgpt", "algorithm", "algorithmic", "automation", "large language"],
+  ["securitization", "securitisation", "security", "threat", "surveillance"], ["protest", "activism", "movement", "resistance", "dissent"],
+  ["leadership", "leader", "authority", "power", "sovereignty", "violence"], ["ethics", "ethical", "moral", "virtue", "responsibility"],
+  ["knowledge hiding", "knowledge sharing", "tacit knowledge", "knowledge"], ["memory", "remembrance", "commemoration", "temporality", "time"],
+  ["advertising", "marketing", "brand", "consumer", "virtue signalling", "csr"], ["apology", "apologies", "crisis communication", "accountability"],
+  ["kinship", "family", "belonging", "identity", "organizational culture"], ["fact-checking", "misinformation", "disinformation", "attribution", "news"],
+  ["assessment", "testing", "multilingual", "linguistic"], ["hedging", "uncertainty", "epistemic"], ["india", "indian", "global south", "postcolonial"]
+];
+
+function rdText(s) { return String(s || "").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim(); }
+function rdTokens(s) {
+  var t = " " + rdText(s).toLowerCase().replace(/[‘’'`]/g, "").replace(/[^a-z0-9\- ]+/g, " ") + " ";
+  return t.split(/\s+/).filter(function (w) { return w.length > 2 && !RD_STOP_SET[w]; })
+    .map(function (w) { return w.replace(/(ies)$/, "y").replace(/([^s])s$/, "$1"); });
+}
+
+function rdCrossrefUrl(issn, fromDate, mailto) {
+  return "https://api.crossref.org/journals/" + issn + "/works?filter=from-pub-date:" + fromDate + ",type:journal-article" +
+    "&rows=60&sort=published&order=desc&select=DOI,title,author,published,container-title,abstract" + (mailto ? "&mailto=" + encodeURIComponent(mailto) : "");
+}
+
+function rdCrossrefItems(json, journal) {
+  var items = (json && json.message && json.message.items) || [];
+  return items.filter(function (w) { return w.DOI && w.title && w.title.length; }).map(function (w) {
+    var d = (w.published && w.published["date-parts"] && w.published["date-parts"][0]) || [];
+    var pad = function (x) { return x < 10 ? "0" + x : "" + x; };
+    return {
+      doi: String(w.DOI).toLowerCase(), title: rdText(w.title[0]),
+      authors: (w.author || []).slice(0, 4).map(function (a) { return [a.family, a.given ? a.given.charAt(0) + "." : ""].filter(Boolean).join(", "); }).join("; ") + ((w.author || []).length > 4 ? " et al." : ""),
+      journal: journal.name, abdc: journal.abdc || "", ft50: !!journal.ft50, mine: !!journal.mine,
+      published: d.length ? d[0] + "-" + pad(d[1] || 1) + "-" + pad(d[2] || 1) : "", abstract: rdText(w.abstract).replace(/^abstract\s*/i, "")
+    };
+  });
+}
+
+/** Ranks items: rare words shared with one of the user's papers, in the title (x2) and abstract, plus theme links. */
+function rdRankInsights(items, papers, seenDois, n) {
+  n = n || 5;
+  seenDois = seenDois || {};
+  var df = {}, N = items.length || 1;
+  items.forEach(function (it) { var s = {}; rdTokens(it.title + " " + it.abstract).forEach(function (w) { if (!s[w]) { s[w] = 1; df[w] = (df[w] || 0) + 1; } }); });
+  var idf = function (w) { return Math.log((N + 1) / (1 + (df[w] || 0))); };
+  var themeOf = {};
+  RD_THEMES.forEach(function (th, i) { th.forEach(function (w) { rdTokens(w).forEach(function (t) { themeOf[t] = i; }); }); });
+  var profiles = papers.map(function (p) {
+    var words = {}, themes = {};
+    rdTokens(p.key + " " + p.title).forEach(function (w) { words[w] = 1; if (themeOf[w] !== undefined) themes[themeOf[w]] = 1; });
+    return { p: p, words: words, themes: themes };
+  });
+  var scored = [];
+  items.forEach(function (it) {
+    if (seenDois[it.doi] || !it.title || /^(editorial|erratum|corrigendum|correction|retraction|book review|reviewer|index|issue information|front matter)/i.test(it.title)) return;
+    var tw = rdTokens(it.title), aw = rdTokens(it.abstract), best = null;
+    var tset = {}, aset = {};
+    tw.forEach(function (w) { tset[w] = 1; }); aw.forEach(function (w) { aset[w] = 1; });
+    profiles.forEach(function (pr) {
+      var sc = 0, hits = [], th = {};
+      Object.keys(pr.words).forEach(function (w) {
+        if (tset[w]) { sc += 2 * idf(w); hits.push(w); } else if (aset[w]) { sc += 0.8 * idf(w); hits.push(w); }
+      });
+      Object.keys(tset).concat(Object.keys(aset)).forEach(function (w) { var t = themeOf[w]; if (t !== undefined && pr.themes[t] && !th[t]) { th[t] = 1; sc += 2.5; } });
+      sc = sc / Math.sqrt(Math.max(4, tw.length));
+      if (!best || sc > best.score) best = { score: sc, pr: pr, hits: hits };
+    });
+    if (!best || best.score <= 0) return;
+    var boost = (it.abdc === "A*" || it.ft50 ? 0.6 : it.abdc === "A" ? 0.35 : 0) + (it.mine ? 0.3 : 0) + (it.abstract ? 0.2 : 0);
+    scored.push({ it: it, score: best.score + boost, paper: best.pr.p, hits: best.hits });
+  });
+  scored.sort(function (a, b) { return b.score - a.score; });
+  var out = [], perPaper = {}, perJournal = {};
+  scored.forEach(function (x) {
+    if (out.length >= n) return;
+    var pk = x.paper.key;
+    if ((perPaper[pk] || 0) >= 2 || (perJournal[x.it.journal] || 0) >= 1) return;
+    perPaper[pk] = (perPaper[pk] || 0) + 1; perJournal[x.it.journal] = 1;
+    out.push(rdDescribe(x));
+  });
+  scored.forEach(function (x) { if (out.length < n && out.every(function (o) { return o.doi !== x.it.doi; })) out.push(rdDescribe(x)); });
+  return out;
+}
+
+function rdDescribe(x) {
+  var it = x.it, p = x.paper;
+  var shared = x.hits.filter(function (w, i, a) { return a.indexOf(w) === i; }).slice(0, 4);
+  var o = {};
+  Object.keys(it).forEach(function (k) { o[k] = it[k]; });
+  o.score = Math.round(x.score * 100) / 100;
+  o.paper = p.key;
+  o.why = "Close to your paper “" + p.key + "”" + (shared.length ? " (shared focus: " + shared.join(", ") + ")" : " (allied theme)") + ".";
+  o.tip = rdTip(it, p, shared);
+  return o;
+}
+
+/** A structured next-study prompt (the optional Claude-written ideas replace this when an API key is set). */
+function rdTip(it, p, shared) {
+  var words = function (s) { return rdText(s).replace(/[‘’“”"]/g, "").split(/[^A-Za-z\-]+/).filter(function (w) { return w.length > 4 && !RD_STOP_SET[w.toLowerCase()]; }); };
+  var theirs = rdTokens(it.title).join(" ");
+  var lens = words(p.title || p.key).filter(function (w) { return theirs.indexOf(rdTokens(w)[0] || "~") < 0; })
+    .filter(function (w, i, a) { return a.indexOf(w) === i; }).slice(0, 3).join(", ");
+  var topic = rdText(it.title).split(/[:?—–]/)[0].trim();
+  var all = ((p.title || "") + " " + p.key).toLowerCase();
+  var method = /review|bibliometric|systematic/.test(all) ? "a systematic or bibliometric review" :
+    /discourse|cda|language|rhetoric|speech/.test(all) ? "a critical discourse analysis" :
+    /blanchot|derrida|heidegger|levinas|foucault/.test(all) ? "a conceptual paper" : "a qualitative, interpretive study";
+  var context = /india|indian|malawi/.test(all) ? "Indian / Global South settings" : "an under-studied setting (e.g. India or the Global South)";
+  return "Next-study idea: " + method.charAt(0).toUpperCase() + method.slice(1) + " that takes up “" + topic + "” through the lens of your paper “" +
+    p.key + "”" + (lens ? " (" + lens + ")" : "") + " in " + context + ", stating what their account leaves unexplained.";
+}
+// ==== end insights.js ====
 
 // ==== emailparse.js (copied from the app by tools/make_gscript.py; edit it there) ====
 // Reads a journal email: what happened, desk or reviewed, how many reviews, manuscript ID, and which submission it is.

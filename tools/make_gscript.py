@@ -13,9 +13,9 @@ SUGGEST = "android/app/src/main/assets/suggest.js"
 EMBED = "android/app/src/main/assets/gscript.js"
 
 src = open(GS, encoding="utf-8").read()
-for name in ("suggest.js", "emailparse.js"):
+for name in ("suggest.js", "emailparse.js", "watchlist.js", "insights.js"):
     code = open("android/app/src/main/assets/" + name, encoding="utf-8").read()
-    code = "\n".join(l for l in code.splitlines() if not l.startswith("if (typeof module"))
+    code = "\n".join(l for l in code.splitlines() if not l.startswith(("if (typeof module", "if (typeof window")))
     start, end = "// ==== %s (copied from the app by tools/make_gscript.py; edit it there) ====" % name, "// ==== end %s ====" % name
     assert start in src, name
     src = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: start + "\n" + code.strip() + "\n" + end, src, flags=re.S)

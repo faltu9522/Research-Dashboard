@@ -266,13 +266,14 @@ function paperCard(p){
 /* ---------- views ---------- */
 function render(){
   $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
-  $("#fab").style.display = (tab==="more"||tab==="stats")?"none":"block";
+  $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights")?"none":"block";
   const v=$("#view");
   if(tab==="home") v.innerHTML=viewHome();
   else if(tab==="review") v.innerHTML=viewReview();
   else if(tab==="papers") v.innerHTML=viewPapers();
   else if(tab==="subs") v.innerHTML=viewSubs();
   else if(tab==="stats") v.innerHTML=viewStats();
+  else if(tab==="insights") v.innerHTML=viewInsights();
   else v.innerHTML=viewMore();
   bindSearch(); bindMore(); if(tab==="stats") bindStats();
 }
@@ -311,7 +312,8 @@ function viewHome(){
     <button class="tile" data-go="subs:All sent"><b>${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
     <button class="tile" data-go="subs:Accepted"><b>${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
   </div>
-  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats &amp; insights →</button></div>
+  ${insightCard()}
+  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button></div>
   <h2>Under review now <small>longest wait first</small></h2>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
   <h2>Waiting on you <small>most urgent first</small></h2>
@@ -418,6 +420,9 @@ document.addEventListener("click",e=>{
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
     case "pending": pendingSheet(); break;
+    case "doi": e.stopPropagation(); openBrowser("https://doi.org/"+a.dataset.doi); break;
+    case "star": { e.stopPropagation(); const it=(S.insights||[]).find(x=>x.doi===a.dataset.doi); if(it){ it.saved=!it.saved; if(it.saved){ GS.savedInsights=(GS.savedInsights||[]).concat([it.doi]); gsStore(); gsSchedule(); } persist(false); render(); toast(it.saved?"Saved to your ideas":"Removed"); } break; }
+    case "insfilter": insFilter=a.dataset.f; render(); break;
     case "gscopy": if(window.Android&&Android.copyText){ Android.copyText(window.RD_GSCRIPT||""); toast("Script copied"); } else { navigator.clipboard&&navigator.clipboard.writeText(window.RD_GSCRIPT||""); toast("Script copied"); } break;
     case "gsshare": shareText(window.RD_GSCRIPT||""); break;
     case "gsconnect": gsConnect(); break;
@@ -840,8 +845,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.2", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.3", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.3","22 Oct 2026",["💡 Research insights: 5 recently published papers a day from ABDC/FT50 and your target journals, matched to your papers, with DOIs and a next-study idea","Optional Claude-written gap ideas (your own API key, set in the sheet)","Save ideas you want to keep"]],
   ["2.2","22 Oct 2026",["Journal emails from Gmail update your sheet and the app automatically (via the Google Sheet script)","Desk rejection vs rejection after review, and reviewer counts, recorded per decision","Unclear emails wait for you under “Journal emails to confirm”","Paste/share an email uses the same reader as the sheet"]],
   ["2.1","22 Oct 2026",["Master data from SK_Research_Updates_2026 (3 new papers, new queued journals, authors)","ABDC 2025 ratings built in (official list, current to Sept 2026) and shown on every journal","Suggested next journals for each paper, and a “What next?” prompt after a rejection","Journal box suggests names from the ABDC list","Works with the RD SK Master Google Sheet (columns found by name)"]],
   ["2.0","21 Oct 2026",["Google Sheets sync, both ways: edit on the laptop or the phone and both stay in step","Newest edit wins when the same row changed in both places"]],
@@ -1130,6 +1136,39 @@ function pendingSheet(){
 }
 const pendingBanner=()=>(S.pending||[]).length?`<button class="banner" data-act="pending" style="width:100%;text-align:left;border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)">📧 ${S.pending.length} journal email${S.pending.length===1?"":"s"} to confirm →</button>`:"";
 
+/* ---------- research insights (made daily by the Google Sheet; see RD SK menu there) ---------- */
+let insFilter="Latest";
+function insightCard(){
+  const list=S.insights||[]; if(!list.length&&!GS.url) return "";
+  const last=list.reduce((m,x)=>x.date>m?x.date:m,""), today=list.filter(x=>x.date===last);
+  return `<button class="card tap" data-go="insights" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px">
+    <div class="t">💡 Research insights${last?` <span class="m">· ${fmt(last)}</span>`:""}</div>
+    <div class="m">${today.length?esc(today[0].title).slice(0,110)+(today.length>1?` · and ${today.length-1} more`:""):"Turn on daily insights in your Google Sheet: RD SK menu → Turn on daily research insights."}</div></button>`;
+}
+function insightItem(x){
+  return `<div class="card">
+    <div class="t">${esc(x.title)}</div>
+    <div class="m" style="margin-top:3px">${esc(x.journal)}${abdcChip(x.abdc)}${x.ft50?' <span class="chip s-acc" style="font-size:11px">FT50</span>':""} · ${fmt(x.published)}</div>
+    ${x.authors?`<div class="m">${esc(x.authors)}</div>`:""}
+    <div class="m" style="margin-top:8px;color:var(--ink)"><b>Why it matters:</b> ${esc(x.why)}</div>
+    <div style="margin-top:8px;padding:10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);font-size:14px">💡 ${esc(x.tip)}${x.by==="Claude"?' <span class="m">· idea by Claude</span>':""}</div>
+    ${x.abstract?`<details style="margin-top:8px"><summary class="m">Abstract</summary><div class="m" style="margin-top:4px">${esc(x.abstract)}</div></details>`:""}
+    <div class="m" style="margin-top:6px">DOI: ${esc(x.doi)}</div>
+    <div class="actions"><button class="primary" data-act="doi" data-doi="${esc(x.doi)}">Open paper ↗</button>
+      <button data-act="star" data-doi="${esc(x.doi)}">${x.saved?"★ Saved":"☆ Save idea"}</button></div></div>`;
+}
+function viewInsights(){
+  const all=(S.insights||[]).slice().sort((a,b)=>(b.date.localeCompare(a.date))||(a.rank-b.rank));
+  const F=["Latest","Saved","All 14 days"];
+  let list=insFilter==="Saved"?all.filter(x=>x.saved):insFilter==="Latest"?all.filter(x=>x.date===(all[0]||{}).date):all;
+  const byDate={}; list.forEach(x=>(byDate[x.date]=byDate[x.date]||[]).push(x));
+  return `<div class="row" style="margin-bottom:6px"><button class="ghost" data-go="home">← Dashboard</button></div>
+    <div class="filters">${F.map(f=>`<button data-act="insfilter" data-f="${f}" class="${f===insFilter?"on":""}">${f}</button>`).join("")}</div>
+    ${list.length?Object.keys(byDate).map(d=>`<h2>${fmt(d)} <small>${byDate[d].length} papers</small></h2>${byDate[d].map(insightItem).join("")}`).join("")
+      :`<div class="empty">${insFilter==="Saved"?"No saved ideas yet. Tap ☆ on an insight to keep it.":GS.url?"No insights yet. In your Google Sheet open the RD SK menu → “Turn on daily research insights”, then tap Sync now here.":"Connect your Google Sheet (More → Google Sheets sync) to get daily insights."}</div>`}
+    <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Next-study ideas are prompts to think with: always read the paper and check the literature before building on them.</div>`;
+}
+
 /* ---------- Google Sheets sync (two-way, via the user's own Apps Script web app) ---------- */
 const GS_KEY="rdsk.gsheets.v1";
 let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:""};
@@ -1157,7 +1196,7 @@ function gsPayload(mode){
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
   const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
-  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
+  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:+S.settings.chaseDays||90}};
 }
 async function gsSync(mode,manual){
@@ -1173,6 +1212,7 @@ async function gsSync(mode,manual){
     if(gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
     gsApply(j);
     GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
+    GS.savedInsights=(GS.savedInsights||[]).filter(d=>!(body.savedInsights||[]).includes(d));
     const sentRes=(body.resolved||[]).map(x=>x.id); GS.resolved=(GS.resolved||[]).filter(x=>!sentRes.includes(x.id)); GS.emailDecisions=(GS.emailDecisions||[]).filter(x=>!sentRes.includes(x.id));
     GS.lastSync=startedAt; GS.lastText=new Date().toLocaleString(); GS.lastError=""; GS.sheet=j.sheet||GS.sheet; gsStore();
     if(manual) toast("Synced with “"+(j.sheet||"Google Sheet")+"” ✓");
@@ -1198,6 +1238,7 @@ function gsApply(j){
   });
   S.papers=papers; S.subs=subs;
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
+  if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
   if(j.app){ if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays; }
   if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
