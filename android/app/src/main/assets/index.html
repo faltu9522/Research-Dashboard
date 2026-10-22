@@ -123,6 +123,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <script src="gscript.js"></script>
 <script src="abdc.js"></script>
 <script src="suggest.js"></script>
+<script src="emailparse.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -243,7 +244,7 @@ function subCard(s, opts={}){
       <div class="t">${esc(s.journal)}${abdcChip(abdcOf(s.journal))}${s.rating?` <span class="m">· ${esc(s.rating)}</span>`:""}</div>
       ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}${p&&p.authors?" · "+esc(p.authors):""}</div>`}
       <div class="m">${s.submitted?"Submitted "+fmt(s.submitted):""}${s.decided?" · decided "+fmt(s.decided):""}</div>
-      <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span> ${open?chaseFlag(d):""}
+      <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(s.status)}</span>${s.dtype&&!open?` <span class="m">${esc(s.dtype)}</span>`:""} ${open?chaseFlag(d):""}
       ${(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
@@ -300,6 +301,7 @@ function viewHome(){
   const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   const stale = S.settings.lastUpdated ? daysBetween(S.settings.lastUpdated,today()) : null;
   return `
+  ${pendingBanner()}
   ${stale!=null&&stale>=10?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
   <div class="tiles">
     <button class="tile" data-go="papers:Active"><b>${st.tracked}</b><span>Papers tracked</span><i>excl. closed/parked</i></button>
@@ -317,7 +319,7 @@ function viewHome(){
 }
 function viewReview(){
   const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
-  return `<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
+  return `${pendingBanner()}<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
   <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an email</button><button data-act="scanqr" style="flex:1">📷 Scan QR</button></div>
   <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app. Sign in by tapping the user ID box and choosing your saved login from Google Password Manager; the app then opens your submitted manuscripts, reads every paper's status (both papers when a journal has two) and moves to the next journal. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
@@ -415,6 +417,7 @@ document.addEventListener("click",e=>{
     case "decide": e.stopPropagation(); decide(s); break;
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
+    case "pending": pendingSheet(); break;
     case "gscopy": if(window.Android&&Android.copyText){ Android.copyText(window.RD_GSCRIPT||""); toast("Script copied"); } else { navigator.clipboard&&navigator.clipboard.writeText(window.RD_GSCRIPT||""); toast("Script copied"); } break;
     case "gsshare": shareText(window.RD_GSCRIPT||""); break;
     case "gsconnect": gsConnect(); break;
@@ -791,7 +794,9 @@ function viewStats(){
   <div class="stattiles">
     ${tile(D.sent.length,"Submissions sent",D.dec.length+" decided")}
     ${tile(D.accRate!=null?D.accRate+"%":"—","Acceptance rate",D.acc.length+" accepted · "+D.rej.length+" rejected")}
-    ${tile(D.rejDays.length?Math.round(100*D.quick/D.rejDays.length)+"%":"—","Quick rejections",D.quick+" of "+D.rejDays.length+" within 14 days (likely desk)")}
+    ${(()=>{ const known=D.rej.filter(x=>x.dtype), desk=known.filter(x=>/^desk/i.test(x.dtype)).length;
+      return known.length>=3?tile(Math.round(100*desk/known.length)+"%","Desk rejections",desk+" of "+known.length+" rejections with a known type (from emails)")
+        :tile(D.rejDays.length?Math.round(100*D.quick/D.rejDays.length)+"%":"—","Quick rejections",D.quick+" of "+D.rejDays.length+" within 14 days (likely desk)"); })()}
     ${tile(median(D.reviewed)!=null?median(D.reviewed)+" d":"—","Median after review",D.reviewed.length+" rejections after 14+ days")}
   </div>
 
@@ -835,8 +840,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.1", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.2", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.2","22 Oct 2026",["Journal emails from Gmail update your sheet and the app automatically (via the Google Sheet script)","Desk rejection vs rejection after review, and reviewer counts, recorded per decision","Unclear emails wait for you under “Journal emails to confirm”","Paste/share an email uses the same reader as the sheet"]],
   ["2.1","22 Oct 2026",["Master data from SK_Research_Updates_2026 (3 new papers, new queued journals, authors)","ABDC 2025 ratings built in (official list, current to Sept 2026) and shown on every journal","Suggested next journals for each paper, and a “What next?” prompt after a rejection","Journal box suggests names from the ABDC list","Works with the RD SK Master Google Sheet (columns found by name)"]],
   ["2.0","21 Oct 2026",["Google Sheets sync, both ways: edit on the laptop or the phone and both stay in step","Newest edit wins when the same row changed in both places"]],
   ["1.9","21 Oct 2026",["📷 QR scanner: scan a code from the laptop Excel file to add submissions","Paste or share RD SK links to add many submissions at once","🔗 Set login link with a Find it helper for journals the app doesn't know","Status check lists journals that still need a login link"]],
@@ -1073,56 +1079,56 @@ window.rdStatusResults=json=>{
 };
 
 /* ---------- update from an editor's email (shared or pasted) ---------- */
-function guessOutcome(t){
-  const x=t.toLowerCase();
-  if(/pleased to (inform you that .{0,80})?accept|accepted (it )?for publication/.test(x)) return "Accepted";
-  if(/major revisions?\b|minor revisions?\b|revise and resubmit|invit\w* you to (revise|resubmit|submit a revised)|revisions? (are|is) (required|needed)/.test(x)) return "Revision requested";
-  if(/regret|unable to (accept|publish|offer|consider)|not (be )?able to (accept|publish|offer)|decided (not|against)|not suitable|reject|declin|not (be )?(proceeding|taking .{0,20}forward)|will not be considered/.test(x)) return "Rejected";
-  if(/unsubmitted|returned to (you|your)|has been returned|sent back to you|please (address|correct) the following|before (it|we) can (be )?(proceed|consider)/.test(x)) return "Returned by office";
-  if(/withdraw/.test(x)) return "Withdrawn";
-  if(/successfully submitted|received your (manuscript|submission)|has been (sent|assigned) (out )?(for|to) (review|reviewers)|under review|out for review|thank you for (your )?submi/.test(x)) return "Under review";
-  return "";
-}
-function matchSubmission(t){
-  const idm=t.match(/\b[A-Z][A-Z0-9]{1,14}-(?:[A-Z]-)?\d{2,4}-\d{2,6}(?:\.R\d+)?\b/), low=" "+normJ(t)+" ";
-  let best=null,bs=0;
-  S.subs.forEach(s=>{
-    const p=paperById(s.paper)||{}; let sc=0;
-    if(idm&&s.msid&&baseId(s.msid)===baseId(idm[0])) sc+=100;
-    const j=normJ(s.journal); if(j.length>3&&low.includes(" "+j+" ")) sc+=30+j.length/10;
-    sc+=25*Math.max(overlap(p.title,t),overlap(s.titleUsed,t),overlap(p.key,t));
-    if(isOpen(s)) sc+=8; else if(s.status==="Planned") sc+=3;
-    if(sc>bs){ bs=sc; best=s; }
-  });
-  return {sub:bs>=20?best:null, msid:idm?idm[0]:""};
-}
+function parseSubs(){ return S.subs.map(x=>{ const p=paperById(x.paper)||{}; return {id:x.id,paper:p.key||"",title:p.title||"",titleUsed:x.titleUsed,journal:x.journal,status:x.status,submitted:x.submitted,msid:x.msid||""}; }); }
 window.rdSharedText=t=>{ closeSheet(); if(/rdsk:\/\/add\?/i.test(t)){ setTab("subs"); addLinksSheet(t); return; } setTab("review"); emailSheet(t); };
-function emailSheet(text){
-  const m=text?matchSubmission(text):{sub:null,msid:""}, outcome=text?guessOutcome(text):"";
+function emailSheet(text, pend){
+  const r=text?rdParseEmail({subject:pend?pend.subject:"",from:pend?pend.from:"",body:text,date:pend?pend.date:today()},parseSubs()):{sub:null,msid:"",status:"",dtype:"",reviews:0};
+  const match=r.sub?S.subs.find(x=>x.id===r.sub.id):null, outcome=r.status||"";
   const subs=S.subs.slice().sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
-  const firstLine=(text||"").split(/\n/).map(x=>x.trim()).find(x=>x.length>8)||"";
-  openSheet(`<h3>Update from email <button class="ghost" onclick="closeSheet()">✕</button></h3>
+  const firstLine=(pend&&pend.subject)||(text||"").split(/\n/).map(x=>x.trim()).find(x=>x.length>8)||"";
+  const dtypes=["","Desk rejection","Rejected after review"];
+  const dt=r.dtype?(r.dtype+(r.reviews>1?" ("+r.reviews+" reviews)":"")):"";
+  openSheet(`<h3>${pend?"Confirm journal email":"Update from email"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    ${pend?`<div class="m"><b>${esc(pend.subject)}</b><br>${esc(pend.from)} · ${fmt(pend.date)} ${pend.link?`· <button class="link" id="eglink">Open in Gmail ↗</button>`:""}</div>`:""}
     <label for="et">Email text</label><textarea id="et" style="min-height:110px" placeholder="Paste the journal's email here">${esc(text)}</textarea>
     <div class="actions"><button id="ere">Read email again</button></div>
     <label for="es">Submission</label>
-    <select id="es"><option value="">— choose —</option>${subs.map(s=>{ const p=paperById(s.paper)||{}; return `<option value="${s.id}" ${m.sub===s?"selected":""}>${esc(s.journal)} · ${esc(p.key||"")} (${esc(s.status)})</option>`; }).join("")}</select>
+    <select id="es"><option value="">— choose —</option>${subs.map(x=>{ const p=paperById(x.paper)||{}; return `<option value="${x.id}" ${match===x?"selected":""}>${esc(x.journal)} · ${esc(p.key||"")} (${esc(x.status)})</option>`; }).join("")}</select>
     <div class="two"><div><label for="eo">New status</label><select id="eo">${STATUSES.map(o=>`<option ${o===outcome?"selected":""}>${o}</option>`).join("")}</select></div>
-    <div><label for="ed">Date</label><input type="date" id="ed" value="${today()}"></div></div>
-    <label for="em">Manuscript ID</label><input id="em" value="${esc(m.msid)}">
-    <div class="hint">${text?(m.sub?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it."):"Paste the email, then tap Read email again."}</div>
-    <div class="actions"><button class="primary" id="esave">Save update</button></div>`);
-  $("#ere").onclick=()=>{ const v=$("#et").value; if(/rdsk:\/\/add\?/i.test(v)) addLinksSheet(v); else emailSheet(v); };
+    <div><label for="ed">Date</label><input type="date" id="ed" value="${(pend&&pend.date)||today()}"></div></div>
+    <div class="two"><div><label for="ek">Decision type</label><select id="ek">${dtypes.map(o=>`<option value="${o}" ${dt.startsWith(o)&&o?"selected":""}>${o||"—"}</option>`).join("")}</select></div>
+    <div><label for="em">Manuscript ID</label><input id="em" value="${esc(r.msid||(pend&&pend.msid)||"")}"></div></div>
+    <div class="hint">${text?(match?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it.")+(r.reviews?" "+r.reviews+" reviewer report(s) found.":""):"Paste the email, then tap Read email again."}</div>
+    <div class="actions"><button class="primary" id="esave">Save update</button>${pend?`<button class="danger" id="edismiss">Not about my papers</button>`:""}</div>`);
+  if($("#eglink")) $("#eglink").onclick=()=>openBrowser(pend.link);
+  $("#ere").onclick=()=>{ const v=$("#et").value; if(/rdsk:\/\/add\?/i.test(v)) addLinksSheet(v); else emailSheet(v,pend); };
+  const resolve=(action,info)=>{ if(!pend) return; GS.resolved=(GS.resolved||[]).concat([{id:pend.id,action}]); if(info) GS.emailDecisions=(GS.emailDecisions||[]).concat([Object.assign({id:pend.id},info)]); gsStore(); S.pending=(S.pending||[]).filter(x=>x.id!==pend.id); };
+  if($("#edismiss")) $("#edismiss").onclick=()=>{ resolve("Dismissed in the app"); persist(false); closeSheet(); render(); gsSchedule(); toast("Dismissed"); };
   $("#esave").onclick=()=>{
-    const s=S.subs.find(x=>x.id===$("#es").value); if(!s) return toast("Choose the submission");
-    const st=$("#eo").value, d=$("#ed").value||today();
-    s.status=st;
-    if(st==="Under review"){ if(!s.submitted) s.submitted=d; s.decided=""; } else if(st!=="Planned") s.decided=d;
-    if($("#em").value.trim()) s.msid=$("#em").value.trim();
+    const x=S.subs.find(y=>y.id===$("#es").value); if(!x) return toast("Choose the submission");
+    const st=$("#eo").value, d=$("#ed").value||today(), k=$("#ek").value;
+    x.status=st;
+    if(st==="Under review"){ if(!x.submitted) x.submitted=d; x.decided=""; } else if(st!=="Planned") x.decided=d;
+    if(k) x.dtype=k+(k==="Rejected after review"&&r.reviews>1?" ("+r.reviews+" reviews)":"");
+    if($("#em").value.trim()) x.msid=$("#em").value.trim();
     const note="Email "+fmt(d)+": "+firstLine.slice(0,80);
-    s.notes=s.notes?s.notes+" | "+note:note;
-    persist(); closeSheet(); render(); toast("Updated · "+s.journal+" → "+st);
+    x.notes=x.notes?x.notes+" | "+note:note;
+    resolve("Confirmed in the app",{paper:(paperById(x.paper)||{}).key,journal:x.journal,status:st,dtype:x.dtype||""});
+    persist(); closeSheet(); render(); toast("Updated · "+x.journal+" → "+st);
+    if(pend&&(S.pending||[]).length) setTimeout(pendingSheet,400);
+    else if(st==="Rejected") setTimeout(()=>whatNext(paperById(x.paper),x),400);
   };
 }
+function pendingSheet(){
+  const list=S.pending||[];
+  if(!list.length){ closeSheet(); return toast("Nothing waiting"); }
+  openSheet(`<h3>Journal emails to confirm <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="hint" style="margin-top:0">Read from Gmail by your Google Sheet. These weren't clear enough to apply automatically.</div>
+    ${list.map((x,i)=>`<div class="card tap" data-pend="${i}"><div class="t">${esc(x.subject)}</div><div class="m">${esc(x.from)} · ${fmt(x.date)}</div>
+      <div style="margin-top:5px">${x.guess?`<span class="chip ${stageClass(x.guess)}">${esc(x.guess)}</span> `:""}${x.journal?`<span class="m">${esc(x.journal)}${x.paper?" · "+esc(x.paper):""}</span>`:'<span class="m">paper not recognised</span>'}</div></div>`).join("")}`);
+  $("#sheet").onclick=e=>{ const c=e.target.closest("[data-pend]"); if(!c) return; const x=list[+c.dataset.pend]; emailSheet([x.subject,x.from,x.body].join("\n"),x); };
+}
+const pendingBanner=()=>(S.pending||[]).length?`<button class="banner" data-act="pending" style="width:100%;text-align:left;border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)">📧 ${S.pending.length} journal email${S.pending.length===1?"":"s"} to confirm →</button>`:"";
 
 /* ---------- Google Sheets sync (two-way, via the user's own Apps Script web app) ---------- */
 const GS_KEY="rdsk.gsheets.v1";
@@ -1132,7 +1138,7 @@ function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catc
 // change tracking: each paper/submission gets mod = time of its last local change
 let H=null, trackPaused=false, gsEditCount=0;
 const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes]);
-const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:""]);
+const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:"",s.dtype||""]);
 function baseline(){ H={}; S.papers.forEach(p=>H[p.id]=sigP(p)); S.subs.forEach(x=>H[x.id]=sigS(x)); }
 function trackChanges(){
   if(trackPaused) return 0;
@@ -1150,8 +1156,8 @@ function gsPayload(mode){
   const pk=id=>(paperById(id)||{}).key||"";
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
   const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
-  const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",mod:mode==="overwrite"?now:(x.mod||0)}));
-  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
+  const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
+  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:+S.settings.chaseDays||90}};
 }
 async function gsSync(mode,manual){
@@ -1167,12 +1173,14 @@ async function gsSync(mode,manual){
     if(gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
     gsApply(j);
     GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
+    const sentRes=(body.resolved||[]).map(x=>x.id); GS.resolved=(GS.resolved||[]).filter(x=>!sentRes.includes(x.id)); GS.emailDecisions=(GS.emailDecisions||[]).filter(x=>!sentRes.includes(x.id));
     GS.lastSync=startedAt; GS.lastText=new Date().toLocaleString(); GS.lastError=""; GS.sheet=j.sheet||GS.sheet; gsStore();
     if(manual) toast("Synced with “"+(j.sheet||"Google Sheet")+"” ✓");
   }catch(err){ GS.lastError=err.message; gsStore(); if(manual) toast("Sheets sync failed: "+err.message); }
   gsBusy=false; render();
 }
 function gsApply(j){
+  const before=JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort());
   const oldS={}; S.subs.forEach(x=>oldS[x.id]=x);
   const oldByKey={}; S.papers.forEach(p=>oldByKey[p.key]=p);
   const created=[];
@@ -1186,10 +1194,12 @@ function gsApply(j){
       papers.push(np); created.push(np); byKey[r.paper]=pid; }
     const o=oldS[r.id]||{};
     const live=r.live?{text:r.live,at:r.liveAt||today(),prev:o.live&&o.live.text===r.live?o.live.prev||"":(o.live&&o.live.text)||"",changedAt:o.live&&o.live.text===r.live?o.live.changedAt||"":(o.live?today():"")}:undefined;
-    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,live,liveLog:o.liveLog};
+    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live,liveLog:o.liveLog};
   });
   S.papers=papers; S.subs=subs;
+  const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
   if(j.app){ if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays; }
+  if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
   if(created.length){ const t=Date.now(); created.forEach(p=>{ p.mod=t; delete H[p.id]; }); trackChanges(); gsSchedule(); }
 }

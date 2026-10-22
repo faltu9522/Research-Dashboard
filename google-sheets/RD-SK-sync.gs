@@ -1,5 +1,5 @@
 /**
- * RD SK ↔ Google Sheets sync (two-way) + suggested next journals.
+ * RD SK ↔ Google Sheets sync (two-way) + suggested next journals + journal emails from Gmail.
  *
  * Setup (once): open your RD SK master Google Sheet → Extensions → Apps Script → replace everything with this file →
  * Save → Deploy → New deployment → type "Web app" → Execute as: Me, Who has access: Anyone → Deploy → Authorize →
@@ -8,6 +8,12 @@
  * Columns are found by their header names, so you can reorder or add columns. The app only changes the columns you
  * type in (and Manuscript ID, Status on journal site, Status checked, App ID, Updated, Suggested next journals).
  * Formula columns, the Dashboard and the ABDC list are left alone.
+ *
+ * Email import (optional): reload the sheet, then menu RD SK → Turn on email import. Every 15 minutes the script reads
+ * journal emails in this Google account's Gmail (ScholarOne, Editorial Manager, publishers, the label "RD-SK", or mail
+ * sent to <you>+rdsk@gmail.com), updates the matching submission when it is sure, logs every email on the Emails tab
+ * and every decision letter (with reviewer comments) on the "Decisions & reviews" tab. Unclear emails wait for you
+ * in the app.
  */
 
 var PAPER_COLS = { key: /^paper/i, title: /^(current |full )?title$/i, authors: /^authors?$/i, type: /^type$/i,
@@ -15,10 +21,16 @@ var PAPER_COLS = { key: /^paper/i, title: /^(current |full )?title$/i, authors: 
 var SUB_COLS = { paper: /^paper$/i, journal: /^journal$/i, abdc: /^abdc/i, rating: /rating|index/i, status: /^status$/i,
   submitted: /^(date submitted|date of submission)/i, decided: /^date of decision/i, notes: /^notes?$/i,
   titleUsed: /^title used/i, msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i,
-  id: /^app id$/i, updated: /^updated$/i };
+  dtype: /^decision type/i, id: /^app id$/i, updated: /^updated$/i };
 var JOURNAL_COLS = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login link/i, email: /email/i };
 var ADD_PAPER = { suggest: 'Suggested next journals', id: 'App ID', updated: 'Updated' };
-var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: 'Status checked', id: 'App ID', updated: 'Updated' };
+var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: 'Status checked', dtype: 'Decision type', id: 'App ID', updated: 'Updated' };
+var EMAILS_SHEET = 'Emails', DECISIONS_SHEET = 'Decisions & reviews', MAIL_LABEL = 'RD-SK';
+var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID'];
+var DECISION_HEAD = ['Decision date', 'Paper', 'Journal', 'Decision', 'Decision type', 'Reviews', 'Manuscript ID', 'Decision letter & reviewer comments', 'Gmail link', 'Message ID'];
+var JOURNAL_SENDERS = ['manuscriptcentral.com', 'scholarone.com', 'editorialmanager.com', 'ariessys.com', 'aries-mail.com',
+  'tandfonline.com', 'taylorandfrancis.com', 'sagepub.com', 'sagepub.co.uk', 'elsevier.com', 'springernature.com', 'springer.com',
+  'wiley.com', 'emerald.com', 'emeraldgrouppublishing.com', 'oup.com', 'cambridge.org', 'epw.in', 'ieee.org', 'informs.org'];
 var APP_SHEET = 'RD SK app', ABDC_SHEET = 'ABDC list';
 
 function doGet() { return out(handle({})); }
@@ -30,7 +42,13 @@ function doPost(e) {
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('RD SK').addItem('Refresh suggested journals', 'refreshSuggestions').addToUi();
+  SpreadsheetApp.getUi().createMenu('RD SK')
+    .addItem('Refresh suggested journals', 'refreshSuggestions')
+    .addSeparator()
+    .addItem('Turn on email import (every 15 min)', 'turnOnEmailImport')
+    .addItem('Import journal emails now', 'importEmailsNow')
+    .addItem('Turn off email import', 'turnOffEmailImport')
+    .addToUi();
 }
 
 function refreshSuggestions() {
@@ -116,14 +134,15 @@ function handle(body) {
       put(row, S, 'paper', s.paper); put(row, S, 'journal', s.journal); put(row, S, 'rating', s.rating || '');
       put(row, S, 'status', s.status || ''); put(row, S, 'submitted', date(s.submitted)); put(row, S, 'decided', date(s.decided));
       put(row, S, 'notes', s.notes || ''); put(row, S, 'titleUsed', s.titleUsed || ''); put(row, S, 'msid', s.msid || '');
-      put(row, S, 'live', s.live || ''); put(row, S, 'liveAt', date(s.liveAt));
+      put(row, S, 'live', s.live || ''); put(row, S, 'liveAt', date(s.liveAt)); put(row, S, 'dtype', s.dtype || '');
       put(row, S, 'id', s.id); put(row, S, 'updated', new Date(s.mod || Date.now()));
     });
+    if (body.emailDecisions) applyEmailDecisions(body.emailDecisions, sb, S, ss);
     (body.deleted || []).forEach(function (id) {
       var i = find(pb, P, id, null);
       if (i >= 0) ['key', 'title', 'authors', 'type', 'override', 'notes', 'suggest', 'id', 'updated'].forEach(function (f) { put(pb.v[i], P, f, ''); });
       i = find(sb, S, id, null);
-      if (i >= 0) ['paper', 'journal', 'rating', 'status', 'submitted', 'decided', 'notes', 'titleUsed', 'msid', 'live', 'liveAt', 'id', 'updated']
+      if (i >= 0) ['paper', 'journal', 'rating', 'status', 'submitted', 'decided', 'notes', 'titleUsed', 'msid', 'live', 'liveAt', 'dtype', 'id', 'updated']
         .forEach(function (f) { put(sb.v[i], S, f, ''); });
     });
 
@@ -147,12 +166,13 @@ function handle(body) {
     }
     save(ps, pb); save(subs, sb);
 
-    // 4. Per-journal data (Journals tab) and app settings.
+    // 4. Per-journal data (Journals tab) and app settings; emails waiting for confirmation in the app.
     var app = appData(ss, body.app);
+    var pending = emailQueue(ss, body.resolved || []);
 
     // 5. Send everything back.
     return {
-      ok: true, now: Date.now(), sheet: ss.getName(), app: app,
+      ok: true, now: Date.now(), sheet: ss.getName(), app: app, pending: pending,
       papers: pb.v.filter(function (r) { return str(g(r, P, 'key')); }).map(function (r) {
         return { id: str(g(r, P, 'id')), key: str(g(r, P, 'key')), title: str(g(r, P, 'title')), authors: str(g(r, P, 'authors')),
                  type: str(g(r, P, 'type')), override: str(g(r, P, 'override')), notes: str(g(r, P, 'notes')) };
@@ -161,7 +181,7 @@ function handle(body) {
         return { id: str(g(r, S, 'id')), paper: str(g(r, S, 'paper')), journal: str(g(r, S, 'journal')), rating: str(g(r, S, 'rating')),
                  abdc: str(g(r, S, 'abdc')), status: str(g(r, S, 'status')), submitted: day(g(r, S, 'submitted'), tz),
                  decided: day(g(r, S, 'decided'), tz), notes: str(g(r, S, 'notes')), titleUsed: str(g(r, S, 'titleUsed')),
-                 msid: str(g(r, S, 'msid')), live: str(g(r, S, 'live')), liveAt: day(g(r, S, 'liveAt'), tz) };
+                 msid: str(g(r, S, 'msid')), live: str(g(r, S, 'live')), liveAt: day(g(r, S, 'liveAt'), tz), dtype: str(g(r, S, 'dtype')) };
       })
     };
   } catch (err) {
@@ -281,6 +301,248 @@ function day(x, tz) {
   var s = str(x); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : '';
 }
 function date(s) { if (!s) return ''; var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
+// ---------- journal emails from Gmail ----------
+function turnOnEmailImport() {
+  turnOffEmailImport(true);
+  ScriptApp.newTrigger('processEmails').timeBased().everyMinutes(15).create();
+  if (!GmailApp.getUserLabelByName(MAIL_LABEL)) GmailApp.createLabel(MAIL_LABEL);
+  var r = importEmails(400);
+  SpreadsheetApp.getActive().toast('Email import is on (every 15 minutes). First run: ' + r.summary, 'RD SK', 12);
+}
+function turnOffEmailImport(quiet) {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'processEmails') ScriptApp.deleteTrigger(t); });
+  if (quiet !== true) SpreadsheetApp.getActive().toast('Email import is off.', 'RD SK');
+}
+function importEmailsNow() { SpreadsheetApp.getActive().toast(importEmails(30).summary, 'RD SK', 10); }
+function processEmails() { importEmails(3); }
+
+function logSheet(ss, name, head) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) { sh = ss.insertSheet(name); sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold'); sh.setFrozenRows(1); }
+  return sh;
+}
+
+/** Reads recent journal emails and applies them. `days` = how far back to look. */
+function importEmails(days) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  var counts = { updated: 0, confirm: 0, already: 0 };
+  try {
+    var ss = SpreadsheetApp.getActive(), tz = ss.getSpreadsheetTimeZone(), me = Session.getEffectiveUser().getEmail();
+    var ps = ss.getSheetByName('Papers'), subsSh = ss.getSheetByName('Submissions');
+    var P = cols(ps, PAPER_COLS, ADD_PAPER), S = cols(subsSh, SUB_COLS, ADD_SUB);
+    var pb = block(ps, P), sb = block(subsSh, S);
+    var el = logSheet(ss, EMAILS_SHEET, EMAIL_HEAD), dl = logSheet(ss, DECISIONS_SHEET, DECISION_HEAD);
+    var seen = {};
+    if (el.getLastRow() > 1) el.getRange(2, 12, el.getLastRow() - 1, 1).getValues().forEach(function (r) { seen[str(r[0])] = 1; });
+    var plus = me.replace('@', '+rdsk@');
+    var q = '(label:' + MAIL_LABEL + ' OR to:' + plus + ' OR from:(' + JOURNAL_SENDERS.join(' OR ') + ')) newer_than:' + days + 'd';
+    var msgs = [];
+    GmailApp.search(q, 0, 300).forEach(function (t) { t.getMessages().forEach(function (m) { if (!seen[m.getId()]) msgs.push(m); }); });
+    msgs.sort(function (a, b) { return a.getDate() - b.getDate(); }); // oldest first, so history applies in order
+    var titles = {};
+    pb.v.forEach(function (r) { titles[str(r[P.key - 1])] = P.title ? str(r[P.title - 1]) : ''; });
+    var logRows = [], decRows = [];
+    msgs.forEach(function (m) {
+      var body = m.getPlainBody() || '', subject = m.getSubject() || '', from = m.getFrom() || '';
+      var fwd = body.match(/^\s*Date:\s*(.+)$/m), when = m.getDate();
+      if (/forwarded message|^fwd?:/i.test(body.slice(0, 400) + '\n' + subject) && fwd && !isNaN(Date.parse(fwd[1]))) when = new Date(Date.parse(fwd[1]));
+      var whenDay = Utilities.formatDate(when, tz, 'yyyy-MM-dd');
+      var cand = [];
+      sb.v.forEach(function (r) {
+        if (!str(r[S.journal - 1])) return;
+        var paper = str(r[S.paper - 1]);
+        cand.push({ id: str(r[S.id - 1]), paper: paper, title: titles[paper] || '', titleUsed: S.titleUsed ? str(r[S.titleUsed - 1]) : '',
+                    journal: str(r[S.journal - 1]), status: str(r[S.status - 1]), submitted: day(r[S.submitted - 1], tz),
+                    msid: S.msid ? str(r[S.msid - 1]) : '', row: r });
+      });
+      var res = rdParseEmail({ subject: subject, from: from, body: body, date: whenDay }, cand);
+      if (!res.event) return;                                         // not about a manuscript
+      var looksJournal = res.msid || /manuscript|submission|decision|your paper/i.test(subject);
+      if (!res.sub && !looksJournal) return;
+      var link = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.getThread().getId();
+      var action;
+      if (res.sub && res.confident) {
+        action = applyEmail(res, res.sub.row, S, sb, whenDay, m.getId());
+        if (/^Updated/.test(action)) counts.updated++; else counts.already++;
+      } else { action = 'Needs confirmation'; counts.confirm++; }
+      var sub = res.sub || {};
+      logRows.push([when, from, subject, sub.paper || '', sub.journal || '', res.status || res.event, res.dtype, res.reviews || '', res.msid,
+                    action, link, m.getId()]);
+      if (/Rejected|Revision requested|Accepted|Returned by office/.test(res.event))
+        decRows.push([when, sub.paper || '', sub.journal || '', res.event, res.dtype, res.reviews || '', res.msid,
+                      body.replace(/\r/g, '').slice(0, 45000), link, m.getId()]);
+      if (!res.sub || !res.confident) {
+        var label = GmailApp.getUserLabelByName(MAIL_LABEL) || GmailApp.createLabel(MAIL_LABEL);
+        m.getThread().addLabel(label);
+      }
+    });
+    save(subsSh, sb);
+    if (logRows.length) el.getRange(el.getLastRow() + 1, 1, logRows.length, EMAIL_HEAD.length).setValues(logRows);
+    if (decRows.length) dl.getRange(dl.getLastRow() + 1, 1, decRows.length, DECISION_HEAD.length).setValues(decRows);
+  } finally {
+    lock.releaseLock();
+  }
+  if (counts.updated) handle({}); // refresh IDs and suggested journals
+  return { counts: counts, summary: counts.updated + ' updated, ' + counts.already + ' already up to date, ' + counts.confirm + ' to confirm in the app' };
+}
+
+/** Applies one confidently matched email to its Submissions row (never moves a row backwards). */
+function applyEmail(res, row, S, sb, whenDay, msgId) {
+  var cur = str(row[S.status - 1]), was = cur, changed = [];
+  var set = function (f, v) { if (S[f] && str(row[S[f] - 1]) !== str(v)) { row[S[f] - 1] = v; changed.push(f); } };
+  if (res.msid && S.msid && !str(row[S.msid - 1])) set('msid', res.msid);
+  var newRow = function (status) {
+    var near = -1; sb.v.forEach(function (r, i) { if (str(r[S.paper - 1]) === str(row[S.paper - 1])) near = i; });
+    var i = freeRow(sb, function (r) { return !str(r[S.paper - 1]) && !str(r[S.journal - 1]); }, near), r = sb.v[i];
+    r[S.paper - 1] = row[S.paper - 1]; r[S.journal - 1] = row[S.journal - 1]; r[S.status - 1] = status; r[S.submitted - 1] = date(whenDay);
+    if (S.msid) r[S.msid - 1] = res.msid || ''; if (S.notes) r[S.notes - 1] = 'From email';
+    r[S.id - 1] = Utilities.getUuid(); r[S.updated - 1] = new Date();
+    return 'Updated: new ' + status + ' row';
+  };
+  var ev = res.event, order = RD_ORDER;
+  if (ev === 'submitted') {
+    if (cur === 'Planned') { set('status', 'Under review'); set('submitted', date(whenDay)); }
+    else if (order[cur] >= 2 && day(row[S.submitted - 1], 'UTC') < whenDay) return newRow('Under review');
+  } else if (ev === 'resubmitted') {
+    if (cur === 'Revision requested') { set('status', 'Revision resubmitted'); if (!str(row[S.decided - 1])) set('decided', date(whenDay)); row[S.updated - 1] = new Date(); return newRow('Under review'); }
+    if (cur === 'Returned by office' || order[cur] >= 4) return newRow('Under review');
+  } else if (ev === 'under review') {
+    if (cur === 'Planned') { set('status', 'Under review'); set('submitted', date(whenDay)); }
+    if (S.live && (cur === 'Under review' || cur === 'Planned')) { set('live', 'Sent for review'); set('liveAt', date(whenDay)); }
+  } else if (order[ev] !== undefined) {
+    if (cur === ev) { if (S.decided && !str(row[S.decided - 1])) set('decided', date(whenDay)); }
+    else if (order[ev] > order[cur] || cur === 'Planned') { set('status', ev); set('decided', date(whenDay)); }
+    if (res.dtype) set('dtype', res.dtype + (res.reviews > 1 ? ' (' + res.reviews + ' reviews)' : ''));
+  }
+  if (!changed.length) return 'Already up to date';
+  row[S.updated - 1] = new Date();
+  if (!str(row[S.id - 1])) row[S.id - 1] = Utilities.getUuid();
+  return 'Updated: ' + (str(row[S.status - 1]) !== was ? was + ' → ' + str(row[S.status - 1]) : changed.join(', '));
+}
+
+/** Emails waiting for the app; `resolved` = [{id, action}] from the app marks them done. */
+function emailQueue(ss, resolved) {
+  var sh = ss.getSheetByName(EMAILS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var rg = sh.getRange(2, 1, sh.getLastRow() - 1, EMAIL_HEAD.length), v = rg.getValues(), done = {}, out = [], dirty = false;
+  resolved.forEach(function (x) { done[x.id] = x.action || 'Confirmed in the app'; });
+  v.forEach(function (r) {
+    var id = str(r[11]);
+    if (str(r[9]) !== 'Needs confirmation') return;
+    if (done[id]) { r[9] = done[id]; dirty = true; return; }
+    out.push({ id: id, date: r[0] instanceof Date ? r[0].toISOString().slice(0, 10) : str(r[0]), from: str(r[1]), subject: str(r[2]),
+               paper: str(r[3]), journal: str(r[4]), guess: str(r[5]), dtype: str(r[6]), reviews: +r[7] || 0, msid: str(r[8]), link: str(r[10]) });
+  });
+  if (dirty) rg.setValues(v);
+  if (out.length) { // add the email text for the app to show
+    var texts = {};
+    out.forEach(function (x) { try { var m = GmailApp.getMessageById(x.id); texts[x.id] = (m.getPlainBody() || '').slice(0, 4000); } catch (e) {} });
+    out.forEach(function (x) { x.body = texts[x.id] || ''; });
+  }
+  return out;
+}
+
+/** Decision type / reviews chosen in the app for an email are written to the Decisions & reviews tab. */
+function applyEmailDecisions(list, sb, S, ss) {
+  var dl = ss.getSheetByName(DECISIONS_SHEET);
+  if (!dl || dl.getLastRow() < 2) return;
+  var rg = dl.getRange(2, 1, dl.getLastRow() - 1, DECISION_HEAD.length), v = rg.getValues();
+  list.forEach(function (x) { v.forEach(function (r) { if (str(r[9]) === x.id) { r[1] = x.paper || r[1]; r[2] = x.journal || r[2]; r[3] = x.status || r[3]; r[4] = x.dtype || r[4]; } }); });
+  rg.setValues(v);
+}
+
+// ==== emailparse.js (copied from the app by tools/make_gscript.py; edit it there) ====
+// Reads a journal email: what happened, desk or reviewed, how many reviews, manuscript ID, and which submission it is.
+// Shared by the app (paste / share an email) and the Google Sheet script (Gmail import), so plain ES5 with no browser APIs.
+//
+// rdParseEmail({subject, from, body, date}, subs) -> {
+//   event: "submitted" | "resubmitted" | "under review" | "Rejected" | "Revision requested" | "Accepted" | "Returned by office" | "Withdrawn" | "",
+//   status, dtype ("Desk rejection" | "Rejected after review" | ""), reviews, msid, sub, score, confident, reasons[] }
+//   subs: [{id, paper, title, titleUsed, journal, status, submitted, msid}]  (paper = short name, title = full title)
+
+var RD_MSID = /\b[A-Z][A-Z0-9&]{1,14}(?:-[A-Z]{1,2})?(?:-\d{2,6}){2,3}(?:\.R\d+)?\b/;
+var RD_ORDER = { "Planned": 0, "Under review": 1, "Returned by office": 2, "Revision requested": 2, "Revision resubmitted": 3,
+  "Rejected": 4, "Accepted": 4, "Withdrawn": 4 };
+
+function rdEmailNorm(s) {
+  return " " + String(s || "").toLowerCase().replace(/&/g, " and ").replace(/[‘’'`"“”]/g, "").replace(/[^a-z0-9]+/g, " ").trim() + " ";
+}
+function rdEmailWords(s) {
+  var stop = { the: 1, and: 1, "for": 1, from: 1, with: 1, into: 1, that: 1, this: 1, their: 1, what: 1, whose: 1, when: 1 };
+  return rdEmailNorm(s).split(" ").filter(function (w) { return w.length > 3 && !stop[w]; });
+}
+function rdEmailOverlap(a, text) {
+  var A = rdEmailWords(a);
+  if (!A.length) return 0;
+  var T = rdEmailNorm(text), hit = 0;
+  A.forEach(function (w) { if (T.indexOf(" " + w + " ") >= 0) hit++; });
+  return hit / A.length;
+}
+function rdBaseId(id) { return String(id || "").toUpperCase().replace(/\.R\d+$/, ""); }
+
+/** What the email says happened. Decisions are checked before acknowledgements (a rejection also says "thank you for submitting"). */
+function rdEmailEvent(text) {
+  var x = String(text || "").toLowerCase().replace(/\s+/g, " ");
+  if (/pleased to (inform you that .{0,120})?accept|(has|have) been accepted for publication|accepted (it )?for publication in|decision (is|was) to accept/.test(x)) return "Accepted";
+  if (/major revisions?\b|minor revisions?\b|revise and resubmit|r\s?&\s?r\b|invit\w* you to (revise|resubmit|submit a revised)|(would|will) be (happy|pleased|glad) to (see|consider|receive) a revised|revisions? (are|is) (required|needed|necessary)|decision (is|was) (a )?(major|minor) revision/.test(x)) return "Revision requested";
+  if (/regret|unable to (accept|publish|offer|consider)|not (be )?able to (accept|publish|offer|consider)|decided (not|against) (to )?(publish|accept|proceed|pursue|send)|cannot (be )?(accept|publish|consider)|not suitable for (publication|the journal|this journal)|reject|declin(e|ed) (your|the|this) (manuscript|paper|submission)|will not be (considered|published|proceeding)|not (be )?(proceeding|moving forward|taking (it|your (manuscript|paper)) forward)/.test(x)) return "Rejected";
+  if (/unsubmitted|(has been|is being) returned to (you|your)|sent back to you|returned (to you )?for (correction|changes|revision of (format|formatting))|before (it|we|your manuscript) can (be )?(proceed|consider|sent)|technical check|please (address|correct) the following/.test(x)) return "Returned by office";
+  if (/withdrawn|withdrawal of (your|the) (manuscript|submission)/.test(x)) return "Withdrawn";
+  if (/revised (manuscript|version|paper|submission)|revision (has been|was) (successfully )?(submitted|received)/.test(x) && /(successfully )?(submitted|received)|thank you for (submitting|your)/.test(x)) return "resubmitted";
+  if (/(sent|send) (it |your manuscript |the manuscript )?(out )?(for|to) (external |peer )?review|under (peer )?review|reviewers? (have been|has been) (invited|assigned|contacted|selected)|out for review|assigned to (an |the )?(editor|associate editor)/.test(x)) return "under review";
+  if (/successfully submitted|been (successfully )?(submitted|received)|received your (manuscript|submission|paper)|thank you for (submitting|your submission)|acknowledg\w+ (the )?receipt|submission (has been )?received|confirm(ing|s)? (the )?(receipt|submission)/.test(x)) return "submitted";
+  return "";
+}
+
+/** Desk rejection vs rejection after review, and how many reviewer reports are in the email. */
+function rdEmailReviews(text) {
+  var t = String(text || ""), x = t.toLowerCase().replace(/\s+/g, " "), n = 0, m, re = /\b(?:reviewer|referee)\s*(?:#|no\.?|number)?\s*:?\s*(\d{1,2})\b/gi;
+  while ((m = re.exec(t))) n = Math.max(n, +m[1]);
+  if (!n && /(reviewer|referee)s?'?\s*(comments|reports?|reviews?)\b/i.test(t)) n = 1;
+  var desk = /without (sending it |being sent )?(out )?(for )?(external |peer )?review|not (be )?sent (it )?(out )?for (external |peer )?review|decided not to send|not send (it|your (manuscript|paper)) (out )?(for|to) (external |peer )?review|editorial (screening|assessment|review|pre-?screening)|desk[- ]?reject|initial (screening|assessment|evaluation)|outside (the )?(aims and )?scope|not a (good )?fit for|does not fit (the|within)/.test(x);
+  return { reviews: n, desk: desk && !n, reviewed: n > 0 || /reviewers? (have|has) (now )?(commented|reviewed|completed|returned)|comments from the reviewers|reviewers'? (comments|reports)/.test(x) };
+}
+
+function rdParseEmail(mail, subs) {
+  var subject = mail.subject || "", from = mail.from || "", body = mail.body || "";
+  var all = subject + "\n" + from + "\n" + body;
+  var event = rdEmailEvent(subject + "\n" + body);
+  var idm = (subject.match(RD_MSID) || body.match(RD_MSID) || [""])[0];
+  var rv = rdEmailReviews(body);
+  var head = rdEmailNorm(subject + " " + from + " " + body.slice(0, 1500));
+  var best = null, bestScore = 0, second = 0, reasons = [];
+  (subs || []).forEach(function (s) {
+    var sc = 0, why = [];
+    if (idm && s.msid && rdBaseId(s.msid) === rdBaseId(idm)) { sc += 100; why.push("manuscript ID"); }
+    var j = rdEmailNorm(String(s.journal || "").replace(/-A$/, "").replace(/\(.*?\)/g, ""));
+    var jHit = j.length > 4 && head.indexOf(j) >= 0;
+    if (jHit) { sc += 30 + j.length / 20; why.push("journal"); }
+    var ov = Math.max(rdEmailOverlap(s.title, all), rdEmailOverlap(s.titleUsed, all), rdEmailOverlap(s.paper, all));
+    if (ov >= 0.3) { sc += 40 * ov; why.push("title " + Math.round(ov * 100) + "%"); }
+    var open = s.status === "Under review" || s.status === "Revision requested" || s.status === "Returned by office";
+    // the attempt from the email's time: submitted on/before the email, the closer the better
+    if (mail.date && s.submitted) {
+      var gap = (Date.parse(mail.date) - Date.parse(s.submitted)) / 864e5;
+      sc += gap < -2 ? -15 : 6 - Math.min(gap, 600) / 120;
+    }
+    if (event === "submitted" && s.status === "Planned") sc += 8;
+    else if (event === "resubmitted" && (s.status === "Revision requested" || s.status === "Returned by office")) sc += 10;
+    else if (event && event !== "submitted" && open) sc += 8;
+    if (sc > bestScore) { second = bestScore; bestScore = sc; best = s; reasons = why; } else if (sc > second) second = sc;
+  });
+  // Confident: manuscript ID, or journal + clear title, or journal alone when it's the only live candidate there.
+  var confident = !!best && !!event && (bestScore >= 100 ||
+    (reasons.indexOf("journal") >= 0 && reasons.some(function (r) { return /^title [5-9]\d|^title 100/.test(r); })) ||
+    (reasons.indexOf("journal") >= 0 && bestScore - second >= 25 && bestScore >= 38));
+  var status = { "submitted": "Under review", "resubmitted": "Under review", "under review": "Under review" }[event] || event;
+  var dtype = "";
+  if (event === "Rejected") dtype = rv.desk ? "Desk rejection" : rv.reviewed ? "Rejected after review" : "";
+  return { event: event, status: status, dtype: dtype, reviews: rv.reviews, msid: idm, sub: bestScore >= 20 ? best : null,
+           score: bestScore, confident: confident, reasons: reasons };
+}
+// ==== end emailparse.js ====
 
 // ==== suggest.js (copied from the app by tools/make_gscript.py; edit it there) ====
 // Next-journal recommendations from the ABDC list. Shared by the app and the Google Sheet script

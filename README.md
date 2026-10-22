@@ -45,6 +45,11 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
 - **ABDC & suggestions** – the ABDC 2025 Journal Quality List (v3, current to Sept 2026) is embedded
   (`assets/abdc.js`); `assets/suggest.js` recommends next journals per paper (same ABDC fields, topic words, tier).
   The sheet script embeds the same engine (`python3 tools/make_gscript.py` after editing suggest.js).
+- **Journal emails (Gmail)** – in the sheet: menu *RD SK → Turn on email import*. Every 15 minutes the script reads
+  journal emails in the sheet owner's Gmail (ScholarOne, Editorial Manager, publishers, label `RD-SK`, or mail to
+  `<you>+rdsk@gmail.com`) with `assets/emailparse.js` (shared with the app), updates confidently matched
+  submissions (status, dates, manuscript ID, desk vs after-review, reviewer count), logs every email on the *Emails*
+  tab and decision letters with reviewer comments on *Decisions & reviews*; unclear ones wait in the app.
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 
