@@ -10,7 +10,7 @@
  * Formula columns, the Dashboard and the ABDC list are left alone.
  *
  * Email import (optional): reload the sheet, then menu RD SK → Turn on email import. Every 15 minutes the script reads
- * journal emails in this Google account's Gmail (ScholarOne, Editorial Manager, publishers, the label "RD-SK", or mail
+ * journal emails (from 1 Oct 2026 on, see EMAIL_FROM_DATE) in this Google account's Gmail (ScholarOne, Editorial Manager, publishers, the label "RD-SK", or mail
  * sent to <you>+rdsk@gmail.com), updates the matching submission when it is sure, logs every email on the Emails tab
  * and every decision letter (with reviewer comments) on the "Decisions & reviews" tab. Unclear emails wait for you
  * in the app.
@@ -30,6 +30,10 @@ var SUB_COLS = { paper: /^paper$/i, journal: /^journal$/i, abdc: /^abdc/i, ratin
 var JOURNAL_COLS = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login link/i, email: /email/i };
 var ADD_PAPER = { suggest: 'Suggested next journals', id: 'App ID', updated: 'Updated' };
 var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: 'Status checked', dtype: 'Decision type', id: 'App ID', updated: 'Updated' };
+// Emails are read only from this date on, and submissions already decided before it are never changed.
+// (Change it with File → Project properties → Script properties: EMAIL_FROM_DATE = yyyy-mm-dd.)
+var EMAIL_FROM_DEFAULT = '2026-10-01';
+function emailFromDate() { return PropertiesService.getScriptProperties().getProperty('EMAIL_FROM_DATE') || EMAIL_FROM_DEFAULT; }
 var EMAILS_SHEET = 'Emails', DECISIONS_SHEET = 'Decisions & reviews', MAIL_LABEL = 'RD-SK';
 var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID', 'Undo data'];
 var DECISION_HEAD = ['Decision date', 'Paper', 'Journal', 'Decision', 'Decision type', 'Reviews', 'Manuscript ID', 'Decision letter & reviewer comments', 'Gmail link', 'Message ID'];
@@ -352,7 +356,9 @@ function importEmails(days) {
     var seen = {};
     if (el.getLastRow() > 1) el.getRange(2, 12, el.getLastRow() - 1, 1).getValues().forEach(function (r) { seen[str(r[0])] = 1; });
     var plus = me.replace('@', '+rdsk@');
-    var q = '(label:' + MAIL_LABEL + ' OR to:' + plus + ' OR from:(' + JOURNAL_SENDERS.join(' OR ') + ')) newer_than:' + days + 'd';
+    var cutoff = emailFromDate();
+    var q = '(label:' + MAIL_LABEL + ' OR to:' + plus + ' OR from:(' + JOURNAL_SENDERS.join(' OR ') + ')) newer_than:' + days + 'd' +
+      ' after:' + cutoff.replace(/-/g, '/');
     var msgs = [];
     GmailApp.search(q, 0, 300).forEach(function (t) { t.getMessages().forEach(function (m) { if (!seen[m.getId()]) msgs.push(m); }); });
     msgs.sort(function (a, b) { return a.getDate() - b.getDate(); }); // oldest first, so history applies in order
@@ -364,6 +370,7 @@ function importEmails(days) {
       var fwd = body.match(/^\s*Date:\s*(.+)$/m), when = m.getDate();
       if (/forwarded message|^fwd?:/i.test(body.slice(0, 400) + '\n' + subject) && fwd && !isNaN(Date.parse(fwd[1]))) when = new Date(Date.parse(fwd[1]));
       var whenDay = Utilities.formatDate(when, tz, 'yyyy-MM-dd');
+      if (whenDay < cutoff) return;                                   // older emails are left alone
       var cand = [];
       sb.v.forEach(function (r) {
         if (!str(r[S.journal - 1])) return;
@@ -411,6 +418,9 @@ function importEmails(days) {
  */
 function applyEmail(res, row, S, sb, whenDay, msgId) {
   var cur = str(row[S.status - 1]), was = cur, changed = [], before = {};
+  // a submission already decided before the start date keeps its status and details as they are
+  var settledOn = day(row[S.decided - 1], 'UTC') || (RD_ORDER[cur] >= 2 ? day(row[S.submitted - 1], 'UTC') : '');
+  if (settledOn && settledOn < emailFromDate()) return { action: 'Left as is (decided before ' + emailFromDate() + ')', undo: null };
   var keep = function (f) { if (S[f] && !(f in before)) { var v = row[S[f] - 1]; before[f] = v instanceof Date ? 'd:' + day(v, 'UTC') : str(v); } };
   var set = function (f, v) { if (S[f] && str(row[S[f] - 1]) !== str(v)) { keep(f); row[S[f] - 1] = v; changed.push(f); } };
   if (!str(row[S.id - 1])) row[S.id - 1] = Utilities.getUuid();

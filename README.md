@@ -46,10 +46,11 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   (`assets/abdc.js`); `assets/suggest.js` recommends next journals per paper (same ABDC fields, topic words, tier).
   The sheet script embeds the same engine (`python3 tools/make_gscript.py` after editing suggest.js).
 - **Journal emails (Gmail)** – in the sheet: menu *RD SK → Turn on email import*. Every 15 minutes the script reads
-  journal emails in the sheet owner's Gmail (ScholarOne, Editorial Manager, publishers, label `RD-SK`, or mail to
+  journal emails (received from 1 Oct 2026 on; script property `EMAIL_FROM_DATE` changes it) in the sheet owner's Gmail (ScholarOne, Editorial Manager, publishers, label `RD-SK`, or mail to
   `<you>+rdsk@gmail.com`) with `assets/emailparse.js` (shared with the app), updates confidently matched
   submissions (status, dates, manuscript ID, desk vs after-review, reviewer count), logs every email on the *Emails*
-  tab and decision letters with reviewer comments on *Decisions & reviews*; unclear ones wait in the app.
+  tab and decision letters with reviewer comments on *Decisions & reviews*; unclear ones wait in the app. Submissions decided
+  before that date are never changed. *RD SK → Repair* undoes all import changes and re-reads the emails.
 - **💡 Research insights** – in the sheet: menu *RD SK → Turn on daily research insights*. Every morning the script
   pulls the last 5 weeks of articles from ~320 journals (`assets/watchlist.js`: ABDC A*/A/B in the user's areas, relevant
   FT50, and every journal the user has used; built by `tools/build_watchlist.py`) via the Crossref API, ranks them against

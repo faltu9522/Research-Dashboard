@@ -848,8 +848,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.6", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.7", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.7","22 Oct 2026",["Email import reads only emails from 1 Oct 2026 onwards; submissions decided before then are never changed"]],
   ["2.6","22 Oct 2026",["Fixed: journal emails could mark under-review papers as rejected (acknowledgement boilerplate, reviewer emails and similar journal names were misread)","Stricter email reader: status changes only when the email clearly names the paper; anything unclear waits for you","Sheet menu: RD SK → Repair undoes all email-import changes and re-reads the emails; every change can now be undone exactly"]],
   ["2.5","22 Oct 2026",["Free Gemini option for written next-study ideas (set in the sheet's RD SK menu)","RD SK is now open source (MIT License)"]],
   ["2.4","22 Oct 2026",["Restore link: after a reinstall or on a new phone, one tap loads everything from your Google Sheet","Your sign-off name and reminder setting are kept in the sheet too"]],
