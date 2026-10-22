@@ -38,6 +38,13 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   ID/Updated columns at the right); formulas and the Dashboard tab are untouched. Newest edit wins per row.
   `android/app/src/main/assets/gscript.js` embeds the same script for the in-app *Copy the script* button
   (regenerate it if you change the .gs file).
+- **Master sheet** – `excel/RD-SK-Master.xlsx` (built by `tools/build_master.py` from the app data, the user's
+  SK_Research_Updates_2026.xlsx and the official ABDC list): Dashboard, Submissions grouped by paper with spare rows,
+  Papers (stage, current journal, queue, suggested next journals), Journals (ABDC 2025 by formula, login links,
+  editor emails) and the full ABDC list tab. Upload it to Google Drive as the Google Sheet the app syncs with.
+- **ABDC & suggestions** – the ABDC 2025 Journal Quality List (v3, current to Sept 2026) is embedded
+  (`assets/abdc.js`); `assets/suggest.js` recommends next journals per paper (same ABDC fields, topic words, tier).
+  The sheet script embeds the same engine (`python3 tools/make_gscript.py` after editing suggest.js).
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 

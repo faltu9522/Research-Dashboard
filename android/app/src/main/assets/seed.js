@@ -6,7 +6,16 @@ window.RD_SEED = {
  },
  "papers": [
   {
-   "id": "p1",
+   "id": "17dc6468-1df1-4443-a434-803e03ab693e",
+   "key": "‘One dies’: Blanchot & organizational speech",
+   "title": "‘One dies’: Blanchot, the impossibility of death and the unworking of organizational speech",
+   "authors": "Kaushal, S., Guha, A.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "b34e6668-3609-4a45-bece-4520094566bf",
    "key": "Death & language: Heidegger–Blanchot",
    "title": "Death, language, and the limits of communication: Heidegger and Blanchot in dialogue",
    "authors": "Kaushal, S., Guha, A.",
@@ -15,16 +24,7 @@ window.RD_SEED = {
    "notes": "7k words. Earlier title: The Voice of Silence: Heidegger and Blanchot on Death and the Limits of Communication. Your note: Research in Phenomenology first, then Angelaki, then Continental Philosophy Review."
   },
   {
-   "id": "p2",
-   "key": "‘One dies’: Blanchot & organizational speech",
-   "title": "‘One dies’: Blanchot, the impossibility of death and the unworking of organizational speech",
-   "authors": "",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p3",
+   "id": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "key": "Derrida hauntology & memory ethics",
    "title": "The Time That Obligates: Derrida, Levinas, and a Hauntological Ethics of Memory",
    "authors": "Kaushal, S., Guha, A.",
@@ -33,7 +33,7 @@ window.RD_SEED = {
    "notes": "Earlier titles: The Specter of Time: Tracing Derrida’s Hauntology… | The Ghosts of Time – Derrida’s Spectral Logic and the Haunting of Historical Presence | Spectral memory, différance, and the ethics of unfinished histories | Derrida, Hauntology, and the Temporal Ethics of Memory"
   },
   {
-   "id": "p4",
+   "id": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "key": "Cockroaches, Not Citizens (CDA)",
    "title": "Cockroaches, Not Citizens: A Critical-Generational-Socio-Cognitive Discourse Analysis of Delegitimization of India’s Cockroach Janta Party",
    "authors": "",
@@ -42,34 +42,25 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p5",
+   "id": "ca9ea5a5-d588-4b4e-8b9e-7fe67e260b04",
    "key": "Distributed securitization (India SIR)",
    "title": "Distributed securitization: threat and procedure in India’s Special Intensive Revision of electoral rolls",
-   "authors": "",
+   "authors": "Kaushal, S., Guha, A., Dhammi, S.",
    "type": "Journal article",
    "override": "",
    "notes": ""
   },
   {
-   "id": "p6",
+   "id": "571f5b0d-f34e-4fe4-a465-119211b94531",
    "key": "Bullshit without a bullshitter (GenAI)",
    "title": "Bullshit Without a Bullshitter: Generative AI, Uptake, and the Organizational Laundering of Indifference to Truth",
-   "authors": "",
+   "authors": "Kaushal, S., Guha, A.",
    "type": "Journal article",
    "override": "",
    "notes": ""
   },
   {
-   "id": "p7",
-   "key": "From Devta to Musafir (EPW)",
-   "title": "From Devta to Musafir",
-   "authors": "",
-   "type": "EPW / short piece",
-   "override": "Closed – rejected",
-   "notes": ""
-  },
-  {
-   "id": "p8",
+   "id": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "key": "Algorithmic silence & org. power",
    "title": "Algorithmic silence and organizational power: digital erasure and the politics of absence",
    "authors": "Kaushal, S., Guha, A.",
@@ -78,7 +69,7 @@ window.RD_SEED = {
    "notes": "Earlier title: The algorithmic vernacular: how AI co-authors organizational language (assumed same paper; split it if not)."
   },
   {
-   "id": "p9",
+   "id": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "key": "Intentional tacit knowledge hiding (Malawi)",
    "title": "Intentional Tacit Knowledge Hiding in Public Service: Evidence from Former Principal Secretaries in Malawi",
    "authors": "Nyoni, A.M., Kaushal, S., Kovid, R.K., Guha, A.",
@@ -87,7 +78,70 @@ window.RD_SEED = {
    "notes": "Other titles used: …in Public Sector Leadership: Risks for Governance and Succession | …and its Implications: Evidence from Public Sector Leadership"
   },
   {
-   "id": "p10",
+   "id": "bafa0498-0d79-4b9e-b4ec-ce60addcfda9",
+   "key": "Who Spoke? (AI attribution)",
+   "title": "Who Spoke? Attribution Distortion and the Split Production Format of AI-Assisted Communication",
+   "authors": "Kaushal, S., Guha, A.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "0f58c819-b7f0-43fe-9518-0273388eea8e",
+   "key": "The Right to the Secret (Foucault–Derrida)",
+   "title": "Right to the Secret (Foucault Derrida)",
+   "authors": "Kaushal, S., Guha, A.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "74c663fe-54d2-4483-a2f8-c3ffc334cfbe",
+   "key": "Who gets named?",
+   "title": "Who gets named? Name Retention and Attribution Style in Indian Fact-Checking",
+   "authors": "Kaushal, S., Guha, A.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
+   "key": "Organizational Silence (lit review)",
+   "title": "The Deficit Model of Organization Silence – A bibliometric review and a Case for Blanchot and Levinas",
+   "authors": "Kaushal, S.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "7ae989dd-29ff-49a0-8341-67ec667787d1",
+   "key": "Whose grief is political?",
+   "title": "Whose grief is political? Grieving rules and the securitization of mourning in Indian news media",
+   "authors": "Kaushal, S., Guha, A.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "e1b4c954-2ade-4e61-9872-24c1cdce2bae",
+   "key": "Assessing in Whose Language?",
+   "title": "Who Decides the Language of a Test?",
+   "authors": "Guha, A., Kaushal, S.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "b4b40544-668e-476d-96d8-14479d6349f5",
+   "key": "Hedging machines: a systematic review",
+   "title": "Hedging machines: a systematic review",
+   "authors": "Kaushal, S.",
+   "type": "Journal article",
+   "override": "",
+   "notes": ""
+  },
+  {
+   "id": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "key": "Farmers’ protest & radical passivity",
    "title": "Toward a Constructive Protest Communication Framework: Radical Passivity and Ethical Address in the 2020–2021 Indian Farmers’ Protest",
    "authors": "Kaushal, S., Guha, A.",
@@ -96,7 +150,34 @@ window.RD_SEED = {
    "notes": "Earlier titles: Farmers’ Protest and the Language of Radical Passivity and Ethics – A Constructive Protest Communication Framework | …An Analytic Framework for Ethical Protest Communication. Word limits: Discourse Studies 8k, Social Movement Studies 8k, Ethics 12k."
   },
   {
-   "id": "p11",
+   "id": "25d59871-eae3-4b70-a492-97166fdda071",
+   "type": "Journal article",
+   "override": "",
+   "notes": "",
+   "key": "Is the Apology the Same Size?",
+   "title": "Is the Apology the Same Size?",
+   "authors": "Guha, A., Kaushal, S."
+  },
+  {
+   "id": "17d85c32-b7d8-4f34-9bd4-a006dccccdca",
+   "type": "Journal article",
+   "override": "",
+   "notes": "",
+   "key": "Can Virtue Be Advertised?",
+   "title": "Can Virtue Be Advertised?",
+   "authors": "Guha, A., Kaushal, S."
+  },
+  {
+   "id": "fc315459-9e61-459f-9707-98666101846d",
+   "type": "Journal article",
+   "override": "",
+   "notes": "",
+   "key": "We Are Family? (corporate kinship talk)",
+   "title": "We Are Family? Corporate Kinship Talk",
+   "authors": "Guha, A., Kaushal, S."
+  },
+  {
+   "id": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "key": "Is Leadership Inherently Violent?",
    "title": "Is Leadership Inherently Violent? Sovereignty, Precarity, and the Ethics of Organizational Authority",
    "authors": "Kaushal, S., Guha, A.",
@@ -105,7 +186,7 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p12",
+   "id": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "key": "Cosmoceuticals",
    "title": "Cosmoceuticals",
    "authors": "",
@@ -114,7 +195,16 @@ window.RD_SEED = {
    "notes": "Links in the old sheet are kept as journal names where the journal wasn’t written out."
   },
   {
-   "id": "p13",
+   "id": "d5b33e88-d423-42b3-a71d-881cb64f07fa",
+   "key": "From Devta to Musafir (EPW)",
+   "title": "From Devta to Musafir",
+   "authors": "",
+   "type": "EPW / short piece",
+   "override": "Closed – rejected",
+   "notes": ""
+  },
+  {
+   "id": "4eacfaf5-b01a-4149-b908-a0d7bc1d51d6",
    "key": "Enhanced Athletes (EPW Letter)",
    "title": "Communication Challenges in the Era of Enhanced Athletes",
    "authors": "",
@@ -123,7 +213,7 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p14",
+   "id": "4e003079-9d51-4c9a-9bac-2a54cdadc4f8",
    "key": "Faith and the Other (EPW)",
    "title": "Faith and the Other: Ethical Reflections on Ceremonial Communication",
    "authors": "",
@@ -132,7 +222,7 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p15",
+   "id": "f9f31476-dd18-4b7b-a8ca-fa1f03c75200",
    "key": "Coffee with the Machine (EPW)",
    "title": "Coffee with the Machine: Sipping Meaning from Digital Tributaries",
    "authors": "",
@@ -141,7 +231,7 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p16",
+   "id": "13cacc50-7a02-480c-9363-f005b0a71afe",
    "key": "India’s Workplace Engagement Crisis (EPW)",
    "title": "India’s Workplace Engagement Crisis",
    "authors": "",
@@ -150,70 +240,7 @@ window.RD_SEED = {
    "notes": "EPW-only piece; not resubmitted elsewhere"
   },
   {
-   "id": "p17",
-   "key": "Who Spoke? Attribution Distortion and the Split Production Format of AI-Assisted Communication",
-   "title": "Who Spoke? Attribution Distortion and the Split Production Format of AI-Assisted Communication",
-   "authors": "Kaushal, S., Guha, A.",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p18",
-   "key": "Whose grief is political? Grieving rules and the securitization of mourning in Indian news media",
-   "title": "Whose grief is political? Grieving rules and the securitization of mourning in Indian news media",
-   "authors": "",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p19",
-   "key": "Assessing in Whose Language?",
-   "title": "Who Decides the Language of a Test?",
-   "authors": "Guha, A., Kaushal. S.",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p20",
-   "key": "Who gets named? Name Retention and Attribution Style in Indian Fact-Checking",
-   "title": "",
-   "authors": "Kaushal, S., Guha, A.",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p21",
-   "key": "The Deficit Model of Organization Silence- A bibliometric review and a Case for Blanchot and Levinas",
-   "title": "The Deficit Model",
-   "authors": "Kaushal, S.",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p22",
-   "key": "Hedging machines: a systematic review",
-   "title": "",
-   "authors": "Kaushal, S.",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p23",
-   "key": "Organizational Silence (lit review)",
-   "title": "",
-   "authors": "",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p24",
+   "id": "95aab267-7528-49e1-9a53-904e07bb4976",
    "key": "Trust by Design (India engagement)",
    "title": "",
    "authors": "",
@@ -222,7 +249,7 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p25",
+   "id": "8d65229b-d6cc-46b8-a512-babbf13244e0",
    "key": "Cockroach Spoke Back (Instagram, irony)",
    "title": "",
    "authors": "",
@@ -231,17 +258,8 @@ window.RD_SEED = {
    "notes": ""
   },
   {
-   "id": "p26",
+   "id": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "key": "From Medium to Interlocutor (GenAI)",
-   "title": "",
-   "authors": "",
-   "type": "Journal article",
-   "override": "",
-   "notes": ""
-  },
-  {
-   "id": "p27",
-   "key": "The Right to the Secret:",
    "title": "",
    "authors": "",
    "type": "Journal article",
@@ -251,8 +269,8 @@ window.RD_SEED = {
  ],
  "subs": [
   {
-   "id": "s1",
-   "paper": "p1",
+   "id": "81278f88-1059-4694-97d7-503e5b586ceb",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Research in Phenomenology",
    "rating": "SSCI IF 0.48",
    "status": "Planned",
@@ -262,8 +280,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s2",
-   "paper": "p1",
+   "id": "a1bcb7b1-a7f7-42de-b19b-89c6534409e1",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Asian Journal of Communication",
    "rating": "IF 2.5",
    "status": "Planned",
@@ -273,8 +291,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s3",
-   "paper": "p1",
+   "id": "ee500892-7098-4e99-9cd1-05f0deb1ebaa",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Critical Horizons",
    "rating": "Q2",
    "status": "Planned",
@@ -284,8 +302,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s4",
-   "paper": "p1",
+   "id": "8e1f98b1-da17-426d-8960-4cd1df597c52",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Mortality (Death and Dying), T&F",
    "rating": "Q1",
    "status": "Planned",
@@ -295,8 +313,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s5",
-   "paper": "p1",
+   "id": "ba43ae41-c21c-46b7-bc55-638aa8b8adc8",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Journal of the British Society for Phenomenology (JBSP)",
    "rating": "",
    "status": "Planned",
@@ -306,8 +324,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s6",
-   "paper": "p1",
+   "id": "1d92175c-b9b5-4536-9ecf-5d167f50ae4a",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Eidos: A Journal for Philosophy of Culture",
    "rating": "",
    "status": "Planned",
@@ -317,8 +335,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s7",
-   "paper": "p1",
+   "id": "8136d29b-1a39-4fb9-b869-59899a7b22e2",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Communications: The European Journal of Communication Research",
    "rating": "",
    "status": "Planned",
@@ -328,10 +346,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s8",
-   "paper": "p2",
+   "id": "1cc3f704-325e-4ec8-929a-1b495764974b",
+   "paper": "17dc6468-1df1-4443-a434-803e03ab693e",
    "journal": "Human Relations",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -339,8 +357,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s9",
-   "paper": "p2",
+   "id": "69cc0ccc-e73d-451e-8d20-cb2768579adc",
+   "paper": "17dc6468-1df1-4443-a434-803e03ab693e",
    "journal": "Philosophy & Social Criticism",
    "rating": "Q1",
    "status": "Planned",
@@ -350,10 +368,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s10",
-   "paper": "p3",
+   "id": "28bacfe2-6e1a-43ca-a459-f7f643e09dc2",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Sociological Inquiry (Wiley)",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -361,8 +379,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s11",
-   "paper": "p3",
+   "id": "32cef7dd-6472-4463-898d-22234c95b34e",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Philosophy & Social Criticism",
    "rating": "Q1",
    "status": "Planned",
@@ -372,8 +390,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s12",
-   "paper": "p3",
+   "id": "7dfd3e5b-07e7-4c07-81b3-34226e567048",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Angelaki",
    "rating": "Q1",
    "status": "Planned",
@@ -383,8 +401,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s13",
-   "paper": "p3",
+   "id": "b94feb27-a171-4592-8da7-d7d13c0ed5a7",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Ethos",
    "rating": "",
    "status": "Planned",
@@ -394,8 +412,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s14",
-   "paper": "p3",
+   "id": "b6796f6e-f03e-4520-8faf-c1cad2194e99",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Theoria",
    "rating": "",
    "status": "Planned",
@@ -405,8 +423,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s15",
-   "paper": "p3",
+   "id": "2c748eb4-5769-48fc-9cf9-0f0f37d7642b",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "The Southern Journal of Philosophy",
    "rating": "",
    "status": "Planned",
@@ -416,8 +434,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s16",
-   "paper": "p3",
+   "id": "29ef8234-11d3-4b86-b560-e70282027884",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Journal of Social Philosophy",
    "rating": "SSCI",
    "status": "Planned",
@@ -427,8 +445,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s17",
-   "paper": "p3",
+   "id": "cd021079-b9db-4495-b31c-3473cdbfb38b",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Theoretical Studies in Literature and Art",
    "rating": "Q2",
    "status": "Planned",
@@ -438,8 +456,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s18",
-   "paper": "p3",
+   "id": "bed0e3f8-7968-4dd1-9d6b-6a3638c6ca11",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Conatus – Journal of Philosophy",
    "rating": "Q2",
    "status": "Planned",
@@ -449,8 +467,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s19",
-   "paper": "p3",
+   "id": "5e5994e5-2e32-49ec-8851-e58f6962ddec",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Oxford Literary Review",
    "rating": "Q4",
    "status": "Planned",
@@ -460,10 +478,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s20",
-   "paper": "p3",
+   "id": "5035fdcb-ee8e-4fc7-84a3-4130a8ea920d",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "The Sociological Review",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -471,10 +489,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s21",
-   "paper": "p3",
+   "id": "c2b75850-8934-40ab-85ac-61e6502f174e",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Social Science Information",
-   "rating": "C",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -482,10 +500,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s22",
-   "paper": "p3",
+   "id": "433c1479-fd79-4a0c-b391-72fd3d6bc757",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Contemporary Sociology",
-   "rating": "C",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -493,10 +511,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s23",
-   "paper": "p3",
+   "id": "285771c7-7a7c-4779-bc77-5702721b6f6f",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "The Social Science Journal",
-   "rating": "C",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -504,8 +522,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s24",
-   "paper": "p3",
+   "id": "45f29165-a766-4e67-8029-5254bfbc6dd7",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "History and Theory",
    "rating": "",
    "status": "Planned",
@@ -515,8 +533,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s25",
-   "paper": "p3",
+   "id": "5d3d56d6-78f9-4abf-9cc7-dd365f561f0e",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Human Studies",
    "rating": "",
    "status": "Planned",
@@ -526,8 +544,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s26",
-   "paper": "p3",
+   "id": "c21144f6-1e49-4b16-a393-7e982eac07e9",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Studies in East European Thought",
    "rating": "",
    "status": "Planned",
@@ -537,8 +555,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s27",
-   "paper": "p3",
+   "id": "430d9b54-87c5-49d3-a2f3-380c384fb02f",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Social Semiotics",
    "rating": "",
    "status": "Planned",
@@ -548,8 +566,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s28",
-   "paper": "p3",
+   "id": "1a67e05c-b2c4-40a9-b114-9fad791c5bca",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Journal of the Philosophy of History",
    "rating": "",
    "status": "Planned",
@@ -559,8 +577,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s29",
-   "paper": "p3",
+   "id": "5b417330-bb47-406a-82f3-5ab90dc2e8c1",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "History & Memory",
    "rating": "",
    "status": "Planned",
@@ -570,8 +588,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s30",
-   "paper": "p3",
+   "id": "e594736a-69bd-4ce5-b747-bb8728330155",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Journal of Philosophical Research (pdcnet.org/jpr)",
    "rating": "",
    "status": "Planned",
@@ -581,8 +599,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s31",
-   "paper": "p3",
+   "id": "e13e44da-a3fb-4f5b-a689-15b6b5228fea",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Asian Journal of Philosophy",
    "rating": "",
    "status": "Planned",
@@ -592,8 +610,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s32",
-   "paper": "p3",
+   "id": "ce57f137-17d3-4b36-bf3d-b34f1df895de",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Rethinking History",
    "rating": "SSCI IF 1",
    "status": "Planned",
@@ -603,10 +621,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s33",
-   "paper": "p4",
+   "id": "7fa6e748-f426-4d4b-ae36-399864fe12fb",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Alternatives: Global, Local, Political",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -614,8 +632,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s34",
-   "paper": "p4",
+   "id": "f16b7562-38c8-49e0-bbb4-9df04157077a",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Political Communication",
    "rating": "",
    "status": "Planned",
@@ -625,10 +643,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s35",
-   "paper": "p4",
+   "id": "1df46e6c-ee50-449b-8025-229fec343485",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Journal of Communication",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -636,10 +654,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s36",
-   "paper": "p5",
+   "id": "a4dbdf6b-5207-43bb-9c9b-32e16f71f039",
+   "paper": "ca9ea5a5-d588-4b4e-8b9e-7fe67e260b04",
    "journal": "Security Studies",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -647,10 +665,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s37",
-   "paper": "p6",
+   "id": "c638d41b-e9cc-4731-a67d-187185add64d",
+   "paper": "571f5b0d-f34e-4fe4-a465-119211b94531",
    "journal": "Human Relations",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -658,10 +676,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s38",
-   "paper": "p8",
+   "id": "b399c536-24f0-48eb-9ceb-60c8d725cbba",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Media, Culture & Society",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -669,10 +687,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s39",
-   "paper": "p8",
+   "id": "ae834cab-2a06-4d05-9e36-51bb284c24b6",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Research in the Sociology of Organizations",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -680,10 +698,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s40",
-   "paper": "p8",
+   "id": "6b728ebf-c7bd-4305-baf5-c8011bc7d479",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "New Technology, Work and Employment",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -691,10 +709,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s41",
-   "paper": "p8",
+   "id": "338b6c8d-2d94-4c4b-ae08-f57011b5fbf0",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Information and Organization",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -702,10 +720,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s42",
-   "paper": "p8",
+   "id": "6e395f16-635b-4800-9a16-564fdd8030d6",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Journal of Management Inquiry",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -713,10 +731,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s43",
-   "paper": "p8",
+   "id": "59e0f91a-9f74-4041-a9de-f3f160eb7ea7",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Culture and Organization",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -724,10 +742,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s44",
-   "paper": "p8",
+   "id": "e80a9b89-1198-4c0f-a955-d4b776f2f936",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Human Relations",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -735,8 +753,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s45",
-   "paper": "p8",
+   "id": "c01a340c-8695-4e2a-a59e-8d45f6f32b43",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Journal of Management Studies",
    "rating": "FT50",
    "status": "Planned",
@@ -746,8 +764,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s46",
-   "paper": "p8",
+   "id": "5ce53f08-66c2-48c1-a1c7-90c578cc4a58",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Academy of Management Review",
    "rating": "FT50",
    "status": "Planned",
@@ -757,10 +775,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s47",
-   "paper": "p9",
+   "id": "1809c892-6092-42c6-90b8-f41fc5cc6354",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Group & Organization Management",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -768,10 +786,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s48",
-   "paper": "p9",
+   "id": "ab78120e-e581-4a6e-b18c-fab6ce1c1474",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Journal of African Business",
-   "rating": "C",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -779,10 +797,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s49",
-   "paper": "p9",
+   "id": "d921c0c6-01a7-4fd3-b3f2-58ce012ae54b",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Personnel Review",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -790,8 +808,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s50",
-   "paper": "p9",
+   "id": "d5e2799f-af3d-4d21-8ca8-eb9b51264581",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Business Information Review",
    "rating": "Q2",
    "status": "Planned",
@@ -801,10 +819,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s51",
-   "paper": "p23",
+   "id": "c380f930-3384-4b33-a7de-e53a9235256a",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Journal of Information, Communication and Ethics in Society",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -812,10 +830,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s52",
-   "paper": "p23",
+   "id": "891209a0-f197-41ee-8c7d-50aacbd5c23e",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Ethics and Information Technology",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -823,10 +841,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s53",
-   "paper": "p23",
+   "id": "ff1ede0b-9415-4969-9b52-42278a99265c",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Journal of Business Ethics",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -834,10 +852,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s54",
-   "paper": "p23",
+   "id": "3db71602-6146-42bd-864a-f08070f566b3",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Business Ethics Quarterly",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -845,10 +863,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s55",
-   "paper": "p23",
+   "id": "4789374e-c9ba-47ce-a6ef-8d0df2d247bb",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Personnel Review",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -856,10 +874,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s56",
-   "paper": "p23",
+   "id": "6eedd786-ea86-4e21-8932-18fbaec23caa",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Employee Relations",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -867,10 +885,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s57",
-   "paper": "p23",
+   "id": "2ffc6772-77be-4fcc-810b-22141cccd92f",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Culture and Organization",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -878,10 +896,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s58",
-   "paper": "p23",
+   "id": "dab6c39f-635f-4ac9-899e-bcb2c852d7c6",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Corporate Communications: An International Journal",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -889,10 +907,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s59",
-   "paper": "p10",
+   "id": "6d29b432-3ecf-49c7-a8ba-96a684a38d8e",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Communication Theory",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -900,10 +918,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s60",
-   "paper": "p10",
+   "id": "88e0d6e3-ccc0-4c82-add2-0cf21bab6c1d",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Discourse Studies",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -911,10 +929,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s61",
-   "paper": "p10",
+   "id": "3ef6ee2c-c945-4932-9b8d-9afebe4b7b7f",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Media, Culture & Society",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -922,10 +940,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s62",
-   "paper": "p10",
+   "id": "7793525e-b0c9-4e9c-b9c5-b93cb542968b",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Communication Management",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -933,8 +951,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s63",
-   "paper": "p10",
+   "id": "8872aa2c-93f6-4b1b-b031-725be3832781",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Social Movement Studies",
    "rating": "SSCI IF 2.5",
    "status": "Planned",
@@ -944,10 +962,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s64",
-   "paper": "p10",
+   "id": "31e27f8f-ee08-4550-ab9a-790b838672f6",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Management Communication Quarterly",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -955,8 +973,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s65",
-   "paper": "p10",
+   "id": "0c3c6214-ef7d-4507-8fac-59750c463375",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Speech Communication",
    "rating": "",
    "status": "Planned",
@@ -966,10 +984,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s66",
-   "paper": "p10",
+   "id": "c7cf20c0-289a-4ecf-be3f-acdbc5f1d2d0",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Language & Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -977,10 +995,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s67",
-   "paper": "p10",
+   "id": "37cf3105-e22c-4d67-a696-24128f0f0eaf",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Critical Asian Studies",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -988,10 +1006,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s68",
-   "paper": "p10",
+   "id": "e9a897af-3011-4b34-a617-a894d938825c",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Social Issues",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -999,10 +1017,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s69",
-   "paper": "p10",
+   "id": "4cd83baa-9dac-4ae9-91df-8555118fc70a",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Theory, Culture and Society",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1010,10 +1028,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s70",
-   "paper": "p10",
+   "id": "4ff302a4-9554-44a6-8b93-429bc0876d5c",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Global Knowledge, Memory and Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1021,10 +1039,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s71",
-   "paper": "p10",
+   "id": "c874d539-4ad4-4112-90a0-834dd42dcbfe",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "International Journal of Strategic Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1032,8 +1050,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s72",
-   "paper": "p10",
+   "id": "6e7d53c4-3aac-4fc5-a047-d1274538c33d",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Applied Linguistics Review",
    "rating": "SSCI IF 2.3",
    "status": "Planned",
@@ -1043,8 +1061,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s73",
-   "paper": "p10",
+   "id": "628ca61b-5ae6-47b1-ad5a-874156669610",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Qualitative Inquiry",
    "rating": "SSCI 0.82",
    "status": "Planned",
@@ -1054,8 +1072,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s74",
-   "paper": "p10",
+   "id": "2a92e9a3-c349-4317-b6fd-26753ca5ffd3",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Research on Language and Social Interaction",
    "rating": "SSCI IF 3, Q1",
    "status": "Planned",
@@ -1065,10 +1083,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s75",
-   "paper": "p10",
+   "id": "8faf1dbd-ce69-4124-ab77-7706fc405de5",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Information, Communication and Ethics in Society",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1076,8 +1094,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s76",
-   "paper": "p10",
+   "id": "dd38fdf4-97a5-4288-9855-71bb7a2116bd",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Communication and Critical/Cultural Studies",
    "rating": "",
    "status": "Planned",
@@ -1087,8 +1105,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s77",
-   "paper": "p24",
+   "id": "731ca9a4-bbbc-455c-8e1e-10b9f4479c2c",
+   "paper": "95aab267-7528-49e1-9a53-904e07bb4976",
    "journal": "Strategic HR Review",
    "rating": "",
    "status": "Planned",
@@ -1098,10 +1116,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s78",
-   "paper": "p11",
+   "id": "fe419a0a-5ad6-4a15-bdef-6375d2fc74c9",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Journal of Leadership and Organizational Studies",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1109,10 +1127,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s79",
-   "paper": "p11",
+   "id": "e3f98e49-024e-4155-8952-f9fc6eb9de85",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Human Relations",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1120,10 +1138,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s80",
-   "paper": "p11",
+   "id": "da55ba31-7503-45c9-a79a-c31b984603d9",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "The Leadership Quarterly",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1131,10 +1149,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s81",
-   "paper": "p11",
+   "id": "e8256656-7a1d-4ef2-8e05-1a334b3233d7",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Business Ethics Quarterly",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1142,10 +1160,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s82",
-   "paper": "p11",
+   "id": "b069372b-c82b-40ee-8693-e58fe4b57f7e",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Ethics: an international journal of social, political, and legal philosophy",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1153,10 +1171,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s83",
-   "paper": "p11",
+   "id": "3e04d6ac-c4c8-40c6-af93-b52f86a5d128",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Leadership",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1164,8 +1182,19 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s84",
-   "paper": "p12",
+   "id": "1374c671-e01c-4941-b3dc-6e66c37156b5",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
+   "journal": "Technology Analysis and Strategic Management",
+   "rating": "",
+   "status": "Planned",
+   "submitted": "",
+   "decided": "",
+   "notes": "From SK_Research_Updates_2026",
+   "titleUsed": ""
+  },
+  {
+   "id": "1c47fba2-3fa2-4b1a-85c7-f384d8aabf74",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "journals.sagepub.com/home/con",
    "rating": "",
    "status": "Planned",
@@ -1175,8 +1204,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s85",
-   "paper": "p12",
+   "id": "34d073ee-6105-40be-b1b1-d6a9a5e3a7e1",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "link.springer.com/journal/41287",
    "rating": "",
    "status": "Planned",
@@ -1186,8 +1215,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s86",
-   "paper": "p12",
+   "id": "b9c5bb2d-f90f-4d00-b745-bea7eb90b426",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "meth.psychopen.eu (Methodology)",
    "rating": "",
    "status": "Planned",
@@ -1197,10 +1226,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s87",
-   "paper": "p12",
+   "id": "a331e8e8-f9f4-49e3-b2eb-3d6283a3270d",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "tandfonline.com/journals/titd20",
-   "rating": "ABDC B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1208,8 +1237,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s88",
-   "paper": "p12",
+   "id": "5ed23a24-0ba1-4755-888b-7df0ac69f706",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "International Journal of Social Research Methodology",
    "rating": "IF 4.2",
    "status": "Planned",
@@ -1219,8 +1248,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s89",
-   "paper": "p12",
+   "id": "42639585-63b8-434a-86e8-a24a6deec09f",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "link.springer.com/journal/13755",
    "rating": "SCIE",
    "status": "Planned",
@@ -1230,8 +1259,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s90",
-   "paper": "p12",
+   "id": "81210f14-ca8c-4248-8192-613187c0ae55",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Technology in Society",
    "rating": "SSCI IF 12.5",
    "status": "Planned",
@@ -1241,10 +1270,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s91",
-   "paper": "p12",
+   "id": "1489a6e2-d737-4238-b348-b1531147812b",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "R&D Management",
-   "rating": "A",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1252,10 +1281,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s92",
-   "paper": "p12",
+   "id": "262193f7-9965-4ad2-9a9c-beea578faf6f",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Social Science & Medicine",
-   "rating": "A*",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1263,8 +1292,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s93",
-   "paper": "p12",
+   "id": "c8492ccd-96a7-4d50-89d6-3b1456c1b8fe",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Foresight",
    "rating": "",
    "status": "Planned",
@@ -1274,8 +1303,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s94",
-   "paper": "p12",
+   "id": "4e85340f-07f2-40fc-bb3d-f1c3c1ff7465",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Information Discovery and Delivery",
    "rating": "",
    "status": "Planned",
@@ -1285,10 +1314,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s95",
-   "paper": "p18",
+   "id": "1f0fdb82-02d6-47f3-b682-218719b249e2",
+   "paper": "7ae989dd-29ff-49a0-8341-67ec667787d1",
    "journal": "Security Studies",
-   "rating": "B",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
@@ -1296,10 +1325,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s96",
-   "paper": "p19",
-   "journal": "IJEM",
-   "rating": "B",
+   "id": "0ba4df3c-0fc3-4cf0-8e5a-88b7dccc6522",
+   "paper": "e1b4c954-2ade-4e61-9872-24c1cdce2bae",
+   "journal": "International Journal of Educational Management",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-20",
    "decided": "",
@@ -1307,10 +1336,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s97",
-   "paper": "p1",
+   "id": "a33650b5-b4e6-4736-88f2-c960389a5705",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Theory, Culture and Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-06-20",
    "decided": "2024-11-11",
@@ -1318,10 +1347,10 @@ window.RD_SEED = {
    "titleUsed": "The Voice of Silence: Heidegger and Blanchot on Death and the Limits of Communication"
   },
   {
-   "id": "s98",
-   "paper": "p1",
+   "id": "672b0a37-0cdb-453b-91d6-9efa0433f2c6",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Communication Monographs",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-12-04",
    "decided": "2024-12-07",
@@ -1329,10 +1358,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s99",
-   "paper": "p1",
+   "id": "38a65209-bf2d-4458-9f75-4ed1004946fb",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Language & Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-12-30",
    "decided": "2025-04-11",
@@ -1340,10 +1369,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s100",
-   "paper": "p1",
+   "id": "c30f8c1a-e091-4d80-b0d7-4af6fb56d969",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Philosophy of the Social Sciences",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-04-14",
    "decided": "2025-04-14",
@@ -1351,10 +1380,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s101",
-   "paper": "p1",
+   "id": "32ae7563-2fbb-4762-9050-79de98e6bb40",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Journal of Communication",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-04-14",
    "decided": "2025-04-15",
@@ -1362,10 +1391,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s102",
-   "paper": "p1",
+   "id": "6b824b46-3a85-4d00-bc9b-33a7bda1c608",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "European Journal of Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-05-02",
    "decided": "2025-05-27",
@@ -1373,10 +1402,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s103",
-   "paper": "p3",
+   "id": "9cc99e55-460b-407d-a593-4e01787889af",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Time and Society",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-06-14",
    "decided": "2024-06-21",
@@ -1384,10 +1413,10 @@ window.RD_SEED = {
    "titleUsed": "The Specter of Time: Tracing Derrida’s Hauntology and the Spectral Interruptions of Linear Temporality"
   },
   {
-   "id": "s104",
-   "paper": "p3",
+   "id": "7def575d-8550-41aa-8985-644f8ef3c836",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Philosophy of the Social Sciences (Sage)",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-06-21",
    "decided": "2024-06-21",
@@ -1395,10 +1424,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s105",
-   "paper": "p3",
+   "id": "3d4a86f4-b0e8-45d7-9742-913b85f72998",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Ethics: an international journal of social, political, and legal philosophy",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-06-21",
    "decided": "2024-06-24",
@@ -1406,8 +1435,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s106",
-   "paper": "p3",
+   "id": "32eeade2-4dd3-40fa-9c4b-04e9a76cd5b3",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Critical Quarterly (Wiley)",
    "rating": "Q2",
    "status": "Rejected",
@@ -1417,8 +1446,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s107",
-   "paper": "p3",
+   "id": "3272873c-858a-4177-93c7-e190688b5931",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "History of European Ideas",
    "rating": "",
    "status": "Rejected",
@@ -1428,8 +1457,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s108",
-   "paper": "p3",
+   "id": "0eb3a3ab-9719-4f7d-9c55-09db4365a508",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Qualitative Inquiry (Sage)",
    "rating": "Q1, SSCI IF 1.4",
    "status": "Rejected",
@@ -1439,8 +1468,8 @@ window.RD_SEED = {
    "titleUsed": "The Ghosts of Time – Derrida’s Spectral Logic and the Haunting of Historical Presence"
   },
   {
-   "id": "s109",
-   "paper": "p3",
+   "id": "44e0e8ed-6f4f-4408-b71c-4f8f809fa0a1",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "INQUIRY: An Interdisciplinary Journal of Philosophy",
    "rating": "SSCI",
    "status": "Rejected",
@@ -1450,8 +1479,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s110",
-   "paper": "p3",
+   "id": "6878522e-8a59-45b4-8e22-c4140519233a",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Philosophical Explorations",
    "rating": "",
    "status": "Rejected",
@@ -1461,8 +1490,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s111",
-   "paper": "p3",
+   "id": "4a3d6f11-0d8c-4204-a252-6ebc9df6b17d",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Journal of Contemporary European Studies",
    "rating": "SSCI",
    "status": "Rejected",
@@ -1472,8 +1501,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s112",
-   "paper": "p3",
+   "id": "d31bc21c-d2c5-41ba-8a8e-33866326290d",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Continental Philosophy Review",
    "rating": "",
    "status": "Rejected",
@@ -1483,8 +1512,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s113",
-   "paper": "p3",
+   "id": "6c89e19f-3939-4b71-acc4-7ba4a262da99",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Global Philosophy",
    "rating": "",
    "status": "Rejected",
@@ -1494,8 +1523,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s114",
-   "paper": "p3",
+   "id": "63ab4f5b-be8c-4151-9f8a-3e0044ed53ab",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Memory Studies",
    "rating": "Q1",
    "status": "Rejected",
@@ -1505,8 +1534,8 @@ window.RD_SEED = {
    "titleUsed": "Spectral memory, différance, and the ethics of unfinished histories"
   },
   {
-   "id": "s115",
-   "paper": "p3",
+   "id": "ff694e92-9012-4be2-af1c-90071ba0e594",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Orbis Litterarum",
    "rating": "",
    "status": "Rejected",
@@ -1516,8 +1545,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s116",
-   "paper": "p3",
+   "id": "c845a947-889f-406c-9abc-0e81489b9ff0",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Journal for Cultural Research",
    "rating": "Q1",
    "status": "Rejected",
@@ -1527,8 +1556,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s117",
-   "paper": "p3",
+   "id": "bc451ab4-4888-498c-9410-b2736e9480c5",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "European Journal of Cultural Studies (Sage)",
    "rating": "SSCI IF 1.9",
    "status": "Rejected",
@@ -1538,10 +1567,10 @@ window.RD_SEED = {
    "titleUsed": "Spectral memory, différance, and the ethics of unfinished histories"
   },
   {
-   "id": "s118",
-   "paper": "p3",
+   "id": "985f676f-32b0-472e-99ba-6677f9c368eb",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Theory, Culture and Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-06-22",
    "decided": "2025-07-25",
@@ -1549,8 +1578,8 @@ window.RD_SEED = {
    "titleUsed": "Derrida, Hauntology, and the Temporal Ethics of Memory"
   },
   {
-   "id": "s119",
-   "paper": "p25",
+   "id": "979f30e5-0646-41de-ad7f-d314ecba8e6c",
+   "paper": "8d65229b-d6cc-46b8-a512-babbf13244e0",
    "journal": "EPW: Engage",
    "rating": "",
    "status": "Rejected",
@@ -1560,10 +1589,10 @@ window.RD_SEED = {
    "titleUsed": "When the Cockroach Spoke Back: Instagram, Irony and Youth Politics in India"
   },
   {
-   "id": "s120",
-   "paper": "p25",
+   "id": "aad795de-5320-4fbe-8152-9c58514eba63",
+   "paper": "8d65229b-d6cc-46b8-a512-babbf13244e0",
    "journal": "Media, Culture & Society",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-06-27",
    "decided": "2026-07-01",
@@ -1571,10 +1600,10 @@ window.RD_SEED = {
    "titleUsed": "When the Cockroach Spoke Back: Satirical Citizenship, Irony, and the Limits of Platform Politics"
   },
   {
-   "id": "s121",
-   "paper": "p4",
+   "id": "5e95ab29-d712-478b-9977-b9788d3fbaab",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Discourse & Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-09-30",
    "decided": "2026-09-30",
@@ -1582,10 +1611,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s122",
-   "paper": "p4",
+   "id": "0b70b4e7-4fd5-4787-ba36-c022ecc38ad8",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Information, Communication & Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-10-01",
    "decided": "2026-10-04",
@@ -1593,8 +1622,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s123",
-   "paper": "p6",
+   "id": "3a358740-fd16-4eb9-bbf3-70d66de4046d",
+   "paper": "571f5b0d-f34e-4fe4-a465-119211b94531",
    "journal": "Academy of Management Review",
    "rating": "FT50",
    "status": "Rejected",
@@ -1604,8 +1633,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s124",
-   "paper": "p7",
+   "id": "93e02291-e43b-4e4e-aeef-7f9cdab92e25",
+   "paper": "d5b33e88-d423-42b3-a71d-881cb64f07fa",
    "journal": "EPW: Postscript",
    "rating": "",
    "status": "Rejected",
@@ -1615,10 +1644,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s125",
-   "paper": "p8",
+   "id": "bc87674b-e489-46aa-a9c6-f772ff1c919b",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Organization Studies",
-   "rating": "A*",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-04-27",
    "decided": "2025-07-15",
@@ -1626,10 +1655,10 @@ window.RD_SEED = {
    "titleUsed": "The algorithmic vernacular: how AI co-authors organizational language"
   },
   {
-   "id": "s126",
-   "paper": "p8",
+   "id": "8c15e817-54db-4ee6-b0fa-16f95ff6e4ed",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Organization Studies",
-   "rating": "A*",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-04",
    "decided": "2025-07-15",
@@ -1637,10 +1666,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s127",
-   "paper": "p8",
+   "id": "bacc7185-ffa5-41be-ad98-6a1890aa65ec",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Theory, Culture and Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-15",
    "decided": "2026-01-14",
@@ -1648,10 +1677,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s128",
-   "paper": "p8",
+   "id": "99343456-c155-4a9f-8b3b-e9680004e004",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Organization: the critical journal of organization, theory and society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-01-20",
    "decided": "2026-02-10",
@@ -1659,10 +1688,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s129",
-   "paper": "p8",
+   "id": "1f0791a1-a4f7-40ab-9e22-a4c72348adc0",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Information and Organization",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-02-10",
    "decided": "2026-02-24",
@@ -1670,10 +1699,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s130",
-   "paper": "p8",
+   "id": "204140e6-4dd9-49ca-a017-2c817307a240",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Qualitative Research in Organizations and Management",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-02-10",
    "decided": "2026-04-20",
@@ -1681,10 +1710,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s131",
-   "paper": "p9",
+   "id": "5f7d529f-31d4-45d8-a9a1-ee2e2bd4068e",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Knowledge Management Research & Practice",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-05-07",
    "decided": "2024-11-16",
@@ -1692,10 +1721,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s132",
-   "paper": "p9",
+   "id": "56d2bbeb-88eb-4c32-8c50-8a11b6708ea3",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Journal of Knowledge Management",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-04-12",
    "decided": "2025-04-12",
@@ -1703,8 +1732,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s133",
-   "paper": "p9",
+   "id": "ac4bb52c-2c87-4335-9ba3-355b00f8c3ad",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "VINE Journal of Information and Knowledge Management Systems",
    "rating": "",
    "status": "Rejected",
@@ -1714,10 +1743,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s134",
-   "paper": "p9",
+   "id": "06056d7e-a0c7-4d2c-86f1-75c68baa698e",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "International Journal of Public Sector Management",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-04-14",
    "decided": "2025-06-07",
@@ -1725,10 +1754,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s135",
-   "paper": "p9",
+   "id": "619ff036-5a3e-4bbc-a3a1-ec3a13306ed1",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "International Journal of Information Management",
-   "rating": "A*",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-06",
    "decided": "2025-07-06",
@@ -1736,10 +1765,10 @@ window.RD_SEED = {
    "titleUsed": "Intentional Tacit Knowledge Hiding and its Implications: Evidence from Public Sector Leadership"
   },
   {
-   "id": "s136",
-   "paper": "p9",
+   "id": "a9f1e692-a7e0-4206-bd85-a631b1f4dcd4",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Public Management Review",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-07",
    "decided": "2025-07-17",
@@ -1747,10 +1776,10 @@ window.RD_SEED = {
    "titleUsed": "Intentional Tacit Knowledge Hiding in Public Sector Leadership: Risks for Governance and Succession"
   },
   {
-   "id": "s137",
-   "paper": "p9",
+   "id": "ee905938-30b5-4b3c-b65d-58bd7178b60a",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Review of Public Personnel Administration",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-17",
    "decided": "2025-07-24",
@@ -1758,10 +1787,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s138",
-   "paper": "p9",
+   "id": "f835d963-03e8-4c4f-9cf1-5e26e0428a6a",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Public Personnel Management",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-07-25",
    "decided": "2025-07-31",
@@ -1769,10 +1798,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s139",
-   "paper": "p9",
+   "id": "59b263e1-02a5-4eed-9784-959cfcd40224",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Qualitative Research in Organizations and Management (QROM)",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-09-03",
    "decided": "2025-09-05",
@@ -1780,10 +1809,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s140",
-   "paper": "p26",
+   "id": "9c32e56e-8e63-43e9-843e-17437e365ca0",
+   "paper": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "journal": "Language & Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-08-11",
    "decided": "2026-08-25",
@@ -1791,10 +1820,10 @@ window.RD_SEED = {
    "titleUsed": "The Algorithmic Interlocutor: Reconceptualizing AI as a Communicative Actor in Human Interaction"
   },
   {
-   "id": "s141",
-   "paper": "p26",
+   "id": "44260234-394c-48dd-bc6c-b2a043637611",
+   "paper": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "journal": "Media, Culture & Society",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-08-12",
    "decided": "2026-09-14",
@@ -1802,10 +1831,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s142",
-   "paper": "p26",
+   "id": "e081ce65-fa6a-47c7-94a6-09dce3694464",
+   "paper": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "journal": "Communication Theory",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-09-15",
    "decided": "2026-09-17",
@@ -1813,10 +1842,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s143",
-   "paper": "p26",
+   "id": "437fa649-ecf6-4eb9-9b4a-0102d3200232",
+   "paper": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "journal": "Journal of Information, Communication and Ethics in Society",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-09-18",
    "decided": "2026-09-18",
@@ -1824,10 +1853,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s144",
-   "paper": "p26",
+   "id": "3b6e021a-685e-4b0a-bdd7-3a070e0f35ea",
+   "paper": "418ddf42-6d29-4e8c-a185-b1f69253e89f",
    "journal": "Information, Communication & Society",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-10-05",
    "decided": "2026-10-10",
@@ -1835,10 +1864,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s145",
-   "paper": "p10",
+   "id": "eeef9247-3b44-4a1b-84f7-0dd135560aae",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Communication (Special Issue)",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-07-01",
    "decided": "2024-07-26",
@@ -1846,10 +1875,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s146",
-   "paper": "p10",
+   "id": "6908ff71-245a-48a7-8c4c-20b718d4bba8",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Communication Research",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-07-27",
    "decided": "2024-08-07",
@@ -1857,10 +1886,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s147",
-   "paper": "p10",
+   "id": "a09ddc30-fb30-414b-8ef9-684e1d757342",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Ethics: an international journal of social, political, and legal philosophy",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-07-28",
    "decided": "2024-07-30",
@@ -1868,10 +1897,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s148",
-   "paper": "p10",
+   "id": "9e972d7d-dffb-43aa-be81-9a78cf9a8e32",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Communication",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-05",
    "decided": "2024-08-16",
@@ -1879,10 +1908,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s149",
-   "paper": "p10",
+   "id": "51a1c57b-7054-44cd-b36e-f81a57600199",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Communication Monographs",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-08",
    "decided": "2024-08-14",
@@ -1890,10 +1919,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s150",
-   "paper": "p10",
+   "id": "317ec7be-b862-4bbd-9c6d-69847ac83ede",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Sociological Inquiry",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-14",
    "decided": "2024-08-20",
@@ -1901,10 +1930,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s151",
-   "paper": "p10",
+   "id": "4062f627-f3f7-4e67-8f0e-f0f6b167e107",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Philosophy of the Social Sciences",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-21",
    "decided": "2024-08-21",
@@ -1912,8 +1941,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s152",
-   "paper": "p10",
+   "id": "7ac37536-3bed-481e-85e1-e66d4cd7bb57",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "The Journal of Peasant Studies",
    "rating": "SSCI IF 4.4",
    "status": "Rejected",
@@ -1923,10 +1952,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s153",
-   "paper": "p10",
+   "id": "bf43782a-8a12-4878-be1c-c20302139c53",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Philosophy & Public Affairs",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-21",
    "decided": "2024-10-12",
@@ -1934,10 +1963,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s154",
-   "paper": "p10",
+   "id": "af9b3403-3874-427b-88a3-2c14844bd69c",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Poetics",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2024-08-21",
    "decided": "2024-09-20",
@@ -1945,8 +1974,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s155",
-   "paper": "p10",
+   "id": "d5e5cdf9-0a21-482f-860b-cecf570a9319",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Communication Methods and Measures",
    "rating": "SSCI IF 6.3, Q1",
    "status": "Rejected",
@@ -1956,10 +1985,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s156",
-   "paper": "p10",
+   "id": "4726c486-9acb-47d3-9b48-bc16a88966e4",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Journal of Applied Communication Research",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2025-05-07",
    "decided": "2025-05-19",
@@ -1967,10 +1996,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s157",
-   "paper": "p10",
+   "id": "28ae7319-27c1-4dd7-910c-a8f655a21fb9",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Discourse & Communication",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-09-08",
    "decided": "2026-09-14",
@@ -1978,10 +2007,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s158",
-   "paper": "p10",
+   "id": "e41cbbf3-c2f9-4579-84ac-25da3c7607a1",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Critical Discourse Studies",
-   "rating": "B",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-09-15",
    "decided": "2026-09-16",
@@ -1989,8 +2018,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s159",
-   "paper": "p24",
+   "id": "0f172c83-3f62-40b5-9773-dbbad7485e89",
+   "paper": "95aab267-7528-49e1-9a53-904e07bb4976",
    "journal": "MIT Sloan Management Review",
    "rating": "",
    "status": "Rejected",
@@ -2000,8 +2029,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s160",
-   "paper": "p24",
+   "id": "db3d7238-bfd6-4ec2-a189-b5527f9516a1",
+   "paper": "95aab267-7528-49e1-9a53-904e07bb4976",
    "journal": "Journal of Organizational Effectiveness: People and Performance (JOEPP)",
    "rating": "",
    "status": "Rejected",
@@ -2011,8 +2040,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s161",
-   "paper": "p24",
+   "id": "d304dac8-8a85-4f4a-84c8-89ca2a69019c",
+   "paper": "95aab267-7528-49e1-9a53-904e07bb4976",
    "journal": "Industrial and Commercial Training",
    "rating": "",
    "status": "Rejected",
@@ -2022,10 +2051,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s162",
-   "paper": "p12",
+   "id": "336665ea-5a7d-448a-ba32-8226e752e0e4",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Technological Forecasting and Social Change",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-02-18",
    "decided": "2026-03-12",
@@ -2033,10 +2062,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s163",
-   "paper": "p12",
+   "id": "0f7030e7-e529-4edd-8f0c-05b89d881c2f",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "Scientometrics",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-06-12",
    "decided": "2026-06-26",
@@ -2044,10 +2073,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s164",
-   "paper": "p8",
+   "id": "a7aae80b-66bd-4521-80b5-dcfedd3d26a3",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Organization: the critical journal of organization, theory and society",
-   "rating": "A",
+   "rating": "",
    "status": "Returned by office",
    "submitted": "2026-01-15",
    "decided": "2026-01-20",
@@ -2055,10 +2084,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s165",
-   "paper": "p9",
+   "id": "ff98bb03-cd2a-4a14-ae61-f48b4cde1729",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Global Knowledge, Memory and Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Returned by office",
    "submitted": "2026-06-11",
    "decided": "2026-07-26",
@@ -2066,8 +2095,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s166",
-   "paper": "p10",
+   "id": "e08cacda-5b89-4ab0-8719-4069dc215194",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Applied Linguistics",
    "rating": "SSCI IF 4.8",
    "status": "Revision resubmitted",
@@ -2077,8 +2106,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s167",
-   "paper": "p1",
+   "id": "a44774ef-12c9-4960-b1dd-374504eff0cf",
+   "paper": "b34e6668-3609-4a45-bece-4520094566bf",
    "journal": "Comparative and Continental Philosophy",
    "rating": "Q4",
    "status": "Under review",
@@ -2088,10 +2117,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s168",
-   "paper": "p2",
+   "id": "be9565ae-4080-44ff-8ffa-7b28a3897888",
+   "paper": "17dc6468-1df1-4443-a434-803e03ab693e",
    "journal": "Organization",
-   "rating": "A",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-01",
    "decided": "",
@@ -2099,10 +2128,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s169",
-   "paper": "p3",
+   "id": "70449bc2-d0f8-4c9f-9143-6b169d545ac1",
+   "paper": "c62a2946-7357-4a7e-bd74-1ad9d1a5180c",
    "journal": "Time and Society",
-   "rating": "B",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-09-24",
    "decided": "",
@@ -2110,10 +2139,10 @@ window.RD_SEED = {
    "titleUsed": "The Time That Obligates: Derrida, Levinas, and a Hauntological Ethics of Memory"
   },
   {
-   "id": "s170",
-   "paper": "p4",
+   "id": "90cb6caa-7a9f-483d-acf1-c5d1367722af",
+   "paper": "eedfba72-bd42-456a-92ab-01fd1bf89b05",
    "journal": "Discourse & Communication",
-   "rating": "A",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-05",
    "decided": "",
@@ -2121,8 +2150,8 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s171",
-   "paper": "p6",
+   "id": "90d0ad77-334d-4191-b7da-4011c6366c73",
+   "paper": "571f5b0d-f34e-4fe4-a465-119211b94531",
    "journal": "Journal of Management Studies",
    "rating": "FT50",
    "status": "Under review",
@@ -2132,10 +2161,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s172",
-   "paper": "p8",
+   "id": "ebc24609-7434-4126-a733-741b3484c5c3",
+   "paper": "79465f49-9f03-4d56-8d91-248cbf5737b5",
    "journal": "Organization Theory",
-   "rating": "A",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-05-11",
    "decided": "",
@@ -2143,10 +2172,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s173",
-   "paper": "p9",
+   "id": "960a541c-6669-4bb4-815c-709b2fd4fbf9",
+   "paper": "b8654d7a-f648-4ad9-96c2-df40bc2bc15e",
    "journal": "Global Knowledge, Memory and Communication",
-   "rating": "B",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-07-29",
    "decided": "",
@@ -2154,21 +2183,25 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s174",
-   "paper": "p10",
+   "id": "e3fc3808-a90a-4edb-be66-56eea162fa9c",
+   "paper": "1bf033c5-0dda-41fd-8452-76721961b8bf",
    "journal": "Applied Linguistics",
    "rating": "SSCI IF 4.8",
    "status": "Under review",
    "submitted": "2026-01-23",
    "decided": "",
    "notes": "Revised version resubmitted",
-   "titleUsed": ""
+   "titleUsed": "",
+   "live": {
+    "text": "Awaiting reviewer scores",
+    "at": "2026-10-22"
+   }
   },
   {
-   "id": "s175",
-   "paper": "p11",
+   "id": "ec1c5ad2-07e6-4481-b8df-1d65fbaddff7",
+   "paper": "e466b52d-8b21-455f-9ce8-ca0d3a04f1a1",
    "journal": "Journal of Business Ethics",
-   "rating": "A",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-05",
    "decided": "",
@@ -2176,10 +2209,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s176",
-   "paper": "p12",
+   "id": "4064b2b6-8e41-458e-8214-2dce3b3038d5",
+   "paper": "c881d3e8-b1d1-4d9a-920e-cb1f012410fa",
    "journal": "IEEE Transactions on Engineering Management",
-   "rating": "A",
+   "rating": "",
    "status": "Rejected",
    "submitted": "2026-10-08",
    "decided": "2026-10-13",
@@ -2187,10 +2220,21 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s177",
-   "paper": "p5",
-   "journal": "Security Dialogue-A",
-   "rating": "A",
+   "id": "8f1fe438-dd60-4cda-b75c-b260e43bd447",
+   "paper": "ca9ea5a5-d588-4b4e-8b9e-7fe67e260b04",
+   "journal": "Security Dialogue",
+   "rating": "",
+   "status": "Under review",
+   "submitted": "2026-10-11",
+   "decided": "",
+   "notes": "",
+   "titleUsed": ""
+  },
+  {
+   "id": "0fc1aa0e-4851-4c9f-9255-7075058a905b",
+   "paper": "bafa0498-0d79-4b9e-b4ec-ce60addcfda9",
+   "journal": "Communication Research",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-12",
    "decided": "",
@@ -2198,21 +2242,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s178",
-   "paper": "p17",
-   "journal": "Communication Research-A",
-   "rating": "A",
-   "status": "Under review",
-   "submitted": "2026-10-12",
-   "decided": "",
-   "notes": "",
-   "titleUsed": ""
-  },
-  {
-   "id": "s179",
-   "paper": "p27",
+   "id": "979e42dc-3780-466e-bd65-162b241c7039",
+   "paper": "0f58c819-b7f0-43fe-9518-0273388eea8e",
    "journal": "Human Relations",
-   "rating": "A*",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-14",
    "decided": "",
@@ -2220,10 +2253,10 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s180",
-   "paper": "p21",
+   "id": "224d2bcb-6140-44e4-abbb-1db50bc4e97a",
+   "paper": "e7ac2cdf-6648-486b-9ae2-f6181e289ec2",
    "journal": "Organization",
-   "rating": "A",
+   "rating": "",
    "status": "Under review",
    "submitted": "2026-10-20",
    "decided": "",
@@ -2231,16 +2264,175 @@ window.RD_SEED = {
    "titleUsed": ""
   },
   {
-   "id": "s181",
-   "paper": "p22",
-   "journal": "International Journal of Information Management-A",
-   "rating": "A",
+   "id": "373f56a2-e133-4556-a08b-b138d3e962a1",
+   "paper": "b4b40544-668e-476d-96d8-14479d6349f5",
+   "journal": "International Journal of Information Management",
+   "rating": "",
    "status": "Planned",
    "submitted": "",
    "decided": "",
    "notes": "",
    "titleUsed": ""
+  },
+  {
+   "id": "8c9efc64-aaa2-45d0-b6fc-12e6ff702d0e",
+   "paper": "74c663fe-54d2-4483-a2f8-c3ffc334cfbe",
+   "journal": "Political Communication",
+   "rating": "",
+   "status": "Planned",
+   "submitted": "",
+   "decided": "",
+   "notes": "From SK_Research_Updates_2026",
+   "titleUsed": ""
+  },
+  {
+   "id": "c545e1ff-f1e5-4e3a-aeff-4efd55d6c157",
+   "paper": "17d85c32-b7d8-4f34-9bd4-a006dccccdca",
+   "journal": "Journal of Markets & Morality",
+   "rating": "",
+   "status": "Planned",
+   "submitted": "",
+   "decided": "",
+   "notes": "From SK_Research_Updates_2026",
+   "titleUsed": ""
   }
  ],
- "portals": {}
+ "portals": {},
+ "abdc": {
+  "Research in Phenomenology": "Not listed",
+  "Asian Journal of Communication": "Not listed",
+  "Critical Horizons": "Not listed",
+  "Mortality (Death and Dying), T&F": "Not listed",
+  "Journal of the British Society for Phenomenology (JBSP)": "Not listed",
+  "Eidos: A Journal for Philosophy of Culture": "Not listed",
+  "Communications: The European Journal of Communication Research": "Not listed",
+  "Human Relations": "A*",
+  "Philosophy & Social Criticism": "Not listed",
+  "Sociological Inquiry (Wiley)": "A",
+  "Angelaki": "Not listed",
+  "Ethos": "Not listed",
+  "Theoria": "Not listed",
+  "The Southern Journal of Philosophy": "Not listed",
+  "Journal of Social Philosophy": "Not listed",
+  "Theoretical Studies in Literature and Art": "Not listed",
+  "Conatus – Journal of Philosophy": "Not listed",
+  "Oxford Literary Review": "Not listed",
+  "The Sociological Review": "A",
+  "Social Science Information": "C",
+  "Contemporary Sociology": "C",
+  "The Social Science Journal": "C",
+  "History and Theory": "Not listed",
+  "Human Studies": "Not listed",
+  "Studies in East European Thought": "Not listed",
+  "Social Semiotics": "Not listed",
+  "Journal of the Philosophy of History": "Not listed",
+  "History & Memory": "Not listed",
+  "Journal of Philosophical Research (pdcnet.org/jpr)": "Not listed",
+  "Asian Journal of Philosophy": "Not listed",
+  "Rethinking History": "Not listed",
+  "Alternatives: Global, Local, Political": "A",
+  "Political Communication": "A",
+  "Journal of Communication": "A",
+  "Security Studies": "B",
+  "Media, Culture & Society": "B",
+  "Research in the Sociology of Organizations": "B",
+  "New Technology, Work and Employment": "A",
+  "Information and Organization": "A*",
+  "Journal of Management Inquiry": "A",
+  "Culture and Organization": "B",
+  "Journal of Management Studies": "A*",
+  "Academy of Management Review": "A*",
+  "Group & Organization Management": "A",
+  "Journal of African Business": "C",
+  "Personnel Review": "A",
+  "Business Information Review": "Not listed",
+  "Journal of Information, Communication and Ethics in Society": "B",
+  "Ethics and Information Technology": "B",
+  "Journal of Business Ethics": "A",
+  "Business Ethics Quarterly": "A",
+  "Employee Relations": "A",
+  "Corporate Communications: An International Journal": "B",
+  "Communication Theory": "A",
+  "Discourse Studies": "A",
+  "Journal of Communication Management": "B",
+  "Social Movement Studies": "Not listed",
+  "Management Communication Quarterly": "B",
+  "Speech Communication": "Not listed",
+  "Language & Communication": "B",
+  "Critical Asian Studies": "B",
+  "Journal of Social Issues": "A",
+  "Theory, Culture and Society": "Not listed",
+  "Global Knowledge, Memory and Communication": "B",
+  "International Journal of Strategic Communication": "B",
+  "Applied Linguistics Review": "Not listed",
+  "Qualitative Inquiry": "Not listed",
+  "Research on Language and Social Interaction": "Not listed",
+  "Communication and Critical/Cultural Studies": "Not listed",
+  "Strategic HR Review": "Not listed",
+  "Journal of Leadership and Organizational Studies": "A",
+  "The Leadership Quarterly": "A*",
+  "Ethics: an international journal of social, political, and legal philosophy": "A",
+  "Leadership": "B",
+  "Technology Analysis and Strategic Management": "B",
+  "International Journal of Social Research Methodology": "B",
+  "Technology in Society": "C",
+  "R&D Management": "A",
+  "Social Science & Medicine": "A",
+  "Foresight": "C",
+  "Information Discovery and Delivery": "C",
+  "International Journal of Educational Management": "B",
+  "Communication Monographs": "Not listed",
+  "Philosophy of the Social Sciences": "B",
+  "European Journal of Communication": "B",
+  "Time and Society": "B",
+  "Philosophy of the Social Sciences (Sage)": "B",
+  "Critical Quarterly (Wiley)": "Not listed",
+  "History of European Ideas": "Not listed",
+  "Qualitative Inquiry (Sage)": "Not listed",
+  "INQUIRY: An Interdisciplinary Journal of Philosophy": "Not listed",
+  "Philosophical Explorations": "Not listed",
+  "Journal of Contemporary European Studies": "Not listed",
+  "Continental Philosophy Review": "Not listed",
+  "Global Philosophy": "Not listed",
+  "Memory Studies": "Not listed",
+  "Orbis Litterarum": "Not listed",
+  "Journal for Cultural Research": "Not listed",
+  "European Journal of Cultural Studies (Sage)": "Not listed",
+  "Discourse & Society": "A",
+  "Information, Communication & Society": "A",
+  "Organization Studies": "A*",
+  "Organization: the critical journal of organization, theory and society": "A",
+  "Qualitative Research in Organizations and Management": "B",
+  "Knowledge Management Research & Practice": "A",
+  "Journal of Knowledge Management": "A",
+  "VINE Journal of Information and Knowledge Management Systems": "B",
+  "International Journal of Public Sector Management": "B",
+  "International Journal of Information Management": "A",
+  "Public Management Review": "A",
+  "Review of Public Personnel Administration": "B",
+  "Public Personnel Management": "B",
+  "Qualitative Research in Organizations and Management (QROM)": "B",
+  "Journal of Communication (Special Issue)": "A",
+  "Communication Research": "A",
+  "Sociological Inquiry": "A",
+  "The Journal of Peasant Studies": "Not listed",
+  "Philosophy & Public Affairs": "A",
+  "Poetics": "Not listed",
+  "Communication Methods and Measures": "Not listed",
+  "Journal of Applied Communication Research": "Not listed",
+  "Discourse & Communication": "A",
+  "Critical Discourse Studies": "B",
+  "MIT Sloan Management Review": "A",
+  "Journal of Organizational Effectiveness: People and Performance (JOEPP)": "B",
+  "Industrial and Commercial Training": "Not listed",
+  "Technological Forecasting and Social Change": "A",
+  "Scientometrics": "A",
+  "Applied Linguistics": "Not listed",
+  "Comparative and Continental Philosophy": "Not listed",
+  "Organization": "A",
+  "Organization Theory": "A",
+  "IEEE Transactions on Engineering Management": "A",
+  "Security Dialogue": "A",
+  "Journal of Markets & Morality": "B"
+ }
 };
