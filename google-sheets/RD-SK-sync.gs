@@ -14,6 +14,11 @@
  * sent to <you>+rdsk@gmail.com), updates the matching submission when it is sure, logs every email on the Emails tab
  * and every decision letter (with reviewer comments) on the "Decisions & reviews" tab. Unclear emails wait for you
  * in the app.
+ *
+ * Research insights (optional): menu RD SK → Turn on daily research insights. Written gap ideas come from a free Gemini key
+ * (RD SK → Set free Gemini API key) or, if you prefer, a paid Claude key; without a key, built-in ideas are used.
+ *
+ * MIT License (see LICENSE in the RD SK repository).
  */
 
 var PAPER_COLS = { key: /^paper/i, title: /^(current |full )?title$/i, authors: /^authors?$/i, type: /^type$/i,
@@ -52,7 +57,8 @@ function onOpen() {
     .addItem("Get today's research insights now", 'insightsNow')
     .addItem('Turn on daily research insights (7 am)', 'turnOnDailyInsights')
     .addItem('Turn off daily research insights', 'turnOffDailyInsights')
-    .addItem('Set Claude API key for written gap ideas (optional)', 'setClaudeKey')
+    .addItem('Set free Gemini API key for written gap ideas', 'setGeminiKey')
+    .addItem('Set Claude API key for written gap ideas (paid, optional)', 'setClaudeKey')
     .addToUi();
 }
 
@@ -488,6 +494,17 @@ function setClaudeKey() {
   ui.alert(key ? 'Saved. Tomorrow\'s insights (or "Get today\'s research insights now") will use Claude-written ideas.' : 'Key removed.');
 }
 
+function setGeminiKey() {
+  var ui = SpreadsheetApp.getUi();
+  var r = ui.prompt('Free Gemini API key', 'Get a free key at aistudio.google.com → Get API key (no card needed). On the free tier ' +
+    'Google may use what is sent (paper titles and abstracts) to improve its products. The key is stored in this script\'s ' +
+    'private properties. Leave empty to remove it.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var key = r.getResponseText().trim(), props = PropertiesService.getScriptProperties();
+  if (key) props.setProperty('GEMINI_API_KEY', key); else props.deleteProperty('GEMINI_API_KEY');
+  ui.alert(key ? 'Saved. Insights will now use Gemini-written ideas (free). Run "Get today\'s research insights now" to try it.' : 'Key removed.');
+}
+
 /** Fetches recent papers from the watch list, ranks them against your papers and writes today's insights. */
 function runInsights() {
   var ss = SpreadsheetApp.getActive(), tz = ss.getSpreadsheetTimeZone(), me = Session.getEffectiveUser().getEmail();
@@ -508,12 +525,11 @@ function runInsights() {
       try { items = items.concat(rdCrossrefItems(JSON.parse(r.getContentText()), batch[k])); } catch (e) { failed++; }
     });
   }
-  var key = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
-  var picked = rdRankInsights(items, papers, seen, key ? 15 : 5), by = 'RD SK';
-  if (key && picked.length) {
-    var ai = claudeIdeas(key, picked, papers);
-    if (ai) { picked = ai; by = 'Claude'; } else picked = picked.slice(0, 5);
-  }
+  var props = PropertiesService.getScriptProperties(), gKey = props.getProperty('GEMINI_API_KEY'), cKey = props.getProperty('CLAUDE_API_KEY');
+  var picked = rdRankInsights(items, papers, seen, gKey || cKey ? 15 : 5), by = 'RD SK', ai = null;
+  if (picked.length && gKey) { ai = geminiIdeas(gKey, picked, papers); if (ai) by = 'Gemini'; }
+  if (picked.length && !ai && cKey) { ai = claudeIdeas(cKey, picked, papers); if (ai) by = 'Claude'; }
+  picked = ai || picked.slice(0, 5);
   var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var rows = picked.map(function (x, n) {
     return [today, n + 1, x.title, x.authors, x.journal, x.abdc, x.ft50 ? 'FT50' : '', x.published, 'https://doi.org/' + x.doi, x.paper,
@@ -521,15 +537,12 @@ function runInsights() {
   });
   if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, INSIGHT_HEAD.length).setValues(rows);
   return { count: rows.length, summary: rows.length + ' insights from ' + items.length + ' recent papers in ' + (RD_WATCH.length - failed) +
-           ' journals' + (by === 'Claude' ? ' (ideas written by Claude)' : '') + '.' };
+           ' journals' + (by !== 'RD SK' ? ' (ideas written by ' + by + ')' : '') + '.' };
 }
 
 /** Claude picks the 5 most useful of the shortlist and writes why it matters and a concrete next study. Null on any problem. */
-function claudeIdeas(key, shortlist, papers) {
-  var schema = { type: 'object', additionalProperties: false, required: ['insights'], properties: { insights: { type: 'array', items: {
-    type: 'object', additionalProperties: false, required: ['doi', 'related_paper', 'why_relevant', 'next_study'],
-    properties: { doi: { type: 'string' }, related_paper: { type: 'string' }, why_relevant: { type: 'string' }, next_study: { type: 'string' } } } } } };
-  var prompt = 'You are helping an academic in communication, discourse and organization studies (continental philosophy, critical ' +
+function ideasPrompt(shortlist, papers) {
+  return 'You are helping an academic in communication, discourse and organization studies (continental philosophy, critical ' +
     'discourse analysis, AI-mediated communication, ethics) stay current and find research gaps.\n\nTheir papers (short name: title):\n' +
     papers.map(function (p) { return '- ' + p.key + ': ' + (p.title || p.key); }).join('\n') +
     '\n\nRecently published candidates:\n' + shortlist.map(function (x) {
@@ -539,6 +552,66 @@ function claudeIdeas(key, shortlist, papers) {
     'given); related_paper (one short name from their list); why_relevant (1-2 sentences on what the study found or argues and how it ' +
     'connects to that paper); next_study (2-3 sentences: a specific, feasible study they could write next that fills a gap this paper ' +
     'leaves open, with research question, method and setting). Be concrete; do not invent findings beyond the abstract.';
+}
+
+/** Maps the model's {insights:[...]} answer back onto the shortlist; null unless at least 3 usable picks. */
+function ideasFrom(json, shortlist) {
+  var out = (json && json.insights) || [], byDoi = {};
+  shortlist.forEach(function (x) { byDoi[x.doi] = x; });
+  var picked = out.filter(function (o) { return o && byDoi[String(o.doi).toLowerCase()]; }).slice(0, 5).map(function (o) {
+    var x = byDoi[String(o.doi).toLowerCase()], y = {};
+    Object.keys(x).forEach(function (k) { y[k] = x[k]; });
+    y.paper = o.related_paper; y.why = o.why_relevant; y.tip = o.next_study;
+    return y;
+  });
+  return picked.length >= 3 ? picked : null;
+}
+
+/** Free Gemini model: a known free Flash model the key can use (newest first), else the newest Flash model it lists. */
+var GEMINI_FREE = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+function geminiModel(key) {
+  var fixed = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL');
+  if (fixed) return fixed;
+  try {
+    var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key }, muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return GEMINI_FREE[0];
+    var names = (JSON.parse(r.getContentText()).models || []).filter(function (m) {
+      return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
+    }).map(function (m) { return String(m.name).replace(/^models\//, ''); });
+    for (var i = 0; i < GEMINI_FREE.length; i++) if (names.indexOf(GEMINI_FREE[i]) >= 0) return GEMINI_FREE[i];
+    var flash = names.filter(function (n) { return /^gemini-[\d.]+-flash(-lite)?$/.test(n); }).sort(function (a, b) {
+      return parseFloat(b.split('-')[1]) - parseFloat(a.split('-')[1]) || a.length - b.length; });
+    return flash[0] || GEMINI_FREE[0];
+  } catch (e) {
+    return GEMINI_FREE[0];
+  }
+}
+
+/** Gemini (free tier) picks the 5 most useful of the shortlist and writes the ideas. Null on any problem (e.g. daily quota). */
+function geminiIdeas(key, shortlist, papers) {
+  var schema = { type: 'OBJECT', required: ['insights'], properties: { insights: { type: 'ARRAY', items: { type: 'OBJECT',
+    required: ['doi', 'related_paper', 'why_relevant', 'next_study'],
+    properties: { doi: { type: 'STRING' }, related_paper: { type: 'STRING' }, why_relevant: { type: 'STRING' }, next_study: { type: 'STRING' } } } } } };
+  try {
+    var model = geminiModel(key);
+    var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true, headers: { 'x-goog-api-key': key },
+      payload: JSON.stringify({ contents: [{ parts: [{ text: ideasPrompt(shortlist, papers) }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: schema } }) });
+    if (r.getResponseCode() !== 200) return null;
+    var res = JSON.parse(r.getContentText()), c = (res.candidates || [])[0];
+    var text = c && c.content ? (c.content.parts || []).map(function (p) { return p.text || ''; }).join('') : '';
+    return text ? ideasFrom(JSON.parse(text), shortlist) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function claudeIdeas(key, shortlist, papers) {
+  var schema = { type: 'object', additionalProperties: false, required: ['insights'], properties: { insights: { type: 'array', items: {
+    type: 'object', additionalProperties: false, required: ['doi', 'related_paper', 'why_relevant', 'next_study'],
+    properties: { doi: { type: 'string' }, related_paper: { type: 'string' }, why_relevant: { type: 'string' }, next_study: { type: 'string' } } } } } };
+  var prompt = ideasPrompt(shortlist, papers);
   try {
     var r = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
@@ -549,15 +622,7 @@ function claudeIdeas(key, shortlist, papers) {
     var msg = JSON.parse(r.getContentText());
     if (msg.stop_reason === 'refusal') return null;
     var text = (msg.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
-    var out = JSON.parse(text).insights, byDoi = {};
-    shortlist.forEach(function (x) { byDoi[x.doi] = x; });
-    var picked = out.filter(function (o) { return byDoi[String(o.doi).toLowerCase()]; }).slice(0, 5).map(function (o) {
-      var x = byDoi[String(o.doi).toLowerCase()], y = {};
-      Object.keys(x).forEach(function (k) { y[k] = x[k]; });
-      y.paper = o.related_paper; y.why = o.why_relevant; y.tip = o.next_study;
-      return y;
-    });
-    return picked.length >= 3 ? picked : null;
+    return ideasFrom(JSON.parse(text), shortlist);
   } catch (e) {
     return null;
   }

@@ -848,8 +848,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.4", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.5", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.5","22 Oct 2026",["Free Gemini option for written next-study ideas (set in the sheet's RD SK menu)","RD SK is now open source (MIT License)"]],
   ["2.4","22 Oct 2026",["Restore link: after a reinstall or on a new phone, one tap loads everything from your Google Sheet","Your sign-off name and reminder setting are kept in the sheet too"]],
   ["2.3","22 Oct 2026",["💡 Research insights: 5 recently published papers a day from ABDC/FT50 and your target journals, matched to your papers, with DOIs and a next-study idea","Optional Claude-written gap ideas (your own API key, set in the sheet)","Save ideas you want to keep"]],
   ["2.2","22 Oct 2026",["Journal emails from Gmail update your sheet and the app automatically (via the Google Sheet script)","Desk rejection vs rejection after review, and reviewer counts, recorded per decision","Unclear emails wait for you under “Journal emails to confirm”","Paste/share an email uses the same reader as the sheet"]],
@@ -884,6 +885,7 @@ function aboutCard(){
       <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
     </dl>
     <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone. It leaves only when you export, share, or sync to your own GitHub repo. Journal passwords are typed into the journals' own pages and never stored by the app; the GitHub token stays on this phone.</div>
+    <div class="hint" style="margin-top:8px"><b>Free &amp; open source:</b> MIT License. Includes jsQR (Apache 2.0) and the ABDC Journal Quality List (© ABDC). Research insights use the free Crossref API; written ideas can use a free Gemini key.</div>
     <div class="actions"><button data-act="ghrepo">Project on GitHub ↗</button></div>
   </div>
   <div class="card">
@@ -1155,7 +1157,7 @@ function insightItem(x){
     <div class="m" style="margin-top:3px">${esc(x.journal)}${abdcChip(x.abdc)}${x.ft50?' <span class="chip s-acc" style="font-size:11px">FT50</span>':""} · ${fmt(x.published)}</div>
     ${x.authors?`<div class="m">${esc(x.authors)}</div>`:""}
     <div class="m" style="margin-top:8px;color:var(--ink)"><b>Why it matters:</b> ${esc(x.why)}</div>
-    <div style="margin-top:8px;padding:10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);font-size:14px">💡 ${esc(x.tip)}${x.by==="Claude"?' <span class="m">· idea by Claude</span>':""}</div>
+    <div style="margin-top:8px;padding:10px;border-radius:9px;background:var(--accent-soft);color:var(--ink);font-size:14px">💡 ${esc(x.tip)}${x.by&&x.by!=="RD SK"?' <span class="m">· idea by '+esc(x.by)+'</span>':""}</div>
     ${x.abstract?`<details style="margin-top:8px"><summary class="m">Abstract</summary><div class="m" style="margin-top:4px">${esc(x.abstract)}</div></details>`:""}
     <div class="m" style="margin-top:6px">DOI: ${esc(x.doi)}</div>
     <div class="actions"><button class="primary" data-act="doi" data-doi="${esc(x.doi)}">Open paper ↗</button>
@@ -1170,7 +1172,7 @@ function viewInsights(){
     <div class="filters">${F.map(f=>`<button data-act="insfilter" data-f="${f}" class="${f===insFilter?"on":""}">${f}</button>`).join("")}</div>
     ${list.length?Object.keys(byDate).map(d=>`<h2>${fmt(d)} <small>${byDate[d].length} papers</small></h2>${byDate[d].map(insightItem).join("")}`).join("")
       :`<div class="empty">${insFilter==="Saved"?"No saved ideas yet. Tap ☆ on an insight to keep it.":GS.url?"No insights yet. In your Google Sheet open the RD SK menu → “Turn on daily research insights”, then tap Sync now here.":"Connect your Google Sheet (More → Google Sheets sync) to get daily insights."}</div>`}
-    <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Next-study ideas are prompts to think with: always read the paper and check the literature before building on them.</div>`;
+    <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Ideas are written by the built-in method, or by Gemini (free key) / Claude (paid key) if you set one in the sheet's RD SK menu. They are prompts to think with: always read the paper and check the literature before building on them.</div>`;
 }
 
 /* ---------- restore on a new phone / after reinstalling ---------- */

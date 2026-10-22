@@ -56,6 +56,9 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   the user's papers (`assets/insights.js`) and writes 5 to the *Research insights* tab with DOI, why it matters and a
   next-study idea. With *Set Claude API key* the script asks `claude-opus-5-5` to choose the 5 from a shortlist of 15 and
   write the ideas (structured JSON output, `fallbacks: "default"`); any failure falls back to the built-in ideas.
+  **Free alternative:** *Set free Gemini API key* (Google AI Studio, no card) uses a free Gemini Flash model for the same
+  job (Gemini is tried first when both keys are set). On Google's free tier, submitted content may be used to improve
+  Google's products. Without any key, the built-in ideas are used (always free).
 - **Excel in/out** – export to `.xlsx` (Papers + Submissions sheets, saved to Downloads), import the workbook's
   `.xlsx` or a `.json` backup.
 
@@ -71,3 +74,13 @@ Data is stored on the phone; GitHub sync (or *More → Save backup*) keeps a cop
   (seed data is only used on first launch or after *Reset*; to load a new workbook on the phone use *Import*).
 - Build: `cd android && ./gradlew assembleRelease` (needs the Android SDK), or run the *Build RD SK APK* GitHub
   Action. The APK is signed with `android/app/rdsk.keystore`, so new builds install over the old one and keep data.
+
+## Licence
+
+RD SK is free and open source under the [MIT License](LICENSE).
+
+Bundled third-party parts keep their own terms:
+- [jsQR](https://github.com/cozmo/jsQR) (QR decoding, `assets/jsQR.min.js`): Apache License 2.0.
+- ABDC Journal Quality List 2025 (`assets/abdc.js`, the *ABDC list* tab): data © Australian Business Deans Council,
+  from [abdc.edu.au](https://abdc.edu.au/abdc-journal-quality-list/); included for reference, not covered by the MIT licence.
+- Research insights use the free [Crossref REST API](https://api.crossref.org) (metadata, CC0).
