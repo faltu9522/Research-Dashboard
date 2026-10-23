@@ -105,6 +105,14 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .aians .aih{font-weight:700;margin:12px 0 4px;color:var(--accent)}
 .aians a{color:var(--accent)}
 textarea.big{min-height:120px}
+.sugwrap{position:relative}
+.sug{position:absolute;left:0;right:0;top:100%;z-index:30;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.35);max-height:280px;overflow-y:auto}
+.sug button{display:flex;gap:8px;align-items:center;justify-content:space-between;width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;
+  background:var(--card);color:var(--ink);text-align:left;padding:11px 12px;font-size:14.5px}
+.sug button:last-child{border-bottom:0}
+.sug button:active{background:var(--accent-soft)}
+.sug .mine{font-size:11px;color:var(--muted);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -505,6 +513,27 @@ function decide(s){
 /* ---------- sheets: submission edit ---------- */
 let abdcTitles=null;
 function journalOptions(){ abdcTitles=abdcTitles||(window.RD_ABDC||[]).map(j=>j[0]); return [...new Set(S.subs.map(s=>s.journal).filter(Boolean).concat(abdcTitles))].sort((a,b)=>a.localeCompare(b)); }
+/** Journal suggestions under a text box (the app's own list: the WebView's datalist popup is see-through in dark mode).
+ *  Your own journals come first, then ABDC titles; names starting with what you typed rank above other matches. */
+function journalPicker(input){
+  if(!input||input.dataset.picker) return; input.dataset.picker="1";
+  const wrap=document.createElement("div"); wrap.className="sugwrap"; input.parentNode.insertBefore(wrap,input); wrap.appendChild(input);
+  const box=document.createElement("div"); box.className="sug"; box.hidden=true; wrap.appendChild(box);
+  const mine=new Set(S.subs.map(s=>s.journal).filter(Boolean));
+  const show=()=>{
+    const q=normJ(input.value); if(q.length<2){ box.hidden=true; return; }
+    const rank=j=>{ const n=normJ(j); if(n===q) return 0; if(n.startsWith(q)) return 1; if((" "+n).includes(" "+q)) return 2; return n.includes(q)?3:9; };
+    const hits=journalOptions().map(j=>[j,rank(j)+(mine.has(j)?0:0.5)]).filter(x=>x[1]<9).sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])).slice(0,8).map(x=>x[0]);
+    if(!hits.length||(hits.length===1&&hits[0]===input.value)){ box.hidden=true; return; }
+    box.innerHTML=hits.map(j=>{ const g=abdcOf(j); return `<button type="button" data-j="${esc(j)}"><span>${esc(j)}</span><span class="mine">${g?"ABDC "+esc(g):""}${mine.has(j)?(g?" · ":"")+"yours":""}</span></button>`; }).join("");
+    box.hidden=false;
+  };
+  input.addEventListener("input",show); input.addEventListener("focus",show);
+  input.addEventListener("blur",()=>setTimeout(()=>{ box.hidden=true; },150));
+  box.addEventListener("pointerdown",e=>e.preventDefault()); // keep the keyboard open while choosing
+  box.addEventListener("click",e=>{ const b=e.target.closest("[data-j]"); if(!b) return; e.stopPropagation();
+    input.value=b.dataset.j; box.hidden=true; input.dispatchEvent(new Event("input",{bubbles:true})); box.hidden=true; });
+}
 /** ABDC 2025 rating: the sheet's Journals tab first (it can hold a name override), else the embedded ABDC list. */
 function abdcOf(journal){
   const m=S.abdc||{}; if(m[journal]&&m[journal]!=="Not listed") return m[journal];
@@ -519,9 +548,8 @@ function editSub(s, presetPaper){
   openSheet(`<h3>${isNew?"New submission":"Edit submission"} <span>${isNew?`<button data-act="scanqr">📷 Scan QR</button> `:""}<button class="ghost" onclick="closeSheet()">✕</button></span></h3>
     <label for="fp">Paper</label>
     <select id="fp">${isNew&&!s.paper?'<option value="">— choose paper —</option>':""}${papers.map(p=>`<option value="${p.id}" ${p.id===s.paper?"selected":""}>${esc(p.key)}</option>`).join("")}</select>
-    <label for="fj">Journal</label><input id="fj" list="jl" value="${esc(s.journal)}" autocomplete="off">
+    <label for="fj">Journal</label><input id="fj" value="${esc(s.journal)}" autocomplete="off" autocapitalize="words">
     <div class="hint" id="fjabdc"></div>
-    <datalist id="jl">${journalOptions().map(j=>`<option value="${esc(j)}">`).join("")}</datalist>
     <div class="two"><div><label for="fr">Rating / index</label><input id="fr" value="${esc(s.rating)}"></div>
     <div><label for="fs">Status</label><select id="fs">${STATUSES.map(o=>`<option ${o===s.status?"selected":""}>${o}</option>`).join("")}</select></div></div>
     <div class="two"><div><label for="fe">Date submitted</label><input type="date" id="fe" value="${esc(s.submitted)}"></div>
@@ -541,7 +569,7 @@ function editSub(s, presetPaper){
   const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); const g=j&&abdcOf(j); $("#fjabdc").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list"):""; if(!j) return; const po=portalFor(j);
     $("#fuh").innerHTML = u?"Using your link.":po.src==="built-in"?"✓ Found automatically: "+esc(po.url):po.src==="yours"?"Using your saved link: "+esc(po.url):`Not known yet: <button class="link" id="ffind">Find it ↗</button>, copy the login page address, then paste it above.`;
     const f=$("#ffind"); if(f) f.onclick=()=>openBrowser(findLinkUrl(j)); };
-  $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
+  journalPicker($("#fj")); $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
   $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
   $("#fsave").onclick=()=>{
@@ -873,8 +901,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.9", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.0", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.0","23 Oct 2026",["Fixed: the journal suggestions list was see-through in dark mode; it is now a clear list under the box, with ABDC ratings and your own journals first"]],
   ["2.9","23 Oct 2026",["New Ask AI tab: fresh journal recommendations, where to go after a rejection, journal fit checks, cover letters and your own questions, for conceptual, literature-review and empirical papers","Answers use your paper's full history, the ABDC 2025 list and what each journal actually published recently (Crossref)","Ask here with your sheet's free Gemini key, or copy the question into the Gemini app to use your Gemini Pro subscription; answers are kept with the paper and on the sheet's AI chat tab","Papers have an Approach field (conceptual, literature review, empirical qualitative / quantitative / mixed)"]],
   ["2.8","22 Oct 2026",["Data replaced with the clean Sheet 2 record (one entry per paper, current submissions and planned journals; old titles removed)","When the sheet's data is replaced (sheet menu RD SK → Replace all…), the phone drops its old copy on the next sync instead of sending it back"]],
   ["2.7","22 Oct 2026",["Email import reads only emails from 1 Oct 2026 onwards; submissions decided before then are never changed"]],
@@ -1235,7 +1264,7 @@ function viewAI(){
       <div class="filters" style="flex-wrap:wrap">${RD_APPROACHES.map(o=>`<button data-act="aiappr" data-v="${o}" class="${o===appr?"on":""}">${o}</button>`).join("")}</div>`:""}
     <label>Question</label>
     <div class="filters" style="flex-wrap:wrap">${kinds.map(k=>`<button data-act="aikind" data-k="${k}" class="${k===kind?"on":""}">${RD_AI_KINDS[k]}</button>`).join("")}</div>
-    ${needJ?`<label for="aij">Journal</label><input id="aij" list="aijl" value="${esc(AIU.journal)}" placeholder="Type a journal name" autocomplete="off"><datalist id="aijl">${jl.map(j=>`<option value="${esc(j)}">`).join("")}</datalist>`:""}
+    ${needJ?`<label for="aij">Journal</label><input id="aij" value="${esc(AIU.journal)}" placeholder="Type a journal name" autocomplete="off" autocapitalize="words">`:""}
     <label for="aix">${kind==="ask"?"Your question":"Anything to add (optional)"}</label>
     <textarea id="aix" placeholder="${kind==="ask"?"e.g. Which ABDC A journals publish Blanchot-inspired organization theory?":"e.g. prefer journals with fast first decisions; it is 11,000 words"}">${esc(AIU.extra)}</textarea>
     <div class="actions"><button class="primary" data-act="aiask" ${AIU.busy?"disabled":""}>✦ Ask here</button><button data-act="aigemini" ${AIU.busy?"disabled":""}>Ask in Gemini app</button></div>
@@ -1262,7 +1291,7 @@ function aiCard(x,i){
 }
 function bindAI(){
   if($("#aip")) $("#aip").onchange=e=>{ AIU.paper=e.target.value; render(); };
-  if($("#aij")) $("#aij").oninput=e=>{ AIU.journal=e.target.value; };
+  if($("#aij")){ $("#aij").oninput=e=>{ AIU.journal=e.target.value; }; journalPicker($("#aij")); }
   if($("#aix")) $("#aix").oninput=e=>{ AIU.extra=e.target.value; };
   if($("#aipaste")) $("#aipaste").oninput=e=>{ AIU.paste=e.target.value; };
 }
