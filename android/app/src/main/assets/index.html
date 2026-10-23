@@ -56,7 +56,7 @@ button.ghost{background:transparent}
 button.danger{color:var(--need)}
 button.link{border:0;background:none;color:var(--accent);padding:4px 0;font-size:13px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
-nav button{flex:1;border:0;border-radius:0;background:none;padding:10px 0 9px;font-size:11.5px;color:var(--muted)}
+nav button{flex:1;white-space:nowrap;border:0;border-radius:0;background:none;padding:10px 0 9px;font-size:11.5px;color:var(--muted)}
 nav button .ic{display:block;font-size:19px;line-height:1.1}
 nav button.on{color:var(--accent);font-weight:600}
 .fab{position:fixed;right:16px;bottom:84px;width:54px;height:54px;border-radius:50%;background:var(--accent);color:var(--accent-ink);border:0;font-size:28px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:6}
@@ -100,6 +100,11 @@ table.tbl td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:
 table.tbl td.n,table.tbl th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .hbar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);min-width:2px}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+.aians{font-size:14.5px;line-height:1.5;margin-top:6px;overflow-wrap:anywhere}
+.aians p{margin:6px 0}.aians ul,.aians ol{margin:4px 0 8px;padding-left:20px}.aians li{margin:3px 0}
+.aians .aih{font-weight:700;margin:12px 0 4px;color:var(--accent)}
+.aians a{color:var(--accent)}
+textarea.big{min-height:120px}
 </style>
 </head>
 <body>
@@ -107,10 +112,11 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <main id="view"></main>
 <button class="fab" id="fab" aria-label="Add submission">+</button>
 <nav id="nav">
-  <button data-tab="home" class="on"><span class="ic">◧</span>Dashboard</button>
-  <button data-tab="review"><span class="ic">⏳</span>Under review</button>
+  <button data-tab="home" class="on"><span class="ic">◧</span>Home</button>
+  <button data-tab="review"><span class="ic">⏳</span>In review</button>
   <button data-tab="papers"><span class="ic">▤</span>Papers</button>
   <button data-tab="subs"><span class="ic">☰</span>Submissions</button>
+  <button data-tab="ai"><span class="ic">✦</span>Ask AI</button>
   <button data-tab="more"><span class="ic">⋯</span>More</button>
 </nav>
 <div class="scrim" id="scrim"></div>
@@ -124,6 +130,8 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 <script src="abdc.js"></script>
 <script src="suggest.js"></script>
 <script src="emailparse.js"></script>
+<script src="watchlist.js"></script>
+<script src="aiassist.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -266,7 +274,7 @@ function paperCard(p){
 /* ---------- views ---------- */
 function render(){
   $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
-  $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights")?"none":"block";
+  $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights"||tab==="ai")?"none":"block";
   const v=$("#view");
   if(tab==="home") v.innerHTML=viewHome();
   else if(tab==="review") v.innerHTML=viewReview();
@@ -274,8 +282,9 @@ function render(){
   else if(tab==="subs") v.innerHTML=viewSubs();
   else if(tab==="stats") v.innerHTML=viewStats();
   else if(tab==="insights") v.innerHTML=viewInsights();
+  else if(tab==="ai") v.innerHTML=viewAI();
   else v.innerHTML=viewMore();
-  bindSearch(); bindMore(); bindWelcome(); if(tab==="stats") bindStats();
+  bindSearch(); bindMore(); bindWelcome(); if(tab==="stats") bindStats(); if(tab==="ai") bindAI();
 }
 function stats(){
   const infos = S.papers.map(p=>({p,...paperInfo(p)}));
@@ -424,6 +433,19 @@ document.addEventListener("click",e=>{
     case "doi": e.stopPropagation(); openBrowser("https://doi.org/"+a.dataset.doi); break;
     case "star": { e.stopPropagation(); const it=(S.insights||[]).find(x=>x.doi===a.dataset.doi); if(it){ it.saved=!it.saved; if(it.saved){ GS.savedInsights=(GS.savedInsights||[]).concat([it.doi]); gsStore(); gsSchedule(); } persist(false); render(); toast(it.saved?"Saved to your ideas":"Removed"); } break; }
     case "insfilter": insFilter=a.dataset.f; render(); break;
+    case "aikind": AIU.kind=a.dataset.k; render(); break;
+    case "aiappr": { const p=paperById(AIU.paper); if(p){ p.approach=a.dataset.v; persist(); render(); } break; }
+    case "aiask": aiRun("here"); break;
+    case "aigemini": aiRun("gemini"); break;
+    case "aiurl": e.preventDefault(); openBrowser(a.dataset.url); break;
+    case "aicopy": { const x=aiEntry(a.dataset.id); if(x) copyOut(aiPlain(x)); break; }
+    case "aishare": { const x=aiEntry(a.dataset.id); if(x) shareText(aiPlain(x)); break; }
+    case "aicont": { const x=aiEntry(a.dataset.id); if(x){ copyOut((x.prompt||"")+(x.prompt?"\n\n---\nEarlier answer:\n":"")+x.answer+"\n\n---\nFollow-up: "); openBrowser("https://gemini.google.com/app"); toast("Copied: paste into Gemini and add your follow-up"); } break; }
+    case "aidel": if(confirm("Remove this answer from the phone? (It stays on the sheet's AI chat tab.)")){ S.aiHidden=(S.aiHidden||[]).concat([a.dataset.id]); S.ai=(S.ai||[]).filter(x=>x.id!==a.dataset.id); persist(false); render(); } break;
+    case "aipastein": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) { $("#aipaste").value=c; AIU.paste=c; } else toast("Long-press the box and choose Paste"); break; }
+    case "aipastesave": aiSavePasted(); break;
+    case "aipastedrop": aiAwait(null); render(); break;
+    case "aiall": AIU.all=!AIU.all; render(); break;
     case "gscopy": if(window.Android&&Android.copyText){ Android.copyText(window.RD_GSCRIPT||""); toast("Script copied"); } else { navigator.clipboard&&navigator.clipboard.writeText(window.RD_GSCRIPT||""); toast("Script copied"); } break;
     case "gsshare": shareText(window.RD_GSCRIPT||""); break;
     case "gsconnect": gsConnect(); break;
@@ -545,6 +567,7 @@ function showPaper(p){
     <div><span class="chip ${stageClass(i.stage)}">${esc(i.stage)}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
     <dl class="kv" style="margin-top:10px">
       <dt>Title</dt><dd>${esc(p.title||"—")}</dd><dt>Authors</dt><dd>${p.authors?esc(p.authors):'<button class="link" onclick="editPaper(paperById(\''+p.id+'\'))">+ Add authors</button>'}</dd><dt>Type</dt><dd>${esc(p.type)}</dd>
+      <dt>Approach</dt><dd>${esc(p.approach||rdGuessApproach(p))}${p.approach?"":' <span class="m">(guessed)</span>'}</dd>
       <dt>Last tried</dt><dd>${i.last?esc(i.last.journal):"—"}</dd><dt>Last decision</dt><dd>${fmt(i.lastDec)}</dd>
       <dt>Next in queue</dt><dd>${i.next?esc(i.next.journal):"—"}</dd><dt>Sent</dt><dd>${i.sent} · ${i.rejections} rejected</dd>
       ${p.notes?`<dt>Notes</dt><dd>${esc(p.notes)}</dd>`:""}
@@ -552,7 +575,7 @@ function showPaper(p){
     <div class="actions">
       ${i.next&&i.stage!=="Under review"?`<button class="primary" id="pnext">Submit to ${esc(i.next.journal)} today</button>`:""}
       ${revRow?`<button class="primary" id="prev">Resubmit revision today</button>`:""}
-      <button id="padd">+ Submission</button><button id="pedit">Edit paper</button></div>
+      <button id="padd">+ Submission</button><button id="pedit">Edit paper</button><button id="pai">✦ Ask AI</button></div>
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
     <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
       <div style="display:flex;flex-direction:column;gap:4px"><button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">No journals queued.</div>'}
@@ -569,6 +592,7 @@ function showPaper(p){
     persist(); render(); showPaper(p); toast("Revision resubmitted"); };
   $("#padd").onclick=()=>editSub(null,p.id);
   $("#pedit").onclick=()=>editPaper(p);
+  $("#pai").onclick=()=>{ AIU.paper=p.id; closeSheet(); setTab("ai"); };
 }
 function movePlanned(pid,sid,dir){
   const idx=S.subs.map((s,k)=>[s,k]).filter(([s])=>s.paper===pid&&s.status==="Planned").map(([,k])=>k);
@@ -583,12 +607,13 @@ function editPaper(p){
     <label for="pa">Authors</label><input id="pa" value="${esc(p.authors)}">
     <div class="two"><div><label for="py">Type</label><select id="py">${TYPES.map(o=>`<option ${o===p.type?"selected":""}>${o}</option>`).join("")}</select></div>
     <div><label for="po">Override</label><select id="po">${OVERRIDES.map(o=>`<option value="${o}" ${o===p.override?"selected":""}>${o||"(none – auto)"}</option>`).join("")}</select></div></div>
+    <label for="pap">Approach</label><select id="pap"><option value="">(guess from the title: ${esc(rdGuessApproach(p))})</option>${RD_APPROACHES.map(o=>`<option ${o===p.approach?"selected":""}>${o}</option>`).join("")}</select>
     <label for="pn">Notes</label><textarea id="pn">${esc(p.notes)}</textarea>
     <div class="actions"><button class="primary" id="psave">Save</button>${isNew?"":`<button class="danger" id="pdel">Delete paper</button>`}</div>`);
   $("#psave").onclick=()=>{
     const k=$("#pk").value.trim(); if(!k) return toast("Short name is required");
     if(S.papers.some(x=>x!==p&&x.key.toLowerCase()===k.toLowerCase())) return toast("That short name is already used");
-    Object.assign(p,{key:k,title:$("#pt").value.trim(),authors:$("#pa").value.trim(),type:$("#py").value,override:$("#po").value,notes:$("#pn").value.trim()});
+    Object.assign(p,{key:k,title:$("#pt").value.trim(),authors:$("#pa").value.trim(),type:$("#py").value,override:$("#po").value,notes:$("#pn").value.trim(),approach:$("#pap").value});
     if(isNew) S.papers.push(p); persist(); render(); showPaper(p);
   };
   if($("#pdel")) $("#pdel").onclick=()=>{ const n=subsOf(p.id).length; if(confirm(`Delete “${p.key}” and its ${n} submission row(s)?`)){ S.papers=S.papers.filter(x=>x!==p); S.subs=S.subs.filter(s=>s.paper!==p.id); persist(); closeSheet(); render(); } };
@@ -647,9 +672,9 @@ function sheetXml(header, rows, widths, dateCols){
 }
 function buildXlsxB64(){
   const pk=id=>(paperById(id)||{}).key||"";
-  const pH=["Paper","Title","Authors","Type","Override","Notes","Stage","Current journal","Sent","Rejections","Next in queue","Suggested next journals"];
+  const pH=["Paper","Title","Authors","Type","Override","Notes","Stage","Current journal","Sent","Rejections","Next in queue","Suggested next journals","Approach"];
   const pR=S.papers.map(p=>{ const i=paperInfo(p), cur=i.subs.find(isOpen); const sg=(!p.override&&window.rdSuggest)?rdSuggest(p,i.subs,window.RD_ABDC||[],5).map(j=>j.title+" ("+j.grade+")").join(" · "):"";
-    return [p.key,p.title,p.authors,p.type,p.override,p.notes,i.stage,cur?cur.journal:"",i.sent,i.rejections,i.next?i.next.journal:"",sg]; });
+    return [p.key,p.title,p.authors,p.type,p.override,p.notes,i.stage,cur?cur.journal:"",i.sent,i.rejections,i.next?i.next.journal:"",sg,p.approach||""]; });
   const sH=["Paper","Journal","ABDC 2025","Other rating / index","Status","Date submitted","Date of decision","Days","Notes","Title used","Manuscript ID","Status on journal site","Status checked"];
   const sR=S.subs.map(s=>[pk(s.paper),s.journal,abdcOf(s.journal),s.rating,s.status,s.submitted,s.decided,subDays(s)??"",s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:""]);
   const NS='xmlns="http://schemas.openxmlformats.org/', head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
@@ -700,14 +725,14 @@ function fromWorkbook(wb){
   const rows=sh=>sh.slice(1).map(r=>r||[]);
   const colsOf=(sh,spec)=>{ const h=(sh[0]||[]).map(x=>String(x??"").trim()), C={}, used={};
     Object.entries(spec).forEach(([f,re])=>{ const i=h.findIndex((x,k)=>!used[k]&&x&&re.test(x)&&!(f==="rating"&&/abdc/i.test(x))); if(i>=0){ C[f]=i; used[i]=1; } }); return C; };
-  const PC=colsOf(P,{key:/^paper/i,title:/^(current |full )?title$/i,authors:/^authors?$/i,type:/^type$/i,override:/^override/i,notes:/^notes?$/i});
+  const PC=colsOf(P,{key:/^paper/i,title:/^(current |full )?title$/i,authors:/^authors?$/i,type:/^type$/i,override:/^override/i,notes:/^notes?$/i,approach:/^approach$/i});
   const SC=colsOf(Sub,{paper:/^paper$/i,journal:/^journal$/i,rating:/rating|index/i,status:/^status$/i,submitted:/^(date submitted|date of submission)/i,decided:/^date of decision/i,notes:/^notes?$/i,titleUsed:/^title used/i,msid:/^manuscript id/i,live:/^status on journal/i,liveAt:/^status checked/i});
   const at=(r,C,f)=>C[f]===undefined?"":r[C[f]];
   const d=v=>{ if(typeof v==="number"&&v>0){ const x=new Date(Math.round(v-25569)*864e5); return x.toISOString().slice(0,10); } if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); return ""; };
   const str=v=>String(v??"").trim();
   const papers=[], byKey={};
   const add=(key,o={})=>{ if(byKey[key]) return byKey[key]; const id=uid("p"); papers.push(Object.assign({id,key,title:"",authors:"",type:"Journal article",override:"",notes:""},o)); byKey[key]=id; return id; };
-  rows(P).forEach(r=>{ const k=str(at(r,PC,"key")); if(k) add(k,{title:str(at(r,PC,"title")),authors:str(at(r,PC,"authors")),type:str(at(r,PC,"type"))||"Journal article",override:str(at(r,PC,"override")),notes:str(at(r,PC,"notes"))}); });
+  rows(P).forEach(r=>{ const k=str(at(r,PC,"key")); if(k) add(k,{title:str(at(r,PC,"title")),authors:str(at(r,PC,"authors")),type:str(at(r,PC,"type"))||"Journal article",override:str(at(r,PC,"override")),notes:str(at(r,PC,"notes")),approach:str(at(r,PC,"approach"))}); });
   const subs=[];
   rows(Sub).forEach(r=>{ const k=str(at(r,SC,"paper")), j=str(at(r,SC,"journal")); if(!j) return; // rows without a journal are headings/spares
     const lv=str(at(r,SC,"live"));
@@ -848,8 +873,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="2.8", APP_BUILD="22 Oct 2026";
+const APP_VERSION="2.9", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["2.9","23 Oct 2026",["New Ask AI tab: fresh journal recommendations, where to go after a rejection, journal fit checks, cover letters and your own questions, for conceptual, literature-review and empirical papers","Answers use your paper's full history, the ABDC 2025 list and what each journal actually published recently (Crossref)","Ask here with your sheet's free Gemini key, or copy the question into the Gemini app to use your Gemini Pro subscription; answers are kept with the paper and on the sheet's AI chat tab","Papers have an Approach field (conceptual, literature review, empirical qualitative / quantitative / mixed)"]],
   ["2.8","22 Oct 2026",["Data replaced with the clean Sheet 2 record (one entry per paper, current submissions and planned journals; old titles removed)","When the sheet's data is replaced (sheet menu RD SK → Replace all…), the phone drops its old copy on the next sync instead of sending it back"]],
   ["2.7","22 Oct 2026",["Email import reads only emails from 1 Oct 2026 onwards; submissions decided before then are never changed"]],
   ["2.6","22 Oct 2026",["Fixed: journal emails could mark under-review papers as rejected (acknowledgement boilerplate, reviewer emails and similar journal names were misread)","Stricter email reader: status changes only when the email clearly names the paper; anything unclear waits for you","Sheet menu: RD SK → Repair undoes all email-import changes and re-reads the emails; every change can now be undone exactly"]],
@@ -1178,6 +1204,119 @@ function viewInsights(){
     <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Ideas are written by the built-in method, or by Gemini (free key) / Claude (paid key) if you set one in the sheet's RD SK menu. They are prompts to think with: always read the paper and check the literature before building on them.</div>`;
 }
 
+/* ---------- Ask AI ---------- */
+const AIU={paper:"",kind:"journals",journal:"",extra:"",busy:"",await:null,paste:"",all:false};
+try{ AIU.await=JSON.parse(localStorage.getItem("rdsk.ai.await")||"null"); }catch(e){}
+function aiAwait(v){ AIU.await=v; try{ v?localStorage.setItem("rdsk.ai.await",JSON.stringify(v)):localStorage.removeItem("rdsk.ai.await"); }catch(e){} }
+function aiEntry(id){ return (S.ai||[]).find(x=>x.id===id); }
+function aiPlainEntry(x){ return {id:x.id,at:x.at,paper:x.paper,approach:x.approach,kind:x.kind,journal:x.journal,question:x.question,answer:x.answer,by:x.by,sources:x.sources||[]}; }
+function aiPlain(x){ return (RD_AI_KINDS[x.kind]||x.kind)+(x.journal?" – "+x.journal:"")+(x.paper?" · "+x.paper:"")+"\n\n"+x.answer+((x.sources||[]).length?"\n\nSources:\n"+x.sources.map(s=>"- "+(s.title||"")+" "+s.url).join("\n"):""); }
+function copyOut(t){ if(window.Android&&Android.copyText) Android.copyText(t); else if(navigator.clipboard) navigator.clipboard.writeText(t); toast("Copied"); }
+function aiMerge(list){
+  if(!Array.isArray(list)) return;
+  const have=new Set((S.ai||[]).map(x=>x.id)), hidden=new Set(S.aiHidden||[]); let n=0;
+  list.forEach(x=>{ if(x&&x.id&&!have.has(x.id)&&!hidden.has(x.id)){ S.ai=(S.ai||[]).concat([Object.assign({},x,{sent:true})]); n++; } });
+  if(n){ S.ai.sort((a,b)=>(a.at||"").localeCompare(b.at||"")); S.ai=S.ai.slice(-300); persist(false); }
+}
+function aiAdd(x){ S.ai=(S.ai||[]).concat([x]).slice(-300); persist(false); }
+function viewAI(){
+  const papers=S.papers.slice().sort((a,b)=>(!!a.override-!!b.override)||a.key.localeCompare(b.key));
+  if(AIU.paper&&!paperById(AIU.paper)) AIU.paper="";
+  const p=paperById(AIU.paper), appr=p?(p.approach||rdGuessApproach(p)):"";
+  const kinds=aiKinds(p), kind=aiKind(p);
+  const needJ=kind==="fit"||kind==="cover";
+  const jl=[...new Set(S.subs.map(s=>s.journal).filter(Boolean))].sort();
+  const list=(S.ai||[]).filter(x=>AIU.all||!p||x.paper===p.key).slice().reverse().slice(0,40);
+  const aw=AIU.await;
+  return `<div class="card">
+    <label for="aip" style="margin-top:0">Paper</label>
+    <select id="aip"><option value="">— General question (no paper) —</option>${papers.map(x=>`<option value="${x.id}" ${x.id===AIU.paper?"selected":""}>${esc(x.key)}${x.override?" ("+esc(x.override)+")":""}</option>`).join("")}</select>
+    ${p?`<label>Approach ${p.approach?"":'<span class="m">· guessed from the title, tap to set</span>'}</label>
+      <div class="filters" style="flex-wrap:wrap">${RD_APPROACHES.map(o=>`<button data-act="aiappr" data-v="${o}" class="${o===appr?"on":""}">${o}</button>`).join("")}</div>`:""}
+    <label>Question</label>
+    <div class="filters" style="flex-wrap:wrap">${kinds.map(k=>`<button data-act="aikind" data-k="${k}" class="${k===kind?"on":""}">${RD_AI_KINDS[k]}</button>`).join("")}</div>
+    ${needJ?`<label for="aij">Journal</label><input id="aij" list="aijl" value="${esc(AIU.journal)}" placeholder="Type a journal name" autocomplete="off"><datalist id="aijl">${jl.map(j=>`<option value="${esc(j)}">`).join("")}</datalist>`:""}
+    <label for="aix">${kind==="ask"?"Your question":"Anything to add (optional)"}</label>
+    <textarea id="aix" placeholder="${kind==="ask"?"e.g. Which ABDC A journals publish Blanchot-inspired organization theory?":"e.g. prefer journals with fast first decisions; it is 11,000 words"}">${esc(AIU.extra)}</textarea>
+    <div class="actions"><button class="primary" data-act="aiask" ${AIU.busy?"disabled":""}>✦ Ask here</button><button data-act="aigemini" ${AIU.busy?"disabled":""}>Ask in Gemini app</button></div>
+    <div class="m" style="margin-top:8px">${AIU.busy?"⏳ "+esc(AIU.busy):GS.url?"<b>Ask here</b>: free, uses the Gemini key in your Google Sheet; the answer is saved. <b>Gemini app</b>: copies the question so you can paste it into Gemini (your Pro subscription).":"<b>Ask here</b> needs your Google Sheet connected (More → Google Sheets sync) with a Gemini key set in its RD SK menu. <b>Gemini app</b> works now."}</div>
+  </div>
+  ${aw?`<div class="card" style="border:2px solid var(--accent)"><div class="t">Paste Gemini's answer to keep it</div>
+    <div class="m">${esc(RD_AI_KINDS[aw.kind])}${aw.paper?" · "+esc(aw.paper):""}. The question is on your clipboard: paste it into Gemini, then copy Gemini's answer and paste it here.</div>
+    <textarea id="aipaste" class="big" placeholder="Gemini's answer">${esc(AIU.paste)}</textarea>
+    <div class="actions"><button data-act="aipastein">Paste</button><button class="primary" data-act="aipastesave">Save answer</button><button class="ghost" data-act="aipastedrop">Not now</button></div></div>`:""}
+  <h2>Answers <small>${p?`<button class="link" data-act="aiall">${AIU.all?"show this paper only":"show all papers"}</button>`:""}</small></h2>
+  ${list.length?list.map(aiCard).join(""):`<div class="empty">No answers yet${p&&!AIU.all?" for this paper":""}.</div>`}
+  <div class="hint">How it works: RD SK sends the AI your paper's title, approach, notes and full submission history, a shortlist of ABDC 2025 journals in its fields, and how many recent articles in each journal are reviews, conceptual or empirical (from Crossref). The AI can still be wrong about a journal's scope or rules: check the journal's website before submitting. Privacy: Google may use what is sent through a free Gemini key (and, unless you turn off Gemini Apps Activity, Gemini app chats) to improve its products. Titles and notes are fine; don't paste full unpublished manuscripts.</div>`;
+}
+// without a paper only a general question or a journal fit check make sense; the chosen type comes back when a paper is picked
+function aiKinds(p){ return p?Object.keys(RD_AI_KINDS):["ask","fit"]; }
+function aiKind(p){ const k=aiKinds(p); return k.includes(AIU.kind)?AIU.kind:k[0]; }
+function aiCard(x,i){
+  return `<div class="card"><div class="t">${esc(RD_AI_KINDS[x.kind]||x.kind||"Answer")}${x.journal?" – "+esc(x.journal):""}</div>
+    <div class="m">${x.paper?esc(x.paper)+" · ":""}${x.approach?esc(x.approach)+" · ":""}${x.at?fmt(x.at.slice(0,10)):""} · ${esc(x.by||"")}</div>
+    ${x.question?`<div class="m" style="margin-top:4px">“${esc(x.question)}”</div>`:""}
+    ${i===0?`<div class="aians">${rdAiMarkdown(x.answer)}</div>`:`<details><summary class="m">Show answer</summary><div class="aians">${rdAiMarkdown(x.answer)}</div></details>`}
+    ${(x.sources||[]).length?`<details><summary class="m">Sources (${x.sources.length})</summary>${x.sources.map(s=>`<div class="m"><a href="#" data-act="aiurl" data-url="${esc(s.url)}">${esc(s.title||s.url)}</a></div>`).join("")}</details>`:""}
+    <div class="actions"><button data-act="aicopy" data-id="${esc(x.id)}">Copy</button><button data-act="aishare" data-id="${esc(x.id)}">Share</button><button data-act="aicont" data-id="${esc(x.id)}">Continue in Gemini</button><button class="ghost danger" data-act="aidel" data-id="${esc(x.id)}">Remove</button></div></div>`;
+}
+function bindAI(){
+  if($("#aip")) $("#aip").onchange=e=>{ AIU.paper=e.target.value; render(); };
+  if($("#aij")) $("#aij").oninput=e=>{ AIU.journal=e.target.value; };
+  if($("#aix")) $("#aix").oninput=e=>{ AIU.extra=e.target.value; };
+  if($("#aipaste")) $("#aipaste").oninput=e=>{ AIU.paste=e.target.value; };
+}
+function aiSetBusy(t){ AIU.busy=t; if(tab==="ai") render(); }
+/** What recent issues of each journal publish: Crossref titles counted by type (5 journals at a time, about 25 s at most). */
+async function aiProfiles(names){
+  const out={}, watch={}; (window.RD_WATCH||[]).forEach(w=>{ watch[rdNormName(w.name)]=w.issn&&w.issn[0]; });
+  const one=async n=>{ const issn=watch[rdNormName(n)]||"";
+    try{ const r=await Promise.race([httpCall("GET",rdJournalProfileUrl(n,issn,""),"",""),new Promise(ok=>setTimeout(()=>ok({status:0}),20000))]);
+      out[n]=r.status===200?rdJournalProfile(JSON.parse(r.text),n,!!issn):null; }catch(e){ out[n]=null; } };
+  for(let i=0;i<names.length;i+=5) await Promise.all(names.slice(i,i+5).map(one));
+  return out;
+}
+async function aiRun(mode){
+  const p=paperById(AIU.paper), kind=aiKind(p), journal=(AIU.journal||"").trim(), extra=(AIU.extra||"").trim();
+  if((kind==="fit"||kind==="cover")&&!journal) return toast("Type the journal name first");
+  if(kind==="ask"&&!extra) return toast("Type your question first");
+  if(mode==="here"&&!GS.url) return toast("Connect your Google Sheet first (More → Google Sheets sync), or use Ask in Gemini app");
+  const approach=p?(p.approach||rdGuessApproach(p)):"";
+  const subs=p?subsOf(p.id).slice().sort((a,b)=>(a.submitted||"~").localeCompare(b.submitted||"~")).map(s=>({journal:s.journal,abdc:abdcOf(s.journal),status:s.status,submitted:s.submitted,decided:s.decided,dtype:s.dtype||"",notes:s.notes||""})):[];
+  let candidates=[];
+  if(p&&kind!=="cover"){
+    const tried=new Set(subs.map(x=>normJ(x.journal)));
+    const own=rdShortlist(p).filter(n=>!tried.has(normJ(n))).slice(0,6).map(n=>{ const j=rdLookup(window.RD_ABDC||[],n); return {title:j?j[0]:n,grade:j?j[1]:"",publisher:j?j[3]:"",mine:true}; });
+    const seen=new Set(own.map(c=>normJ(c.title)));
+    candidates=own.concat(rdSuggest({key:p.key,title:p.title},subs,window.RD_ABDC||[],12).filter(j=>!seen.has(normJ(j.title))).slice(0,14-own.length).map(j=>({title:j.title,grade:j.grade,publisher:j.publisher})));
+  }
+  const names=(kind==="ask"?[]:candidates.map(c=>c.title)).concat(journal&&kind!=="cover"?[journal]:[]);
+  let profiles={};
+  if(names.length){ aiSetBusy("Checking what "+names.length+" journal"+(names.length>1?"s":"")+" published recently (Crossref)…"); profiles=await aiProfiles(names); }
+  const prompt=rdAiPrompt(kind,{paper:p,approach,subs,candidates,profiles,journal,journalAbdc:journal?abdcOf(journal):"",extra});
+  const meta={id:uid("ai"),paper:p?p.key:"",approach,kind,journal,question:extra};
+  if(mode==="gemini"){
+    copyOut(prompt); aiAwait(Object.assign({prompt},meta)); AIU.paste=""; aiSetBusy("");
+    openBrowser("https://gemini.google.com/app"); toast("Question copied: paste it into Gemini");
+    return;
+  }
+  aiSetBusy("Asking Gemini… (10–40 seconds)");
+  try{
+    const r=await httpCall("POST",GS.url,"",JSON.stringify({ask:Object.assign({prompt},meta)}));
+    let j=null; try{ j=JSON.parse(r.text); }catch(e){}
+    if(!j) throw new Error(r.status===0?"No connection":"Unexpected reply ("+r.status+"). Did you deploy the new script version?");
+    if(!j.ok) throw new Error(j.error||"No answer");
+    aiAdd(Object.assign({},j.entry,{prompt,sent:true}));
+    AIU.extra=""; aiSetBusy(""); toast("Answer ready ✓");
+  }catch(err){ aiSetBusy(""); alert("Couldn't get an answer: "+err.message); }
+}
+function aiSavePasted(){
+  const t=(($("#aipaste")||{}).value||AIU.paste||"").trim(), aw=AIU.await;
+  if(!aw) return; if(!t) return toast("Paste Gemini's answer first");
+  aiAdd(Object.assign({},aw,{at:new Date().toISOString(),answer:t,by:"Gemini app",sent:false}));
+  aiAwait(null); AIU.paste=""; AIU.extra=""; render(); gsSchedule(); toast("Answer saved");
+}
+
 /* ---------- restore on a new phone / after reinstalling ---------- */
 function restoreLink(){ return "rdsk://connect?url="+encodeURIComponent(GS.url); }
 function restoreFromLink(t){
@@ -1216,7 +1355,7 @@ try{ Object.assign(GS, JSON.parse(localStorage.getItem(GS_KEY)||"{}")); }catch(e
 function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catch(e){} }
 // change tracking: each paper/submission gets mod = time of its last local change
 let H=null, trackPaused=false, gsEditCount=0;
-const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes]);
+const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes].concat(p.approach?[p.approach]:[]));
 const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:"",s.dtype||""]);
 function baseline(){ H={}; S.papers.forEach(p=>H[p.id]=sigP(p)); S.subs.forEach(x=>H[x.id]=sigS(x)); }
 function trackChanges(){
@@ -1234,9 +1373,9 @@ function gsSchedule(){ if(!GS.url||!GS.auto) return; clearTimeout(gsTimer); gsTi
 function gsPayload(mode){
   const pk=id=>(paperById(id)||{}).key||"";
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
-  const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,mod:mode==="overwrite"?now:(p.mod||0)}));
+  const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,approach:p.approach||"",mod:mode==="overwrite"?now:(p.mod||0)}));
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
-  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
+  return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),aiLog:(S.ai||[]).filter(x=>!x.sent).map(aiPlainEntry),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
       settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false}}};
 }
@@ -1257,6 +1396,7 @@ async function gsSync(mode,manual){
     }
     if(!fresh&&gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
     gsApply(j);
+    (S.ai||[]).forEach(x=>{ if((body.aiLog||[]).some(y=>y.id===x.id)) x.sent=true; }); aiMerge(j.ai);
     GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
     GS.savedInsights=(GS.savedInsights||[]).filter(d=>!(body.savedInsights||[]).includes(d));
     const sentRes=(body.resolved||[]).map(x=>x.id); GS.resolved=(GS.resolved||[]).filter(x=>!sentRes.includes(x.id)); GS.emailDecisions=(GS.emailDecisions||[]).filter(x=>!sentRes.includes(x.id));
@@ -1270,7 +1410,8 @@ function gsApply(j){
   const oldS={}; S.subs.forEach(x=>oldS[x.id]=x);
   const oldByKey={}; S.papers.forEach(p=>oldByKey[p.key]=p);
   const created=[];
-  const papers=j.papers.map(p=>({id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type||"Journal article",override:p.override,notes:p.notes,syncedKey:p.key}));
+  const papers=j.papers.map(p=>({id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type||"Journal article",override:p.override,notes:p.notes,syncedKey:p.key,
+    approach:p.approach!==undefined?p.approach:((oldByKey[p.key]||{}).approach||"")}));
   const byKey={}; papers.forEach(p=>byKey[p.key]=p.id);
   const subs=j.subs.map(r=>{
     let pid=byKey[r.paper];
@@ -1368,7 +1509,7 @@ const httpWaiters={}; let httpSeq=0;
 window.rdHttpDone=(id,status,text)=>{ const w=httpWaiters[id]; delete httpWaiters[id]; if(w) w({status,text}); };
 function httpCall(method,url,token,body){
   if(window.Android && Android.httpAsync) return new Promise(res=>{ const id="h"+(++httpSeq); httpWaiters[id]=res; Android.httpAsync(id,method,url,token,body||""); });
-  return fetch(url,{method,headers:{"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},body:body||undefined,cache:"no-store"})
+  return fetch(url,{method,headers:token?{"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}:{},body:body||undefined,cache:"no-store"})
     .then(async r=>({status:r.status,text:await r.text()}),e=>({status:0,text:JSON.stringify({message:"Network error: "+e.message})}));
 }
 async function ghApi(method, path, body){

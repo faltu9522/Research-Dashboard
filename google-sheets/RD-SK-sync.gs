@@ -22,13 +22,13 @@
  */
 
 var PAPER_COLS = { key: /^paper/i, title: /^(current |full )?title$/i, authors: /^authors?$/i, type: /^type$/i,
-  override: /^override/i, notes: /^notes?$/i, suggest: /^suggested next/i, id: /^app id$/i, updated: /^updated$/i };
+  override: /^override/i, notes: /^notes?$/i, suggest: /^suggested next/i, id: /^app id$/i, updated: /^updated$/i, approach: /^approach$/i };
 var SUB_COLS = { paper: /^paper$/i, journal: /^journal$/i, abdc: /^abdc/i, rating: /rating|index/i, status: /^status$/i,
   submitted: /^(date submitted|date of submission)/i, decided: /^date of decision/i, notes: /^notes?$/i,
   titleUsed: /^title used/i, msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i,
   dtype: /^decision type/i, id: /^app id$/i, updated: /^updated$/i };
 var JOURNAL_COLS = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login link/i, email: /email/i };
-var ADD_PAPER = { suggest: 'Suggested next journals', id: 'App ID', updated: 'Updated' };
+var ADD_PAPER = { suggest: 'Suggested next journals', id: 'App ID', updated: 'Updated', approach: 'Approach' };
 var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: 'Status checked', dtype: 'Decision type', id: 'App ID', updated: 'Updated' };
 // Emails are read only from this date on, and submissions already decided before it are never changed.
 // (Change it with File → Project properties → Script properties: EMAIL_FROM_DATE = yyyy-mm-dd.)
@@ -47,7 +47,7 @@ function doGet() { return out(handle({})); }
 function doPost(e) {
   var body = {};
   try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) {}
-  return out(handle(body));
+  return out(body.ask ? aiAsk(body.ask) : handle(body));
 }
 
 function onOpen() {
@@ -102,7 +102,7 @@ function replaceData(d, keepHistory) {
     var ps = ss.getSheetByName('Papers'), subsSh = ss.getSheetByName('Submissions');
     var P = cols(ps, PAPER_COLS, ADD_PAPER), S = cols(subsSh, SUB_COLS, ADD_SUB);
     var pb = block(ps, P), sb = block(subsSh, S);
-    var pf = ['key', 'title', 'authors', 'type', 'override', 'notes', 'suggest', 'id', 'updated'];
+    var pf = ['key', 'title', 'authors', 'type', 'override', 'notes', 'suggest', 'id', 'updated', 'approach'];
     var sf = ['paper', 'journal', 'rating', 'status', 'submitted', 'decided', 'notes', 'titleUsed', 'msid', 'live', 'liveAt', 'dtype', 'id', 'updated'];
     var blank = function (b, C, fields, row) { fields.forEach(function (f) { if (C[f]) { b.v[row][C[f] - 1] = ''; b.f[row][C[f] - 1] = ''; } }); };
     var at = function (b, i) { while (b.v.length <= i) freeRow(b, function () { return false; }, -1); return b.v[i]; };
@@ -242,6 +242,7 @@ function handle(body) {
       var row = pb.v[i], old = str(g(row, P, 'key'));
       put(row, P, 'key', p.key); put(row, P, 'title', p.title || ''); put(row, P, 'authors', p.authors || '');
       put(row, P, 'type', p.type || ''); put(row, P, 'override', p.override || ''); put(row, P, 'notes', p.notes || '');
+      if (p.approach !== undefined) put(row, P, 'approach', p.approach || '');
       put(row, P, 'id', p.id); put(row, P, 'updated', new Date(p.mod || Date.now()));
       if (old && old !== p.key) sb.v.forEach(function (r) { if (str(g(r, S, 'paper')) === old) put(r, S, 'paper', p.key); });
     });
@@ -260,7 +261,7 @@ function handle(body) {
     if (body.emailDecisions) applyEmailDecisions(body.emailDecisions, sb, S, ss);
     (body.deleted || []).forEach(function (id) {
       var i = find(pb, P, id, null);
-      if (i >= 0) ['key', 'title', 'authors', 'type', 'override', 'notes', 'suggest', 'id', 'updated'].forEach(function (f) { put(pb.v[i], P, f, ''); });
+      if (i >= 0) ['key', 'title', 'authors', 'type', 'override', 'notes', 'suggest', 'id', 'updated', 'approach'].forEach(function (f) { put(pb.v[i], P, f, ''); });
       i = find(sb, S, id, null);
       if (i >= 0) ['paper', 'journal', 'rating', 'status', 'submitted', 'decided', 'notes', 'titleUsed', 'msid', 'live', 'liveAt', 'dtype', 'id', 'updated']
         .forEach(function (f) { put(sb.v[i], S, f, ''); });
@@ -290,13 +291,15 @@ function handle(body) {
     var app = appData(ss, body.app);
     var pending = emailQueue(ss, body.resolved || []);
     var insights = insightRows(ss, body.savedInsights || []);
+    if (body.aiLog && body.aiLog.length) aiLogAdd(ss, body.aiLog);
+    var ai = aiRows(ss);
 
     // 5. Send everything back.
     return {
-      ok: true, now: Date.now(), epoch: epoch, sheet: ss.getName(), app: app, pending: pending, insights: insights,
+      ok: true, now: Date.now(), epoch: epoch, sheet: ss.getName(), app: app, ai: ai, pending: pending, insights: insights,
       papers: pb.v.filter(function (r) { return str(g(r, P, 'key')); }).map(function (r) {
         return { id: str(g(r, P, 'id')), key: str(g(r, P, 'key')), title: str(g(r, P, 'title')), authors: str(g(r, P, 'authors')),
-                 type: str(g(r, P, 'type')), override: str(g(r, P, 'override')), notes: str(g(r, P, 'notes')) };
+                 type: str(g(r, P, 'type')), override: str(g(r, P, 'override')), notes: str(g(r, P, 'notes')), approach: str(g(r, P, 'approach')) };
       }),
       subs: sb.v.filter(isSub).map(function (r) {
         return { id: str(g(r, S, 'id')), paper: str(g(r, S, 'paper')), journal: str(g(r, S, 'journal')), rating: str(g(r, S, 'rating')),
@@ -683,6 +686,89 @@ function applyEmailDecisions(list, sb, S, ss) {
   var rg = dl.getRange(2, 1, dl.getLastRow() - 1, DECISION_HEAD.length), v = rg.getValues();
   list.forEach(function (x) { v.forEach(function (r) { if (str(r[9]) === x.id) { r[1] = x.paper || r[1]; r[2] = x.journal || r[2]; r[3] = x.status || r[3]; r[4] = x.dtype || r[4]; } }); });
   rg.setValues(v);
+}
+
+// ---------- Ask AI (the app's AI tab): answers with your Gemini key (free) or Claude key, logged on the 'AI chat' tab ----------
+var AI_SHEET = 'AI chat';
+var AI_HEAD = ['Date', 'Paper', 'Approach', 'Question', 'Journal', 'Details', 'Answer', 'By', 'ID'];
+
+/** One question from the app: {id, prompt, paper, approach, kind, journal, question}. The prompt is built on the phone. */
+function aiAsk(a) {
+  var props = PropertiesService.getScriptProperties(), gKey = props.getProperty('GEMINI_API_KEY'), cKey = props.getProperty('CLAUDE_API_KEY');
+  if (!gKey && !cKey) return { ok: false, error: "No AI key in the sheet yet. In the Google Sheet: RD SK menu → Set free Gemini API key." };
+  var prompt = String(a.prompt || '').slice(0, 60000), r = null, err = '';
+  if (gKey) { r = geminiText(gKey, prompt); if (r.error) { err = r.error; r = null; } }
+  if (!r && cKey) { r = claudeText(cKey, prompt); if (r.error) { err = err || r.error; r = null; } }
+  if (!r) return { ok: false, error: err || 'No answer' };
+  var entry = { id: a.id || Utilities.getUuid(), at: new Date().toISOString(), paper: a.paper || '', approach: a.approach || '', kind: a.kind || '',
+                journal: a.journal || '', question: a.question || '', answer: r.text, by: r.by, sources: r.sources || [] };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try { aiLogAdd(SpreadsheetApp.getActive(), [entry]); } finally { lock.releaseLock(); }
+  return { ok: true, entry: entry };
+}
+
+/** Gemini text answer; tries Google Search grounding first (fresher journal facts), then plain. {text, by, sources} or {error}. */
+function geminiText(key, prompt) {
+  var model = geminiModel(key), last = '';
+  var call = function (grounded) {
+    var body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } };
+    if (grounded) body.tools = [{ google_search: {} }];
+    return UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true, headers: { 'x-goog-api-key': key }, payload: JSON.stringify(body) });
+  };
+  var tries = [true, false];
+  for (var i = 0; i < tries.length; i++) {
+    try {
+      var r = call(tries[i]), code = r.getResponseCode();
+      if (code === 429) { last = "Gemini's free limit is used up for now. Try again in a minute (or tomorrow), or use “Ask in Gemini app”."; continue; }
+      if (code !== 200) { last = 'Gemini error ' + code; continue; }
+      var res = JSON.parse(r.getContentText()), c = (res.candidates || [])[0];
+      var text = c && c.content ? (c.content.parts || []).map(function (p) { return p.text || ''; }).join('').trim() : '';
+      if (!text) { last = 'Gemini gave no answer' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''); continue; }
+      var src = ((c.groundingMetadata || {}).groundingChunks || []).map(function (g) { return g.web ? { title: g.web.title || '', url: g.web.uri } : null; })
+        .filter(function (x) { return x && x.url; }).slice(0, 8);
+      return { text: text, by: 'Gemini (' + model + (tries[i] ? ', with Google Search' : '') + ')', sources: src };
+    } catch (e) { last = String(e && e.message || e); }
+  }
+  return { error: last };
+}
+
+function claudeText(key, prompt) {
+  try {
+    var r = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
+      payload: JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 8000, fallbacks: 'default', output_config: { effort: 'low' },
+        messages: [{ role: 'user', content: prompt }] }) });
+    if (r.getResponseCode() !== 200) return { error: 'Claude error ' + r.getResponseCode() };
+    var msg = JSON.parse(r.getContentText());
+    if (msg.stop_reason === 'refusal') return { error: 'Claude declined to answer' };
+    var text = (msg.content || []).filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('').trim();
+    return text ? { text: text, by: 'Claude', sources: [] } : { error: 'Claude gave no answer' };
+  } catch (e) { return { error: String(e && e.message || e) }; }
+}
+
+/** Adds answers to the 'AI chat' tab (skips IDs already there). */
+function aiLogAdd(ss, list) {
+  var sh = logSheet(ss, AI_SHEET, AI_HEAD), have = {};
+  if (sh.getLastRow() > 1) sh.getRange(2, 9, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { have[str(r[0])] = 1; });
+  var rows = list.filter(function (e) { return e && e.id && e.answer && !have[e.id]; }).map(function (e) {
+    var src = (e.sources || []).map(function (x) { return '\n- ' + (x.title || 'source') + ': ' + x.url; }).join('');
+    return [new Date(e.at || Date.now()), e.paper || '', e.approach || '', e.kind || '', e.journal || '', e.question || '',
+            String(e.answer).slice(0, 45000) + (src ? '\n\nSources:' + src : ''), e.by || '', e.id];
+  });
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, AI_HEAD.length).setValues(rows);
+}
+
+/** The latest 100 answers, so a reinstalled app gets them back. */
+function aiRows(ss) {
+  var sh = ss.getSheetByName(AI_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var n = Math.min(sh.getLastRow() - 1, 100);
+  return sh.getRange(sh.getLastRow() - n + 1, 1, n, AI_HEAD.length).getValues().filter(function (r) { return str(r[8]) && str(r[6]); }).map(function (r) {
+    return { id: str(r[8]), at: r[0] instanceof Date ? r[0].toISOString() : str(r[0]), paper: str(r[1]), approach: str(r[2]), kind: str(r[3]),
+             journal: str(r[4]), question: str(r[5]), answer: str(r[6]), by: str(r[7]) };
+  });
 }
 
 // ---------- daily research insights (Crossref + the watch list; optional Claude-written ideas) ----------

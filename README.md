@@ -68,6 +68,13 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   with *Sync now*. *Load from GitHub* pulls the backup back onto a phone. Needs a fine-grained token limited
   to this repo with **Contents: Read and write**; the token stays on the phone and is never exported.
 
+- **Ask AI** (tab) – pick a paper and its approach (conceptual, literature review, empirical qualitative / quantitative /
+  mixed), then ask for fresh journal recommendations, where to go after the last rejection, whether a journal fits, a
+  cover letter, or anything else. RD SK adds the paper's full history, its shortlist, matching ABDC 2025 journals and what
+  each journal published recently (Crossref titles), so answers rest on real data. *Ask here* uses the sheet's free Gemini
+  key (Google Search grounding when available; Claude key as fallback) and logs answers on the sheet's *AI chat* tab;
+  *Ask in Gemini app* copies the question for the Gemini app (e.g. a Gemini Pro subscription) and lets you paste the
+  answer back. Answers come back after a reinstall with the restore link.
 - **Replace all data** (sheet menu *RD SK → Replace all papers and submissions with the Sheet 2 record*) – wipes
   Papers and Submissions and writes the clean record in `data/current-data.json` (made from Sheet 2 of
   SK_Research_Updates_2026.xlsx). Journals, ABDC list, email log, insights, settings, triggers and the web-app link

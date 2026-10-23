@@ -301,7 +301,7 @@ public class MainActivity extends Activity {
                         c.setInstanceFollowRedirects(false);
                         c.setRequestMethod(verb);
                         c.setConnectTimeout(20000);
-                        c.setReadTimeout(60000);
+                        c.setReadTimeout(120000);
                         c.setUseCaches(false);
                         if (token != null && !token.isEmpty()) {
                             c.setRequestProperty("Authorization", "Bearer " + token);
