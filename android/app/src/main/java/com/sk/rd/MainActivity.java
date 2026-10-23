@@ -182,6 +182,40 @@ public class MainActivity extends Activity {
     }
 
     /** Opens a URL in the user's web browser itself, skipping apps (like GitHub's) that claim the link. */
+    private static final String GEMINI_APP = "com.google.android.apps.bard";
+
+    /**
+     * Hands a question to the Gemini app: shared straight in when the app accepts shared text, else the app is
+     * opened (the question is already on the clipboard), else gemini.google.com (the app opens it if it handles the link).
+     */
+    private String openGemini(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_TEXT, text);
+        send.setPackage(GEMINI_APP);
+        try {
+            startActivity(send);
+            return "sent";
+        } catch (ActivityNotFoundException | SecurityException e) {
+            // not a share target on this version: open the app instead
+        }
+        Intent launch = getPackageManager().getLaunchIntentForPackage(GEMINI_APP);
+        if (launch != null) {
+            try {
+                startActivity(launch);
+                return "app";
+            } catch (ActivityNotFoundException | SecurityException e) {
+                // fall through to the link
+            }
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://gemini.google.com/app")));
+        } catch (ActivityNotFoundException e) {
+            openExternal("https://gemini.google.com/app");
+        }
+        return "link";
+    }
+
     private void openInBrowser(String url) {
         Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/"));
         android.content.pm.ResolveInfo ri = getPackageManager().resolveActivity(probe, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
@@ -251,6 +285,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void openInBrowser(String url) {
             runOnUiThread(() -> MainActivity.this.openInBrowser(url));
+        }
+
+        @JavascriptInterface
+        public String openGemini(String text) {
+            return MainActivity.this.openGemini(text);
         }
 
         @JavascriptInterface

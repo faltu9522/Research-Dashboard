@@ -708,30 +708,44 @@ function aiAsk(a) {
   return { ok: true, entry: entry };
 }
 
-/** Gemini text answer; tries Google Search grounding first (fresher journal facts), then plain. {text, by, sources} or {error}. */
+/**
+ * Gemini text answer: Google Search grounding first (fresher journal facts), then plain. A busy model (500/503/504) is
+ * retried once and then the next free model is tried; a model out of free quota (429) is skipped. {text, by, sources} or {error}.
+ */
 function geminiText(key, prompt) {
-  var model = geminiModel(key), last = '';
-  var call = function (grounded) {
+  var models = geminiModels(key).slice(0, 4), started = Date.now(), busy = 0, quota = 0, last = '';
+  var call = function (model, grounded) {
     var body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } };
     if (grounded) body.tools = [{ google_search: {} }];
     return UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true, headers: { 'x-goog-api-key': key }, payload: JSON.stringify(body) });
   };
-  var tries = [true, false];
-  for (var i = 0; i < tries.length; i++) {
-    try {
-      var r = call(tries[i]), code = r.getResponseCode();
-      if (code === 429) { last = "Gemini's free limit is used up for now. Try again in a minute (or tomorrow), or use “Ask in Gemini app”."; continue; }
-      if (code !== 200) { last = 'Gemini error ' + code; continue; }
-      var res = JSON.parse(r.getContentText()), c = (res.candidates || [])[0];
-      var text = c && c.content ? (c.content.parts || []).map(function (p) { return p.text || ''; }).join('').trim() : '';
-      if (!text) { last = 'Gemini gave no answer' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''); continue; }
-      var src = ((c.groundingMetadata || {}).groundingChunks || []).map(function (g) { return g.web ? { title: g.web.title || '', url: g.web.uri } : null; })
-        .filter(function (x) { return x && x.url; }).slice(0, 8);
-      return { text: text, by: 'Gemini (' + model + (tries[i] ? ', with Google Search' : '') + ')', sources: src };
-    } catch (e) { last = String(e && e.message || e); }
+  for (var m = 0; m < models.length; m++) {
+    var plan = [true, false, false]; // grounded, plain, plain again after a pause if the model was busy
+    for (var k = 0; k < plan.length; k++) {
+      if (Date.now() - started > 85000) return { error: geminiErr(busy, quota, last) };
+      if (k === 2 && !busy) break;
+      try {
+        var r = call(models[m], plan[k]), code = r.getResponseCode();
+        if (code === 429) { quota++; break; }                                  // this model's free quota is used up
+        if (code === 500 || code === 503 || code === 504) { busy++; Utilities.sleep(k === 1 ? 2500 : 800); continue; }
+        if (code === 404) break;                                               // model not available to this key
+        if (code !== 200) { last = 'Gemini error ' + code; continue; }
+        var res = JSON.parse(r.getContentText()), c = (res.candidates || [])[0];
+        var text = c && c.content ? (c.content.parts || []).map(function (p) { return p.text || ''; }).join('').trim() : '';
+        if (!text) { last = 'Gemini gave no answer' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''); continue; }
+        var src = ((c.groundingMetadata || {}).groundingChunks || []).map(function (g) { return g.web ? { title: g.web.title || '', url: g.web.uri } : null; })
+          .filter(function (x) { return x && x.url; }).slice(0, 8);
+        return { text: text, by: 'Gemini (' + models[m] + (plan[k] ? ', with Google Search' : '') + ')', sources: src };
+      } catch (e) { last = String(e && e.message || e); }
+    }
   }
-  return { error: last };
+  return { error: geminiErr(busy, quota, last) };
+}
+function geminiErr(busy, quota, last) {
+  if (busy) return "Google's free Gemini models are busy right now (error 503), even after retrying. Try again in a few minutes, or use “Ask in Gemini app”.";
+  if (quota) return "Gemini's free limit is used up for now. Try again later (it resets daily), or use “Ask in Gemini app”.";
+  return last || 'Gemini gave no answer';
 }
 
 function claudeText(key, prompt) {
@@ -872,25 +886,27 @@ function ideasFrom(json, shortlist) {
   return picked.length >= 3 ? picked : null;
 }
 
-/** Free Gemini model: a known free Flash model the key can use (newest first), else the newest Flash model it lists. */
+/** Free Gemini models the key can use, best first: known free Flash models, then any other Flash model it lists. */
 var GEMINI_FREE = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
-function geminiModel(key) {
+function geminiModels(key) {
   var fixed = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL');
-  if (fixed) return fixed;
+  if (fixed) return [fixed];
   try {
     var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key }, muteHttpExceptions: true });
-    if (r.getResponseCode() !== 200) return GEMINI_FREE[0];
+    if (r.getResponseCode() !== 200) return GEMINI_FREE.slice();
     var names = (JSON.parse(r.getContentText()).models || []).filter(function (m) {
       return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
     }).map(function (m) { return String(m.name).replace(/^models\//, ''); });
-    for (var i = 0; i < GEMINI_FREE.length; i++) if (names.indexOf(GEMINI_FREE[i]) >= 0) return GEMINI_FREE[i];
-    var flash = names.filter(function (n) { return /^gemini-[\d.]+-flash(-lite)?$/.test(n); }).sort(function (a, b) {
+    var known = GEMINI_FREE.filter(function (n) { return names.indexOf(n) >= 0; });
+    var flash = names.filter(function (n) { return /^gemini-[\d.]+-flash(-lite)?$/.test(n) && known.indexOf(n) < 0; }).sort(function (a, b) {
       return parseFloat(b.split('-')[1]) - parseFloat(a.split('-')[1]) || a.length - b.length; });
-    return flash[0] || GEMINI_FREE[0];
+    var all = known.concat(flash);
+    return all.length ? all : GEMINI_FREE.slice();
   } catch (e) {
-    return GEMINI_FREE[0];
+    return GEMINI_FREE.slice();
   }
 }
+function geminiModel(key) { return geminiModels(key)[0]; }
 
 /** Gemini (free tier) picks the 5 most useful of the shortlist and writes the ideas. Null on any problem (e.g. daily quota). */
 function geminiIdeas(key, shortlist, papers) {

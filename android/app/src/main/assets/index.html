@@ -448,7 +448,7 @@ document.addEventListener("click",e=>{
     case "aiurl": e.preventDefault(); openBrowser(a.dataset.url); break;
     case "aicopy": { const x=aiEntry(a.dataset.id); if(x) copyOut(aiPlain(x)); break; }
     case "aishare": { const x=aiEntry(a.dataset.id); if(x) shareText(aiPlain(x)); break; }
-    case "aicont": { const x=aiEntry(a.dataset.id); if(x){ copyOut((x.prompt||"")+(x.prompt?"\n\n---\nEarlier answer:\n":"")+x.answer+"\n\n---\nFollow-up: "); openBrowser("https://gemini.google.com/app"); toast("Copied: paste into Gemini and add your follow-up"); } break; }
+    case "aicont": { const x=aiEntry(a.dataset.id); if(x){ toGemini((x.prompt||"")+(x.prompt?"\n\n---\nEarlier answer:\n":"")+x.answer+"\n\n---\nFollow-up: "); } break; }
     case "aidel": if(confirm("Remove this answer from the phone? (It stays on the sheet's AI chat tab.)")){ S.aiHidden=(S.aiHidden||[]).concat([a.dataset.id]); S.ai=(S.ai||[]).filter(x=>x.id!==a.dataset.id); persist(false); render(); } break;
     case "aipastein": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) { $("#aipaste").value=c; AIU.paste=c; } else toast("Long-press the box and choose Paste"); break; }
     case "aipastesave": aiSavePasted(); break;
@@ -901,8 +901,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.0", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.1", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.1","23 Oct 2026",["Ask in Gemini app now opens the installed Gemini app (the question is passed straight in, and kept on the clipboard), not the browser","Ask here: when a Gemini model is busy (error 503) or out of free quota, RD SK retries and tries the other free Gemini models"]],
   ["3.0","23 Oct 2026",["Fixed: the journal suggestions list was see-through in dark mode; it is now a clear list under the box, with ABDC ratings and your own journals first"]],
   ["2.9","23 Oct 2026",["New Ask AI tab: fresh journal recommendations, where to go after a rejection, journal fit checks, cover letters and your own questions, for conceptual, literature-review and empirical papers","Answers use your paper's full history, the ABDC 2025 list and what each journal actually published recently (Crossref)","Ask here with your sheet's free Gemini key, or copy the question into the Gemini app to use your Gemini Pro subscription; answers are kept with the paper and on the sheet's AI chat tab","Papers have an Approach field (conceptual, literature review, empirical qualitative / quantitative / mixed)"]],
   ["2.8","22 Oct 2026",["Data replaced with the clean Sheet 2 record (one entry per paper, current submissions and planned journals; old titles removed)","When the sheet's data is replaced (sheet menu RD SK → Replace all…), the phone drops its old copy on the next sync instead of sending it back"]],
@@ -1325,8 +1326,8 @@ async function aiRun(mode){
   const prompt=rdAiPrompt(kind,{paper:p,approach,subs,candidates,profiles,journal,journalAbdc:journal?abdcOf(journal):"",extra});
   const meta={id:uid("ai"),paper:p?p.key:"",approach,kind,journal,question:extra};
   if(mode==="gemini"){
-    copyOut(prompt); aiAwait(Object.assign({prompt},meta)); AIU.paste=""; aiSetBusy("");
-    openBrowser("https://gemini.google.com/app"); toast("Question copied: paste it into Gemini");
+    aiAwait(Object.assign({prompt},meta)); AIU.paste=""; aiSetBusy("");
+    toGemini(prompt);
     return;
   }
   aiSetBusy("Asking Gemini… (10–40 seconds)");
@@ -1338,6 +1339,13 @@ async function aiRun(mode){
     aiAdd(Object.assign({},j.entry,{prompt,sent:true}));
     AIU.extra=""; aiSetBusy(""); toast("Answer ready ✓");
   }catch(err){ aiSetBusy(""); alert("Couldn't get an answer: "+err.message); }
+}
+/** Opens the Gemini app with the question (shared straight in where the app allows it; it is on the clipboard too). */
+function toGemini(text){
+  if(window.Android&&Android.copyText) Android.copyText(text); else if(navigator.clipboard) navigator.clipboard.writeText(text);
+  const how=(window.Android&&Android.openGemini)?Android.openGemini(text):(openBrowser("https://gemini.google.com/app"),"link");
+  toast(how==="sent"?"Sent to the Gemini app: tap send there, then copy its answer back here":
+        how==="app"?"Gemini opened: paste the question (it's on your clipboard)":"Gemini app not found: opened Gemini on the web; paste the question there");
 }
 function aiSavePasted(){
   const t=(($("#aipaste")||{}).value||AIU.paste||"").trim(), aw=AIU.await;
