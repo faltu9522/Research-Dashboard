@@ -467,6 +467,7 @@ document.addEventListener("click",e=>{
     case "gssync": gsSync("normal",true); break;
     case "gsforget": if(confirm("Disconnect Google Sheets? Your data stays on the phone and in the sheet.")){ GS.url=""; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
     case "gsignin": googleSignIn(); break;
+    case "copysetup": copyOut("RD SK Google sign-in setup\nPackage name: com.sk.rd\nSHA-1: A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3\nScope: https://www.googleapis.com/auth/drive.file\nAPIs: Google Sheets API, Google Drive API"); break;
     case "gsignout": if(confirm("Sign out of Google? Your data stays on the phone and in your sheet; sign in again any time to carry on.")){ if(window.Android&&Android.googleSignOut) Android.googleSignOut(); gTok={token:"",at:0}; GS.drive={}; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
     case "gopen": openBrowser("https://docs.google.com/spreadsheets/d/"+GS.drive.id+"/edit"); break;
     case "gkeysave": { const k=($("#gkey")||{}).value||""; GS.gemini=k.trim(); gsStore(); gsSchedule(); render(); toast(GS.gemini?"Gemini key saved":"Gemini key removed"); break; }
@@ -911,8 +912,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.2", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.3", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.3","27 Oct 2026",["Sign in with Google: when Google doesn't finish sign-in, RD SK now says why (Google's error code) and lists the Google Cloud settings to check, instead of doing nothing"]],
   ["3.2","27 Oct 2026",["Sign in with Google: RD SK creates and syncs its own master sheet in your Google Drive (no scripts, no web-app link); after a reinstall just sign in","Ask AI uses your Gemini key straight from the phone","Email import and daily insights: a small helper script you install once in the sheet (no deployment)"]],
   ["3.1","23 Oct 2026",["Ask in Gemini app now opens the installed Gemini app (the question is passed straight in, and kept on the clipboard), not the browser","Ask here: when a Gemini model is busy (error 503) or out of free quota, RD SK retries and tries the other free Gemini models"]],
   ["3.0","23 Oct 2026",["Fixed: the journal suggestions list was see-through in dark mode; it is now a clear list under the box, with ABDC ratings and your own journals first"]],
@@ -1383,7 +1385,7 @@ async function googleToken(interactive){
   if(window.RDSK_TEST_GOOGLE){ gTok={token:"test-token",at:Date.now()}; return gTok.token; }
   if(!(window.Android&&Android.googleToken)) throw new Error("Google sign-in works in the phone app");
   const r=await gCall(id=>Android.googleToken(id,!!interactive));
-  if(!r.ok){ if(r.val==="consent-needed"||r.val==="not-signed-in") throw new Error("Please sign in with Google again (More → Google account)"); throw new Error(r.val==="cancelled"?"Sign-in cancelled":r.val); }
+  if(!r.ok){ if(r.val==="consent-needed"||r.val==="not-signed-in") throw new Error("Please sign in with Google again (More → Google account)"); throw new Error(r.val==="cancelled"||r.val==="closed"?"Sign-in cancelled":String(r.val).replace(/^setup\|/,"")); }
   gTok={token:r.val,at:Date.now()}; return r.val;
 }
 function googleErr(st,j){
@@ -1419,6 +1421,23 @@ async function gCreateSheet(title){
   if(r.status>=400||!j.id) throw new Error(googleErr(r.status,j));
   return j;
 }
+/** Explains a failed sign-in instead of failing silently; setup problems list exactly what Google needs to match. */
+function signInProblem(val,email){
+  if(val==="cancelled") return toast("Sign-in cancelled");
+  const setup=/^setup\|/.test(val), closed=val==="closed", msg=String(val).replace(/^setup\|/,"");
+  openSheet(`<h3>Sign-in didn't finish <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m" style="color:var(--ink)">${closed?"Google's permission screen closed without giving RD SK access. If you didn't close it yourself, Google most likely doesn't recognise the app yet.":esc(msg)}</div>
+    ${setup||closed?`<div class="card" style="background:var(--accent-soft);border:0;margin-top:10px"><div class="t">Check in Google Cloud (console.cloud.google.com), same project for all of these</div>
+      <ol class="m" style="color:var(--ink);padding-left:20px;margin:6px 0">
+        <li><b>APIs &amp; Services → Library</b>: Google Sheets API and Google Drive API are <b>enabled</b>.</li>
+        <li><b>Google Auth Platform → Branding</b>: app name and emails saved.</li>
+        <li><b>Audience</b>: <b>In production</b>, or in Testing with <b>${esc(email||"your account")}</b> added as a test user.</li>
+        <li><b>Data access</b>: the scope <code>.../auth/drive.file</code> is listed.</li>
+        <li><b>Clients</b>: an <b>Android</b> client with package name <code>com.sk.rd</code> and SHA-1<br><code style="font-size:11.5px">A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3</code></li>
+      </ol>
+      <div class="m">Changes can take 5–10 minutes to reach your phone. Then tap Sign in with Google again.</div></div>`:""}
+    <div class="actions"><button data-act="copysetup">Copy these details</button><button class="primary" onclick="closeSheet();googleSignIn()">Try again</button></div>`);
+}
 async function googleSignIn(){
   try{
     let email;
@@ -1426,7 +1445,7 @@ async function googleSignIn(){
     else {
       if(!(window.Android&&Android.googleChooseAccount)) return toast("Google sign-in works in the phone app");
       const r=await gCall(id=>Android.googleChooseAccount(id));
-      if(!r.ok){ if(r.val!=="cancelled") alert("Google sign-in didn't work: "+r.val); return; }
+      if(!r.ok) return signInProblem(r.val,r.email);
       email=r.email; gTok={token:r.val,at:Date.now()};
     }
     toast("Signed in as "+email+" · looking for your RD SK sheet…");

@@ -187,11 +187,19 @@ public class MainActivity extends Activity {
                 .addOnFailureListener(e -> googleDone(id, false, googleError(e)));
     }
 
+    /** Google's reason in words, with its status code, so a setup problem is never silent. */
     private static String googleError(Exception e) {
+        int code = e instanceof com.google.android.gms.common.api.ApiException
+                ? ((com.google.android.gms.common.api.ApiException) e).getStatusCode() : -1;
         String m = String.valueOf(e.getMessage());
-        if (m.contains("10:") || m.contains("DEVELOPER_ERROR"))
-            return "Google says this app isn't registered yet (developer error 10): check the Android OAuth client (package com.sk.rd and the SHA-1) in your Google Cloud project";
-        return m;
+        if (code == 16 || code == 12501) return "cancelled";
+        if (code == 10 || m.contains("DEVELOPER_ERROR"))
+            return "setup|Google doesn't recognise this app yet (error 10). In Google Cloud → Clients, the Android client needs package name com.sk.rd "
+                    + "and SHA-1 A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3, in the same project where the consent screen is set up.";
+        if (code == 7) return "No internet connection (error 7). Try again.";
+        if (code == 17 || code == 8)
+            return "setup|Google Play services couldn't finish sign-in (error " + code + "). Update Google Play services (Play Store), then try again.";
+        return "setup|Google sign-in failed (error " + code + "): " + m;
     }
 
     @Override
@@ -206,12 +214,17 @@ public class MainActivity extends Activity {
         }
         if (requestCode == GOOGLE_AUTH) {
             String id = pendingGoogle; pendingGoogle = null;
+            if (data == null) {
+                // the permission screen closed without any answer: almost always an incomplete Google Cloud setup
+                googleDone(id, false, resultCode == RESULT_OK ? "setup|Google sent no answer." : "closed");
+                return;
+            }
             try {
                 com.google.android.gms.auth.api.identity.AuthorizationResult r =
                         com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(data);
-                googleDone(id, r.getAccessToken() != null, r.getAccessToken() != null ? r.getAccessToken() : "cancelled");
+                googleDone(id, r.getAccessToken() != null, r.getAccessToken() != null ? r.getAccessToken() : "closed");
             } catch (Exception e) {
-                googleDone(id, false, resultCode == RESULT_OK ? googleError(e) : "cancelled");
+                googleDone(id, false, googleError(e));
             }
             return;
         }
