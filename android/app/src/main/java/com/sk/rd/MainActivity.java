@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 
 /** Hosts the offline dashboard (assets/index.html) in a WebView; data is kept in the WebView's localStorage. */
 public class MainActivity extends Activity {
-    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8;
+    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8, GOOGLE_AUTH_LEGACY = 9;
     private static final String SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
     private String pendingGoogle = null;
     private WebView web;
@@ -184,7 +184,39 @@ public class MainActivity extends Activity {
                         googleDone(id, true, res.getAccessToken());
                     }
                 })
-                .addOnFailureListener(e -> googleDone(id, false, googleError(e)));
+                .addOnFailureListener(e -> {
+                    String why = googleError(e);
+                    if ("cancelled".equals(why)) googleDone(id, false, why);
+                    else legacyToken(id, interactive, why);   // e.g. error 8: try Google's older token service, which names the problem
+                });
+    }
+
+    /** Google's long-standing token service (GoogleAuthUtil): a fallback that also explains setup problems by name. */
+    private void legacyToken(String id, boolean interactive, String firstError) {
+        String email = prefs().getString("account", "");
+        new Thread(() -> {
+            try {
+                String token = com.google.android.gms.auth.GoogleAuthUtil.getToken(this, new android.accounts.Account(email, "com.google"), "oauth2:" + SCOPE_DRIVE_FILE);
+                googleDone(id, true, token);
+            } catch (com.google.android.gms.auth.UserRecoverableAuthException ue) {
+                if (!interactive || ue.getIntent() == null) { googleDone(id, false, "consent-needed"); return; }
+                runOnUiThread(() -> {
+                    pendingGoogle = id;
+                    try { startActivityForResult(ue.getIntent(), GOOGLE_AUTH_LEGACY); }
+                    catch (ActivityNotFoundException x) { googleDone(id, false, firstError); }
+                });
+            } catch (com.google.android.gms.auth.GoogleAuthException ge) {
+                String m = String.valueOf(ge.getMessage());
+                if (m.contains("UNREGISTERED_ON_API_CONSOLE") || m.contains("INVALID_AUDIENCE") || m.contains("INVALID_CLIENT"))
+                    googleDone(id, false, "setup|Google says RD SK is not registered (" + m + "). In Google Cloud → Clients there must be an Android client with package name com.sk.rd "
+                            + "and SHA-1 A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3, and the consent screen must be set up in the same project.");
+                else googleDone(id, false, "setup|Google sign-in failed: " + m + " (" + firstError.replace("setup|", "") + ")");
+            } catch (java.io.IOException io) {
+                googleDone(id, false, "No connection to Google: " + io.getMessage());
+            } catch (Exception x) {
+                googleDone(id, false, firstError);
+            }
+        }).start();
     }
 
     /** Google's reason in words, with its status code, so a setup problem is never silent. */
@@ -198,7 +230,7 @@ public class MainActivity extends Activity {
                     + "and SHA-1 A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3, in the same project where the consent screen is set up.";
         if (code == 7) return "No internet connection (error 7). Try again.";
         if (code == 17 || code == 8)
-            return "setup|Google Play services couldn't finish sign-in (error " + code + "). Update Google Play services (Play Store), then try again.";
+            return "setup|Google Play services couldn't finish sign-in (error " + code + "): usually the Google Cloud setup below doesn't match yet.";
         return "setup|Google sign-in failed (error " + code + "): " + m;
     }
 
@@ -210,6 +242,12 @@ public class MainActivity extends Activity {
             if (name == null) { googleDone(id, false, "cancelled"); return; }
             prefs().edit().putString("account", name).apply();
             googleToken(id, true);
+            return;
+        }
+        if (requestCode == GOOGLE_AUTH_LEGACY) {
+            String id = pendingGoogle; pendingGoogle = null;
+            if (resultCode == RESULT_OK) legacyToken(id, false, "closed");
+            else googleDone(id, false, "closed");
             return;
         }
         if (requestCode == GOOGLE_AUTH) {
@@ -384,6 +422,11 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String googleAccount() { return prefs().getString("account", ""); }
+
+        @JavascriptInterface
+        public void googleClearToken(String token) {
+            new Thread(() -> { try { com.google.android.gms.auth.GoogleAuthUtil.clearToken(MainActivity.this, token); } catch (Exception e) { /* nothing cached */ } }).start();
+        }
 
         @JavascriptInterface
         public void googleSignOut() { prefs().edit().remove("account").apply(); }

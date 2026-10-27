@@ -912,8 +912,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.3", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.4", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.4","27 Oct 2026",["Google sign-in: if Google's newer sign-in service fails (e.g. error 8), RD SK tries Google's older token service, which works on more phones and names setup problems exactly"]],
   ["3.3","27 Oct 2026",["Sign in with Google: when Google doesn't finish sign-in, RD SK now says why (Google's error code) and lists the Google Cloud settings to check, instead of doing nothing"]],
   ["3.2","27 Oct 2026",["Sign in with Google: RD SK creates and syncs its own master sheet in your Google Drive (no scripts, no web-app link); after a reinstall just sign in","Ask AI uses your Gemini key straight from the phone","Email import and daily insights: a small helper script you install once in the sheet (no deployment)"]],
   ["3.1","23 Oct 2026",["Ask in Gemini app now opens the installed Gemini app (the question is passed straight in, and kept on the clipboard), not the browser","Ask here: when a Gemini model is busy (error 503) or out of free quota, RD SK retries and tries the other free Gemini models"]],
@@ -1399,7 +1400,7 @@ async function gApi(method,path,body,retry){
   const token=await googleToken(false);
   const url=/^https:/.test(path)?path:"https://sheets.googleapis.com/v4/"+path;
   const r=await httpCall(method,url,token,body?JSON.stringify(body):"");
-  if(r.status===401&&!retry){ gTok={token:"",at:0}; return gApi(method,path,body,true); }
+  if(r.status===401&&!retry){ if(window.Android&&Android.googleClearToken) Android.googleClearToken(token); gTok={token:"",at:0}; return gApi(method,path,body,true); }
   let j={}; try{ j=r.text?JSON.parse(r.text):{}; }catch(e){}
   if(r.status===0) throw new Error("No connection");
   if(r.status>=400) throw new Error(googleErr(r.status,j));
