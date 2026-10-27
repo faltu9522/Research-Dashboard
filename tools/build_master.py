@@ -105,6 +105,9 @@ def load_abdc(path):
 
 def main(seed_path, _new_sheet, abdc_path, portals_path, out_xlsx, out_seed):
     seed = json.loads(open(seed_path, encoding="utf-8").read().split("=", 1)[1].rstrip().rstrip(";"))
+    if _new_sheet == "--template":  # empty master for the app to create in Google Drive (it writes the data itself)
+        build(seed, {}, [], [], abdc_path, portals_path, out_xlsx, None)
+        return
     if _new_sheet.endswith(".json"):
         cur = json.load(open(_new_sheet, encoding="utf-8"))
         papers = {p["id"]: dict(p) for p in cur["papers"]}
@@ -250,7 +253,7 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
         for _ in range(spare):
             put_formulas(r)
             r += 1
-    for extra in range(30):  # more room at the bottom
+    for extra in range(30 if order else 400):  # more room at the bottom
         put_formulas(r)
         r += 1
     last = r - 1
@@ -278,7 +281,7 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
     pw = wb.create_sheet("Papers")
     header(pw, [("Paper", 34), ("Title", 60), ("Authors", 30), ("Type", 16), ("Override", 16), ("Notes", 40), ("Stage", 18),
                 ("Current journal", 34), ("Sent", 7), ("Rejections", 10), ("Next in queue", 34), ("Suggested next journals", 70),
-                ("App ID", 10), ("Updated", 16), ("wait rank", 6)])
+                ("App ID", 10), ("Updated", 16), ("wait rank", 6), ("Approach", 22)])
     pw.freeze_panes = "B2"
     for i, pid in enumerate(order, 2):
         p = papers[pid]
@@ -287,6 +290,8 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
             if v:
                 pw.cell(i, c, v)
         pw.cell(i, 12, suggestions.get(pid, ""))
+        if p.get("approach"):
+            pw.cell(i, 16, p["approach"])
         pw.cell(i, 13, p["id"])
     for i in range(2, 201):
         A = f"A{i}"
@@ -307,6 +312,8 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
     dv_t = DataValidation(type="list", formula1='"Journal article,EPW / short piece,Book chapter,Other"', allow_blank=True)
     pw.add_data_validation(dv_o); dv_o.add("E2:E200")
     pw.add_data_validation(dv_t); dv_t.add("D2:D200")
+    dv_a = DataValidation(type="list", formula1='"Conceptual,Literature review,Empirical – qualitative,Empirical – quantitative,Empirical – mixed methods"', allow_blank=True)
+    pw.add_data_validation(dv_a); dv_a.add("P2:P200")
 
     # Journals
     jw = wb.create_sheet("Journals")
@@ -414,7 +421,10 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
                                     "matching topic words, around the tier of the last journal). Refreshed on every app sync, or "
                                     "from the menu RD SK → Refresh suggested journals. Your own Planned queue always comes first."),
         ("Don't edit", "Grey/automatic columns (ABDC, Days) and the hidden columns (App ID, Updated, helpers) are managed for you."),
-        ("Phone app", "Connect this Google Sheet to RD SK (More → Google Sheets sync). Changes on either side appear on the other."),
+        ("Phone app", "RD SK keeps this sheet in sync: sign in with this Google account in the app (More → Google account). "
+                      "Changes on either side appear on the other. After reinstalling, just sign in again."),
+        ("Email import & insights", "Optional: Extensions → Apps Script, paste the RD SK helper script (copy it from the app: More → "
+                                    "Email import helper), save, reload this sheet, then use the RD SK menu."),
     ]
     for i, (a, b) in enumerate(tips, 3):
         hw.cell(i, 1, a).font = Font(bold=True)
@@ -422,6 +432,9 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
         hw.row_dimensions[i].height = 44
     wb.active = 0
     wb.save(out_xlsx)
+    if not out_seed:
+        print(f"template rows={last}")
+        return
 
     # app seed in the same shape the app uses
     out = {"version": 1, "settings": seed["settings"], "papers": [papers[pid] for pid in order], "subs": subs, "portals": {},

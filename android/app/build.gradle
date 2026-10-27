@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+dependencies {
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
+}
+
 android {
     namespace 'com.sk.rd'
     compileSdk 34
@@ -10,8 +14,8 @@ android {
         applicationId 'com.sk.rd'
         minSdk 24
         targetSdk 34
-        versionCode 22
-        versionName '3.1'
+        versionCode 23
+        versionName '3.2'
     }
 
     // A fixed signing key kept in the repo so every build can be installed over the previous one

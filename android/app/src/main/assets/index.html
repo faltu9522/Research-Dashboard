@@ -140,6 +140,7 @@ textarea.big{min-height:120px}
 <script src="emailparse.js"></script>
 <script src="watchlist.js"></script>
 <script src="aiassist.js"></script>
+<script src="gsheets.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -397,8 +398,12 @@ function viewMore(){
     </div>
     <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Data lives only on this phone, so save a backup now and then (and before uninstalling). Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
   </div>
-  <h2>Google Sheets sync</h2>
-  <div class="card">${gsCard()}</div>
+  <h2>Google account <small>your data in your own Google Drive</small></h2>
+  <div class="card">${googleCard()}</div>
+  ${gDirect()?`<h2>Email import &amp; daily insights <small>optional, install once</small></h2><div class="card">${helperCard()}</div>`:""}
+  <h2>Ask AI <small>free Gemini key</small></h2>
+  <div class="card">${geminiCard()}</div>
+  ${GS.url||!gDirect()?`<details class="card"><summary class="t">Older way: web-app link${GS.url?" (in use)":""}</summary><div style="margin-top:8px">${gsCard()}</div></details>`:""}
   <h2>Sync to GitHub</h2>
   <div class="card">${ghCard()}</div>
   <h2>Journal login links</h2>
@@ -461,6 +466,11 @@ document.addEventListener("click",e=>{
     case "gssharelink": shareText("RD SK restore link (tap on your phone after reinstalling RD SK; keep private):\n"+restoreLink()); break;
     case "gssync": gsSync("normal",true); break;
     case "gsforget": if(confirm("Disconnect Google Sheets? Your data stays on the phone and in the sheet.")){ GS.url=""; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
+    case "gsignin": googleSignIn(); break;
+    case "gsignout": if(confirm("Sign out of Google? Your data stays on the phone and in your sheet; sign in again any time to carry on.")){ if(window.Android&&Android.googleSignOut) Android.googleSignOut(); gTok={token:"",at:0}; GS.drive={}; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
+    case "gopen": openBrowser("https://docs.google.com/spreadsheets/d/"+GS.drive.id+"/edit"); break;
+    case "gkeysave": { const k=($("#gkey")||{}).value||""; GS.gemini=k.trim(); gsStore(); gsSchedule(); render(); toast(GS.gemini?"Gemini key saved":"Gemini key removed"); break; }
+    case "gkeyget": openBrowser("https://aistudio.google.com/apikey"); break;
     case "gspaste": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#gsurl").value=c.trim(); else toast("Long-press the box and choose Paste"); break; }
     case "setlink": e.stopPropagation(); setLinkSheet(s.journal); break;
     case "scanqr": scanSheet(); break;
@@ -745,7 +755,7 @@ $("#fileIn").onchange=async e=>{
     else next=fromWorkbook(await readWorkbook(await f.arrayBuffer()));
     if(!confirm(`Replace app data with ${next.papers.length} papers and ${next.subs.length} submissions from “${f.name}”?`)) return;
     next.portals=Object.assign({}, S.portals, next.portals||{}); next.settings=Object.assign({}, S.settings, next.settings||{});
-    S=next; trackPaused=true; persist(); trackPaused=false; baseline(); if(GS.url){ GS.lastSync=0; gsStore(); } render(); toast("Imported"+(GS.url?" · Google Sheet unchanged until you choose Sync now":""));
+    S=next; trackPaused=true; persist(); trackPaused=false; baseline(); if(gsOn()){ GS.lastSync=0; gsStore(); } render(); toast("Imported"+(gsOn()?" · Google Sheet unchanged until you choose Sync now":""));
   }catch(err){ alert("Import failed: "+err.message); }
 };
 function fromWorkbook(wb){
@@ -901,8 +911,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.1", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.2", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.2","27 Oct 2026",["Sign in with Google: RD SK creates and syncs its own master sheet in your Google Drive (no scripts, no web-app link); after a reinstall just sign in","Ask AI uses your Gemini key straight from the phone","Email import and daily insights: a small helper script you install once in the sheet (no deployment)"]],
   ["3.1","23 Oct 2026",["Ask in Gemini app now opens the installed Gemini app (the question is passed straight in, and kept on the clipboard), not the browser","Ask here: when a Gemini model is busy (error 503) or out of free quota, RD SK retries and tries the other free Gemini models"]],
   ["3.0","23 Oct 2026",["Fixed: the journal suggestions list was see-through in dark mode; it is now a clear list under the box, with ABDC ratings and your own journals first"]],
   ["2.9","23 Oct 2026",["New Ask AI tab: fresh journal recommendations, where to go after a rejection, journal fit checks, cover letters and your own questions, for conceptual, literature-review and empirical papers","Answers use your paper's full history, the ABDC 2025 list and what each journal actually published recently (Crossref)","Ask here with your sheet's free Gemini key, or copy the question into the Gemini app to use your Gemini Pro subscription; answers are kept with the paper and on the sheet's AI chat tab","Papers have an Approach field (conceptual, literature review, empirical qualitative / quantitative / mixed)"]],
@@ -940,7 +951,7 @@ function aboutCard(){
       ${info.android?`<dt>Device</dt><dd>${esc(info.device)} · Android ${esc(info.android)}</dd>`:""}
       ${info.webview?`<dt>WebView</dt><dd>${esc(info.webview)}</dd>`:""}
       <dt>Your data</dt><dd>${S.papers.length} papers · ${S.subs.length} submission rows · last change ${fmt(S.settings.lastUpdated)}</dd>
-      <dt>Google Sheets</dt><dd>${GS.url?(GS.lastText?"synced "+esc(GS.lastText):"connected"):"not set up"}</dd>
+      <dt>Google Sheets</dt><dd>${gsOn()?(GS.lastText?"synced "+esc(GS.lastText):"connected"):"not set up"}</dd>
       <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
     </dl>
     <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone. It leaves only when you export, share, or sync to your own GitHub repo. Journal passwords are typed into the journals' own pages and never stored by the app; the GitHub token stays on this phone.</div>
@@ -1204,7 +1215,7 @@ const pendingBanner=()=>(S.pending||[]).length?`<button class="banner" data-act=
 /* ---------- research insights (made daily by the Google Sheet; see RD SK menu there) ---------- */
 let insFilter="Latest";
 function insightCard(){
-  const list=S.insights||[]; if(!list.length&&!GS.url) return "";
+  const list=S.insights||[]; if(!list.length&&!gsOn()) return "";
   const last=list.reduce((m,x)=>x.date>m?x.date:m,""), today=list.filter(x=>x.date===last);
   return `<button class="card tap" data-go="insights" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px">
     <div class="t">💡 Research insights${last?` <span class="m">· ${fmt(last)}</span>`:""}</div>
@@ -1230,7 +1241,7 @@ function viewInsights(){
   return `<div class="row" style="margin-bottom:6px"><button class="ghost" data-go="home">← Dashboard</button></div>
     <div class="filters">${F.map(f=>`<button data-act="insfilter" data-f="${f}" class="${f===insFilter?"on":""}">${f}</button>`).join("")}</div>
     ${list.length?Object.keys(byDate).map(d=>`<h2>${fmt(d)} <small>${byDate[d].length} papers</small></h2>${byDate[d].map(insightItem).join("")}`).join("")
-      :`<div class="empty">${insFilter==="Saved"?"No saved ideas yet. Tap ☆ on an insight to keep it.":GS.url?"No insights yet. In your Google Sheet open the RD SK menu → “Turn on daily research insights”, then tap Sync now here.":"Connect your Google Sheet (More → Google Sheets sync) to get daily insights."}</div>`}
+      :`<div class="empty">${insFilter==="Saved"?"No saved ideas yet. Tap ☆ on an insight to keep it.":gsOn()?"No insights yet. In your Google Sheet open the RD SK menu → “Turn on daily research insights”, then tap Sync now here.":"Connect your Google Sheet (More → Google Sheets sync) to get daily insights."}</div>`}
     <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Ideas are written by the built-in method, or by Gemini (free key) / Claude (paid key) if you set one in the sheet's RD SK menu. They are prompts to think with: always read the paper and check the literature before building on them.</div>`;
 }
 
@@ -1269,7 +1280,7 @@ function viewAI(){
     <label for="aix">${kind==="ask"?"Your question":"Anything to add (optional)"}</label>
     <textarea id="aix" placeholder="${kind==="ask"?"e.g. Which ABDC A journals publish Blanchot-inspired organization theory?":"e.g. prefer journals with fast first decisions; it is 11,000 words"}">${esc(AIU.extra)}</textarea>
     <div class="actions"><button class="primary" data-act="aiask" ${AIU.busy?"disabled":""}>✦ Ask here</button><button data-act="aigemini" ${AIU.busy?"disabled":""}>Ask in Gemini app</button></div>
-    <div class="m" style="margin-top:8px">${AIU.busy?"⏳ "+esc(AIU.busy):GS.url?"<b>Ask here</b>: free, uses the Gemini key in your Google Sheet; the answer is saved. <b>Gemini app</b>: copies the question so you can paste it into Gemini (your Pro subscription).":"<b>Ask here</b> needs your Google Sheet connected (More → Google Sheets sync) with a Gemini key set in its RD SK menu. <b>Gemini app</b> works now."}</div>
+    <div class="m" style="margin-top:8px">${AIU.busy?"⏳ "+esc(AIU.busy):(GS.gemini||GS.url)?"<b>Ask here</b>: free, uses your Gemini key; the answer is saved. <b>Gemini app</b>: hands the question to the Gemini app (your Pro subscription).":"<b>Ask here</b> needs your free Gemini key (More → Ask AI). <b>Gemini app</b> works now."}</div>
   </div>
   ${aw?`<div class="card" style="border:2px solid var(--accent)"><div class="t">Paste Gemini's answer to keep it</div>
     <div class="m">${esc(RD_AI_KINDS[aw.kind])}${aw.paper?" · "+esc(aw.paper):""}. The question is on your clipboard: paste it into Gemini, then copy Gemini's answer and paste it here.</div>
@@ -1310,7 +1321,7 @@ async function aiRun(mode){
   const p=paperById(AIU.paper), kind=aiKind(p), journal=(AIU.journal||"").trim(), extra=(AIU.extra||"").trim();
   if((kind==="fit"||kind==="cover")&&!journal) return toast("Type the journal name first");
   if(kind==="ask"&&!extra) return toast("Type your question first");
-  if(mode==="here"&&!GS.url) return toast("Connect your Google Sheet first (More → Google Sheets sync), or use Ask in Gemini app");
+  if(mode==="here"&&!GS.gemini&&!GS.url) return toast("Add your free Gemini key first (More → Ask AI), or use Ask in Gemini app");
   const approach=p?(p.approach||rdGuessApproach(p)):"";
   const subs=p?subsOf(p.id).slice().sort((a,b)=>(a.submitted||"~").localeCompare(b.submitted||"~")).map(s=>({journal:s.journal,abdc:abdcOf(s.journal),status:s.status,submitted:s.submitted,decided:s.decided,dtype:s.dtype||"",notes:s.notes||""})):[];
   let candidates=[];
@@ -1331,6 +1342,13 @@ async function aiRun(mode){
     return;
   }
   aiSetBusy("Asking Gemini… (10–40 seconds)");
+  if(GS.gemini){
+    try{ const r=await geminiAsk(GS.gemini,prompt);
+      aiAdd(Object.assign({},meta,{at:new Date().toISOString(),answer:r.text,by:r.by,sources:r.sources,prompt,sent:false}));
+      AIU.extra=""; aiSetBusy(""); gsSchedule(); toast("Answer ready ✓");
+    }catch(err){ aiSetBusy(""); alert("Couldn't get an answer: "+err.message); }
+    return;
+  }
   try{
     const r=await httpCall("POST",GS.url,"",JSON.stringify({ask:Object.assign({prompt},meta)}));
     let j=null; try{ j=JSON.parse(r.text); }catch(e){}
@@ -1354,6 +1372,174 @@ function aiSavePasted(){
   aiAwait(null); AIU.paste=""; AIU.extra=""; render(); gsSchedule(); toast("Answer saved");
 }
 
+/* ---------- Google account: RD SK keeps your data in a sheet in your own Google Drive ---------- */
+let gTok={token:"",at:0}; const gWait={}; let gSeq=0;
+window.rdGoogleDone=(id,ok,val,email)=>{ const w=gWait[id]; delete gWait[id]; if(w) w({ok,val,email}); };
+function gCall(fn){ return new Promise(res=>{ const id="g"+(++gSeq); gWait[id]=res; fn(id); }); }
+function gDirect(){ return !!(GS.drive&&GS.drive.id); }
+function gsOn(){ return !!(GS.url||gDirect()); }
+async function googleToken(interactive){
+  if(gTok.token&&Date.now()-gTok.at<45*60e3) return gTok.token;
+  if(window.RDSK_TEST_GOOGLE){ gTok={token:"test-token",at:Date.now()}; return gTok.token; }
+  if(!(window.Android&&Android.googleToken)) throw new Error("Google sign-in works in the phone app");
+  const r=await gCall(id=>Android.googleToken(id,!!interactive));
+  if(!r.ok){ if(r.val==="consent-needed"||r.val==="not-signed-in") throw new Error("Please sign in with Google again (More → Google account)"); throw new Error(r.val==="cancelled"?"Sign-in cancelled":r.val); }
+  gTok={token:r.val,at:Date.now()}; return r.val;
+}
+function googleErr(st,j){
+  const m=(j&&j.error&&j.error.message)||("Google error "+st);
+  if(/has not been used|is disabled|SERVICE_DISABLED|not been enabled/i.test(m)) return "Turn on the Google Sheets API and the Google Drive API in your Google Cloud project, then try again.";
+  if(st===404) return "Your RD SK sheet wasn't found (deleted, or in another account). Sign in again to pick or create one.";
+  if(st===403&&/insufficient|scope|permission/i.test(m)) return "Google didn't give RD SK access to this sheet. Sign in again and allow access.";
+  return m;
+}
+async function gApi(method,path,body,retry){
+  const token=await googleToken(false);
+  const url=/^https:/.test(path)?path:"https://sheets.googleapis.com/v4/"+path;
+  const r=await httpCall(method,url,token,body?JSON.stringify(body):"");
+  if(r.status===401&&!retry){ gTok={token:"",at:0}; return gApi(method,path,body,true); }
+  let j={}; try{ j=r.text?JSON.parse(r.text):{}; }catch(e){}
+  if(r.status===0) throw new Error("No connection");
+  if(r.status>=400) throw new Error(googleErr(r.status,j));
+  return j;
+}
+/** A new Google Sheet in your Drive, made from the built-in master template (all tabs, formulas and the ABDC list). */
+async function gCreateSheet(title){
+  const meta=rdgCreateMeta(title), token=await googleToken(false);
+  let r;
+  if(window.Android&&Android.driveCreateFromAsset) r=await new Promise(res=>{ const id="h"+(++httpSeq); httpWaiters[id]=res; Android.driveCreateFromAsset(id,token,"master-template.xlsx",meta); });
+  else {
+    const buf=await new Promise((ok,bad)=>{ const x=new XMLHttpRequest(); x.open("GET","master-template.xlsx"); x.responseType="arraybuffer"; x.onload=()=>ok(x.response); x.onerror=()=>bad(new Error("template missing")); x.send(); });
+    const b="rdsk"+Date.now();
+    const blob=new Blob(["--"+b+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+meta+"\r\n--"+b+"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n",buf,"\r\n--"+b+"--"]);
+    const x=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"multipart/related; boundary="+b},body:blob});
+    r={status:x.status,text:await x.text()};
+  }
+  let j={}; try{ j=JSON.parse(r.text); }catch(e){}
+  if(r.status>=400||!j.id) throw new Error(googleErr(r.status,j));
+  return j;
+}
+async function googleSignIn(){
+  try{
+    let email;
+    if(window.RDSK_TEST_GOOGLE) email=window.RDSK_TEST_GOOGLE;
+    else {
+      if(!(window.Android&&Android.googleChooseAccount)) return toast("Google sign-in works in the phone app");
+      const r=await gCall(id=>Android.googleChooseAccount(id));
+      if(!r.ok){ if(r.val!=="cancelled") alert("Google sign-in didn't work: "+r.val); return; }
+      email=r.email; gTok={token:r.val,at:Date.now()};
+    }
+    toast("Signed in as "+email+" · looking for your RD SK sheet…");
+    const found=await rdgFind(gApi);
+    GS.drive={account:email,id:"",name:""}; gsStore();
+    chooseSheet(email,found);
+  }catch(err){ alert("Google sign-in: "+err.message); }
+}
+function chooseSheet(email,found){
+  const n=S.papers.length, m=S.subs.length;
+  openSheet(`<h3>Your RD SK sheet <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m" style="color:var(--ink)">Signed in as <b>${esc(email)}</b>.</div>
+    ${found.length?`<div class="m" style="margin-top:8px">RD SK sheets in this account's Drive:</div>`+found.slice(0,4).map((f,i)=>`<div class="card tap" data-gfile="${i}"><div class="t">Use “${esc(f.name)}”${i===0?" (latest)":""}</div><div class="m">last changed ${esc(new Date(f.modifiedTime).toLocaleString())}${S.settings.fresh?" · loads your papers onto this phone":""}</div></div>`).join("")
+      :`<div class="m" style="margin-top:8px">No RD SK sheet in this account yet.</div>`}
+    <div class="card tap" id="gnew"><div class="t">${found.length?"Create a new RD SK sheet instead":"Create my RD SK sheet"}</div>
+      <div class="m">“RD SK Master” is made in ${esc(email)}'s Google Drive (all tabs, formulas and the ABDC list) and this phone's ${n} papers and ${m} submissions are copied in.${GS.url?" Your current web-app sheet is read one last time first, then left as it is.":""}</div></div>
+    <div class="hint">RD SK can only see the files it creates; the rest of your Drive stays private.</div>`);
+  $("#sheet").onclick=e=>{ const c=e.target.closest("[data-gfile]"); if(c){ closeSheet(); useSheet(email,found[+c.dataset.gfile]); } };
+  $("#gnew").onclick=()=>{ closeSheet(); createSheet(email); };
+}
+async function useSheet(email,f){
+  const go=async mode=>{
+    if(GS.url){ GS.oldUrl=GS.url; GS.url=""; }
+    GS.drive={account:email,id:f.id,name:f.name}; GS.lastSync=0; GS.deleted=[]; GS.epoch=""; GS.lastError=""; gsStore(); baseline();
+    await gsSync(mode,true);
+    if(GS.lastError) return alert("Couldn't load from the sheet: "+GS.lastError);
+    delete S.settings.fresh; persist(false); setTab(tab==="more"?"more":"home"); toast("Using “"+f.name+"” ✓");
+  };
+  if(S.settings.fresh) return go("link");
+  openSheet(`<h3>First sync with “${esc(f.name)}” <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="card tap" id="gkeep"><div class="t">Load the sheet's data (recommended)</div><div class="m">The phone takes the sheet's papers and submissions; this phone's manuscript IDs and journal statuses are added where the sheet has none.</div></div>
+    <div class="card tap" id="gphone"><div class="t">Use this phone's data</div><div class="m">The phone's papers and submissions are written into the sheet (matching rows overwritten, missing ones added).</div></div>`);
+  $("#gkeep").onclick=()=>{ closeSheet(); go("link"); }; $("#gphone").onclick=()=>{ closeSheet(); go("overwrite"); };
+}
+async function createSheet(email){
+  try{
+    if(GS.url){ toast("Reading your current sheet one last time…"); await gsSync("normal",false); }
+    toast("Creating “RD SK Master” in your Google Drive…");
+    const f=await gCreateSheet("RD SK Master");
+    toast("Copying your papers and submissions…");
+    await rdgReplace(gApi,f.id,S.papers,S.subs);
+    (S.ai||[]).forEach(x=>x.sent=false);
+    if(GS.url){ GS.oldUrl=GS.url; GS.url=""; }
+    GS.drive={account:email,id:f.id,name:f.name}; GS.lastSync=0; GS.deleted=[]; GS.epoch=""; GS.lastError=""; gsStore(); baseline();
+    await gsSync("normal",true);
+    if(GS.lastError) return alert("The sheet was created, but the first sync failed: "+GS.lastError);
+    delete S.settings.fresh; persist(false); render(); toast("Your data is now in “"+f.name+"” ✓");
+  }catch(err){ alert("Couldn't create the sheet: "+err.message); }
+}
+function googleCard(){
+  if(!gDirect()) return `<div class="m" style="color:var(--ink)">Sign in with one of your Google accounts and RD SK keeps all your papers, submissions, links and AI answers in a Google Sheet in <b>that account's Drive</b>, made and synced by the app. No scripts, no web-app link. After a reinstall or on a new phone, just sign in again.</div>
+    <div class="actions"><button class="primary" data-act="gsignin">Sign in with Google</button></div>
+    <div class="hint">One-time setup by you in Google Cloud (free) is needed before this works: see “Google sign-in setup” in the RD SK repo README. RD SK asks only for access to the files it creates.</div>`;
+  return `<div class="m" style="color:var(--ink)">✓ Signed in as <b>${esc(GS.drive.account||"")}</b> · sheet <b>${esc(GS.drive.name||"")}</b>. Changes here reach the sheet within seconds; changes in the sheet arrive when you open the app or tap Sync now.</div>
+    <div class="hint">${GS.lastText?"Last synced: <b>"+esc(GS.lastText)+"</b>":"Not synced yet."}${GS.lastError?`<br><span style="color:var(--need)">Last error: ${esc(GS.lastError)}</span>`:""}</div>
+    <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="gsauto" style="width:auto" ${GS.auto?"checked":""}> Sync automatically</label>
+    <div class="actions"><button class="primary" data-act="gssync">Sync now ⇅</button><button data-act="gopen">Open sheet ↗</button><button data-act="gsignin">Switch account or sheet</button><button class="danger ghost" data-act="gsignout">Sign out</button></div>`;
+}
+function helperCard(){
+  const sc=GS.script||{};
+  return `<div class="m" style="color:var(--ink)">${sc.version?`✓ Helper script installed (version ${esc(sc.version)})${sc.email?" · email import on":" · email import off"}${sc.insights?" · daily insights on":""}.${sc.version!==HELPER_VERSION?` <b>A newer helper (${HELPER_VERSION}) is available</b>: repeat steps 1–3 below when convenient.`:""}`:"Optional: a small script in your sheet reads journal emails from this Google account's Gmail every 15 minutes and writes daily research insights, even when your phone is off."}</div>
+    ${sc.version===HELPER_VERSION?"":`<ol class="m" style="color:var(--ink);padding-left:20px;margin:10px 0">
+      <li>Tap <b>Copy the script</b>, then <b>Open sheet</b>.</li>
+      <li>In the sheet: <b>Extensions → Apps Script</b>, delete what's there, paste, tap <b>Save</b>. (No deployment needed.)</li>
+      <li>Reload the sheet; a <b>RD SK</b> menu appears. Choose <b>Turn on email import</b> and <b>Turn on daily research insights</b>, then allow access (Advanced → Go to … if Google warns: it's your own script).</li>
+    </ol>
+    <div class="actions"><button data-act="gscopy">Copy the script</button><button data-act="gopen">Open sheet ↗</button></div>`}
+    <div class="hint">Emails are read from the Gmail of the account that owns the sheet (${esc(GS.drive.account||"")}).</div>`;
+}
+function geminiCard(){
+  return `<div class="m" style="color:var(--ink)">“Ask here” in the Ask AI tab uses a free Gemini API key. ${GS.gemini?"✓ Key saved.":"No key yet."}</div>
+    <label for="gkey">Gemini API key</label>
+    <div class="row"><input id="gkey" class="grow" type="password" value="${esc(GS.gemini||"")}" placeholder="AIza…" autocapitalize="off" autocorrect="off"><button data-act="gkeysave">Save</button></div>
+    <div class="actions"><button data-act="gkeyget">Get a free key ↗</button></div>
+    <div class="hint">Kept on this phone and in your sheet's hidden settings tab, so it comes back after a reinstall and the helper script can use it for insights. On Google's free tier, what you send may be used to improve Google's products.</div>`;
+}
+const HELPER_VERSION="3.2";
+/** Gemini straight from the phone: Google Search grounding first, a busy model is retried, then the other free models. */
+async function geminiAsk(key,prompt){
+  const base="https://generativelanguage.googleapis.com/v1beta/models", started=Date.now();
+  let models=GEMINI_PHONE.slice();
+  try{ const r=await httpCall("GET",base+"?pageSize=1000&key="+encodeURIComponent(key),"","");
+    if(r.status===400||r.status===403) throw new Error("Gemini didn't accept the key: check it in More → Ask AI");
+    const names=(JSON.parse(r.text).models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>String(m.name).replace(/^models\//,""));
+    const known=GEMINI_PHONE.filter(n=>names.includes(n)), flash=names.filter(n=>/^gemini-[\d.]+-flash(-lite)?$/.test(n)&&!known.includes(n)).sort((a,b)=>parseFloat(b.split("-")[1])-parseFloat(a.split("-")[1]));
+    if(known.length||flash.length) models=known.concat(flash);
+  }catch(e){ if(/didn't accept/.test(e.message)) throw e; }
+  let busy=0, quota=0, last="";
+  for(const m of models.slice(0,4)){
+    for(const k of [0,1,2]){
+      if(Date.now()-started>85000) break;
+      if(k===2&&!busy) break;
+      const grounded=k===0, body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4}};
+      if(grounded) body.tools=[{google_search:{}}];
+      const r=await httpCall("POST",base+"/"+m+":generateContent?key="+encodeURIComponent(key),"",JSON.stringify(body));
+      if(r.status===429){ quota++; break; }
+      if(r.status===500||r.status===503||r.status===504){ busy++; await new Promise(ok=>setTimeout(ok,k===1?2500:800)); continue; }
+      if(r.status===404) break;
+      if(r.status===0){ last="No connection"; continue; }
+      if(r.status!==200){ last="Gemini error "+r.status; continue; }
+      let j={}; try{ j=JSON.parse(r.text); }catch(e){}
+      const c=(j.candidates||[])[0], text=c&&c.content?(c.content.parts||[]).map(p=>p.text||"").join("").trim():"";
+      if(!text){ last="Gemini gave no answer"; continue; }
+      const sources=((c.groundingMetadata||{}).groundingChunks||[]).map(g=>g.web?{title:g.web.title||"",url:g.web.uri}:null).filter(x=>x&&x.url).slice(0,8);
+      return {text,by:"Gemini ("+m+(grounded?", with Google Search":"")+")",sources};
+    }
+  }
+  if(busy) throw new Error("Google's free Gemini models are busy right now (error 503), even after retrying. Try again in a few minutes, or use “Ask in Gemini app”.");
+  if(quota) throw new Error("Gemini's free limit is used up for now. Try again later, or use “Ask in Gemini app”.");
+  throw new Error(last||"Gemini gave no answer");
+}
+const GEMINI_PHONE=["gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash"];
+
 /* ---------- restore on a new phone / after reinstalling ---------- */
 function restoreLink(){ return "rdsk://connect?url="+encodeURIComponent(GS.url); }
 function restoreFromLink(t){
@@ -1371,8 +1557,10 @@ async function restoreFrom(u){
   delete S.settings.fresh; persist(false); setTab("home"); toast("Restored from “"+(GS.sheet||"Google Sheet")+"” ✓");
 }
 function welcomeCard(){
-  if(!S.settings.fresh||GS.url) return "";
+  if(!S.settings.fresh||gsOn()) return "";
   return `<div class="card" style="border:2px solid var(--accent)"><div class="t">👋 New install? Restore your data</div>
+    <div class="actions"><button class="primary" data-act="gsignin">Sign in with Google</button></div>
+    <div class="m" style="margin:8px 0 2px">Signed in before? Your papers load from your Google Drive. Or use the older restore link:</div>
     <div class="m" style="color:var(--ink);margin-top:4px">Tap your <b>RD SK restore link</b> (the rdsk://connect… link you saved in your email or notes), or paste your Google Sheet's web-app URL here.</div>
     <div class="row" style="margin-top:8px"><input id="wurl" class="grow" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off"><button id="wpaste">Paste</button></div>
     <div class="actions"><button class="primary" id="wgo">Restore from Google Sheet</button><button class="ghost" id="wskip">Start with the built-in data</button></div></div>`;
@@ -1387,7 +1575,7 @@ function bindWelcome(){
 
 /* ---------- Google Sheets sync (two-way, via the user's own Apps Script web app) ---------- */
 const GS_KEY="rdsk.gsheets.v1";
-let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:""};
+let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:"",drive:{},gemini:""};
 try{ Object.assign(GS, JSON.parse(localStorage.getItem(GS_KEY)||"{}")); }catch(e){}
 function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catch(e){} }
 // change tracking: each paper/submission gets mod = time of its last local change
@@ -1401,12 +1589,12 @@ function trackChanges(){
   const now=Date.now(), seen=new Set(); let n=0;
   const look=(r,sg)=>{ seen.add(r.id); if(H[r.id]!==sg){ r.mod=now; H[r.id]=sg; n++; } };
   S.papers.forEach(p=>look(p,sigP(p))); S.subs.forEach(x=>look(x,sigS(x)));
-  Object.keys(H).forEach(id=>{ if(!seen.has(id)){ delete H[id]; if(GS.url&&!GS.deleted.includes(id)) GS.deleted.push(id); n++; } });
-  if(n){ gsEditCount++; if(GS.url) gsStore(); }
+  Object.keys(H).forEach(id=>{ if(!seen.has(id)){ delete H[id]; if(gsOn()&&!GS.deleted.includes(id)) GS.deleted.push(id); n++; } });
+  if(n){ gsEditCount++; if(gsOn()) gsStore(); }
   return n;
 }
 let gsTimer=null, gsBusy=false;
-function gsSchedule(){ if(!GS.url||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
+function gsSchedule(){ if(!gsOn()||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
 function gsPayload(mode){
   const pk=id=>(paperById(id)||{}).key||"";
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
@@ -1414,17 +1602,19 @@ function gsPayload(mode){
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
   return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),aiLog:(S.ai||[]).filter(x=>!x.sent).map(aiPlainEntry),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
-      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false}}};
+      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false},
+      secrets:mode!=="link"&&GS.gemini?{gemini:GS.gemini}:undefined}};
 }
 async function gsSync(mode,manual){
-  if(!GS.url) return manual&&toast("Connect Google Sheets first");
+  if(!gsOn()) return manual&&toast("Sign in with Google first (More → Google account)");
   if(gsBusy){ gsSchedule(); return; }
   gsBusy=true; if(manual) toast("Syncing with Google Sheets…");
   const startEdits=gsEditCount, startedAt=Date.now(), body=gsPayload(mode), sentDeleted=body.deleted;
   try{
-    const r=await httpCall("POST",GS.url,"",JSON.stringify(body));
-    let j=null; try{ j=JSON.parse(r.text); }catch(e){}
-    if(!j){ throw new Error(r.status===0?"No connection":/<html/i.test(r.text)?"The script address isn't a working web app (check: Deploy → Web app, access: Anyone)":"Unexpected reply ("+r.status+")"); }
+    let j=null;
+    if(gDirect()) j=await rdgSync(gApi,GS.drive.id,body,{abdc:window.RD_ABDC||[],suggest:window.rdSuggest});
+    else { const r=await httpCall("POST",GS.url,"",JSON.stringify(body)); try{ j=JSON.parse(r.text); }catch(e){}
+    if(!j){ throw new Error(r.status===0?"No connection":/<html/i.test(r.text)?"The script address isn't a working web app (check: Deploy → Web app, access: Anyone)":"Unexpected reply ("+r.status+")"); } }
     if(!j.ok) throw new Error(j.error||"Script error");
     const fresh=j.epoch!==undefined&&(j.epoch||"")!==(GS.epoch||"");
     if(fresh){ // the sheet's data was replaced: its copy wins, the phone's old changes and deletions are dropped
@@ -1463,7 +1653,8 @@ function gsApply(j){
   S.papers=papers; S.subs=subs;
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
   if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
-  if(j.app){ if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
+  if(j.app){ if(j.app.secrets&&j.app.secrets.gemini&&!GS.gemini) GS.gemini=j.app.secrets.gemini; if(j.app.script) GS.script=j.app.script;
+    if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
     if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
   if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
@@ -1546,7 +1737,10 @@ const httpWaiters={}; let httpSeq=0;
 window.rdHttpDone=(id,status,text)=>{ const w=httpWaiters[id]; delete httpWaiters[id]; if(w) w({status,text}); };
 function httpCall(method,url,token,body){
   if(window.Android && Android.httpAsync) return new Promise(res=>{ const id="h"+(++httpSeq); httpWaiters[id]=res; Android.httpAsync(id,method,url,token,body||""); });
-  return fetch(url,{method,headers:token?{"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}:{},body:body||undefined,cache:"no-store"})
+  const gh=/^https:\/\/api\.github\.com\//.test(url), headers={};
+  if(token){ headers.Authorization="Bearer "+token; if(gh){ headers.Accept="application/vnd.github+json"; headers["X-GitHub-Api-Version"]="2022-11-28"; } }
+  if(body&&!gh) headers["Content-Type"]="application/json";
+  return fetch(url,{method,headers,body:body||undefined,cache:"no-store"})
     .then(async r=>({status:r.status,text:await r.text()}),e=>({status:0,text:JSON.stringify({message:"Network error: "+e.message})}));
 }
 async function ghApi(method, path, body){
@@ -1592,8 +1786,8 @@ async function ghPull(){
 }
 
 load(); baseline(); render(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
-if(GS.url&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&GS.url&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
+if(gsOn()&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&gsOn()&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
 </script>
 </body>
 </html>

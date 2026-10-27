@@ -32,7 +32,9 @@ import java.nio.charset.StandardCharsets;
 
 /** Hosts the offline dashboard (assets/index.html) in a WebView; data is kept in the WebView's localStorage. */
 public class MainActivity extends Activity {
-    private static final int PICK_FILE = 1, CHECK_STATUS = 5;
+    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8;
+    private static final String SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
+    private String pendingGoogle = null;
     private WebView web;
     private ValueCallback<Uri[]> pendingChooser;
     private android.webkit.PermissionRequest pendingCamera;
@@ -137,8 +139,82 @@ public class MainActivity extends Activity {
         web.saveState(out);
     }
 
+    // ---------- Google sign-in: access only to the files RD SK creates (drive.file) ----------
+    private android.content.SharedPreferences prefs() { return getSharedPreferences("rdsk-google", MODE_PRIVATE); }
+
+    private void googleDone(String id, boolean ok, String tokenOrError) {
+        String email = prefs().getString("account", "");
+        String js = "window.rdGoogleDone && rdGoogleDone(" + JSONObject.quote(id) + "," + ok + "," + JSONObject.quote(tokenOrError == null ? "" : tokenOrError)
+                + "," + JSONObject.quote(email) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    /** Lets you pick one of the Google accounts on the phone, then asks for access. */
+    private void googleChooseAccount(String id) {
+        pendingGoogle = id;
+        String current = prefs().getString("account", "");
+        android.accounts.Account sel = current.isEmpty() ? null : new android.accounts.Account(current, "com.google");
+        Intent pick = android.accounts.AccountManager.newChooseAccountIntent(sel, null, new String[]{"com.google"}, null, null, null, null);
+        try {
+            startActivityForResult(pick, PICK_ACCOUNT);
+        } catch (ActivityNotFoundException e) {
+            googleDone(id, false, "No account chooser on this phone");
+        }
+    }
+
+    /** An access token for the chosen account; with interactive=false it never shows a screen. */
+    private void googleToken(String id, boolean interactive) {
+        String email = prefs().getString("account", "");
+        if (email.isEmpty()) { googleDone(id, false, "not-signed-in"); return; }
+        com.google.android.gms.auth.api.identity.AuthorizationRequest req = new com.google.android.gms.auth.api.identity.AuthorizationRequest.Builder()
+                .setRequestedScopes(java.util.Collections.singletonList(new com.google.android.gms.common.api.Scope(SCOPE_DRIVE_FILE)))
+                .setAccount(new android.accounts.Account(email, "com.google"))
+                .build();
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(req)
+                .addOnSuccessListener(res -> {
+                    if (res.hasResolution()) {
+                        if (!interactive) { googleDone(id, false, "consent-needed"); return; }
+                        try {
+                            pendingGoogle = id;
+                            startIntentSenderForResult(res.getPendingIntent().getIntentSender(), GOOGLE_AUTH, null, 0, 0, 0);
+                        } catch (Exception e) {
+                            googleDone(id, false, "Couldn't open Google sign-in: " + e.getMessage());
+                        }
+                    } else {
+                        googleDone(id, true, res.getAccessToken());
+                    }
+                })
+                .addOnFailureListener(e -> googleDone(id, false, googleError(e)));
+    }
+
+    private static String googleError(Exception e) {
+        String m = String.valueOf(e.getMessage());
+        if (m.contains("10:") || m.contains("DEVELOPER_ERROR"))
+            return "Google says this app isn't registered yet (developer error 10): check the Android OAuth client (package com.sk.rd and the SHA-1) in your Google Cloud project";
+        return m;
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PICK_ACCOUNT) {
+            String id = pendingGoogle; pendingGoogle = null;
+            String name = (resultCode == RESULT_OK && data != null) ? data.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME) : null;
+            if (name == null) { googleDone(id, false, "cancelled"); return; }
+            prefs().edit().putString("account", name).apply();
+            googleToken(id, true);
+            return;
+        }
+        if (requestCode == GOOGLE_AUTH) {
+            String id = pendingGoogle; pendingGoogle = null;
+            try {
+                com.google.android.gms.auth.api.identity.AuthorizationResult r =
+                        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(data);
+                googleDone(id, r.getAccessToken() != null, r.getAccessToken() != null ? r.getAccessToken() : "cancelled");
+            } catch (Exception e) {
+                googleDone(id, false, resultCode == RESULT_OK ? googleError(e) : "cancelled");
+            }
+            return;
+        }
         if (requestCode == CHECK_STATUS) {
             String res = data != null ? data.getStringExtra("results") : null;
             if (res != null) web.evaluateJavascript("window.rdStatusResults && rdStatusResults(" + JSONObject.quote(res) + ")", null);
@@ -288,6 +364,57 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void googleChooseAccount(String id) { runOnUiThread(() -> MainActivity.this.googleChooseAccount(id)); }
+
+        @JavascriptInterface
+        public void googleToken(String id, boolean interactive) { runOnUiThread(() -> MainActivity.this.googleToken(id, interactive)); }
+
+        @JavascriptInterface
+        public String googleAccount() { return prefs().getString("account", ""); }
+
+        @JavascriptInterface
+        public void googleSignOut() { prefs().edit().remove("account").apply(); }
+
+        /** Uploads an xlsx from the app's assets to Drive as a new Google Sheet (converted), answering via rdHttpDone. */
+        @JavascriptInterface
+        public void driveCreateFromAsset(String id, String token, String asset, String metadataJson) {
+            new Thread(() -> {
+                int status = 0;
+                String text;
+                try {
+                    InputStream in = getAssets().open(asset);
+                    ByteArrayOutputStream file = new ByteArrayOutputStream();
+                    byte[] b = new byte[16384];
+                    for (int n; (n = in.read(b)) > 0; ) file.write(b, 0, n);
+                    in.close();
+                    String bnd = "rdsk" + System.currentTimeMillis();
+                    ByteArrayOutputStream body = new ByteArrayOutputStream();
+                    body.write(("--" + bnd + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + metadataJson + "\r\n--" + bnd
+                            + "\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                    file.writeTo(body);
+                    body.write(("\r\n--" + bnd + "--").getBytes(StandardCharsets.UTF_8));
+                    HttpURLConnection c = (HttpURLConnection) new URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink").openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(20000);
+                    c.setReadTimeout(120000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Authorization", "Bearer " + token);
+                    c.setRequestProperty("Content-Type", "multipart/related; boundary=" + bnd);
+                    try (OutputStream os = c.getOutputStream()) { body.writeTo(os); }
+                    status = c.getResponseCode();
+                    InputStream rin = status >= 400 ? c.getErrorStream() : c.getInputStream();
+                    ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                    if (rin != null) { for (int n; (n = rin.read(b)) > 0; ) buf.write(b, 0, n); rin.close(); }
+                    text = buf.toString("UTF-8");
+                } catch (Exception e) {
+                    text = "{\"error\":{\"message\":" + JSONObject.quote("Network error: " + e.getMessage()) + "}}";
+                }
+                String js = "window.rdHttpDone(" + JSONObject.quote(id) + "," + status + "," + JSONObject.quote(text) + ")";
+                runOnUiThread(() -> web.evaluateJavascript(js, null));
+            }).start();
+        }
+
+        @JavascriptInterface
         public String openGemini(String text) {
             return MainActivity.this.openGemini(text);
         }
@@ -344,8 +471,10 @@ public class MainActivity extends Activity {
                         c.setUseCaches(false);
                         if (token != null && !token.isEmpty()) {
                             c.setRequestProperty("Authorization", "Bearer " + token);
-                            c.setRequestProperty("Accept", "application/vnd.github+json");
-                            c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+                            if (target.startsWith("https://api.github.com/")) {
+                                c.setRequestProperty("Accept", "application/vnd.github+json");
+                                c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
+                            }
                         }
                         if (hop == 0 && body != null && !body.isEmpty()) {
                             c.setDoOutput(true);

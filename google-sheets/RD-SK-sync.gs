@@ -35,7 +35,8 @@ var ADD_SUB = { msid: 'Manuscript ID', live: 'Status on journal site', liveAt: '
 var EMAIL_FROM_DEFAULT = '2026-10-01';
 function emailFromDate() { return PropertiesService.getScriptProperties().getProperty('EMAIL_FROM_DATE') || EMAIL_FROM_DEFAULT; }
 var EMAILS_SHEET = 'Emails', DECISIONS_SHEET = 'Decisions & reviews', MAIL_LABEL = 'RD-SK';
-var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID', 'Undo data'];
+var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID', 'Undo data', 'Text'];
+var SCRIPT_VERSION = '3.2';
 var DECISION_HEAD = ['Decision date', 'Paper', 'Journal', 'Decision', 'Decision type', 'Reviews', 'Manuscript ID', 'Decision letter & reviewer comments', 'Gmail link', 'Message ID'];
 var JOURNAL_SENDERS = ['manuscriptcentral.com', 'scholarone.com', 'editorialmanager.com', 'ariessys.com', 'aries-mail.com',
   'tandfonline.com', 'taylorandfrancis.com', 'sagepub.com', 'sagepub.co.uk', 'elsevier.com', 'springernature.com', 'springer.com',
@@ -171,6 +172,32 @@ function fillFormulas(sh, C, dataFields, rows) {
     var col = []; for (var k = 0; k < rows; k++) col.push([t]);
     sh.getRange(2, j + 1, rows, 1).setFormulasR1C1(col);
   }
+}
+
+/** Tells the app which helper version is installed and what is switched on (shown under More in RD SK). */
+function markScript() {
+  try {
+    var ss = SpreadsheetApp.getActive(), names = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
+    var info = { version: SCRIPT_VERSION, email: names.indexOf('processEmails') >= 0, insights: names.indexOf('dailyInsights') >= 0, at: new Date().toISOString() };
+    var sh = ss.getSheetByName(APP_SHEET);
+    if (!sh) { sh = ss.insertSheet(APP_SHEET); sh.hideSheet(); sh.getRange(1, 1, 1, 2).setValues([['setting', 'value (JSON)']]); }
+    var v = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 2).getValues(), row = -1;
+    v.forEach(function (r, i) { if (str(r[0]) === 'script') row = i + 1; });
+    if (row < 0) row = sh.getLastRow() + 1;
+    sh.getRange(row, 1, 1, 2).setValues([['script', JSON.stringify(info)]]);
+  } catch (e) {}
+}
+
+/** The Gemini key: set in the sheet's RD SK menu, or saved from the app (More → Ask AI). */
+function geminiKey() {
+  var k = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (k) return k;
+  try {
+    var sh = SpreadsheetApp.getActive().getSheetByName(APP_SHEET), out = '';
+    if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function (r) {
+      if (str(r[0]) === 'secrets') { try { out = JSON.parse(r[1]).gemini || ''; } catch (e) {} } });
+    return out;
+  } catch (e) { return ''; }
 }
 
 /** Records an edit time (and an ID) on rows you change by hand, so the newest edit wins when syncing. */
@@ -434,13 +461,15 @@ function turnOnEmailImport() {
   if (!GmailApp.getUserLabelByName(MAIL_LABEL)) GmailApp.createLabel(MAIL_LABEL);
   var r = importEmails(400);
   SpreadsheetApp.getActive().toast('Email import is on (every 15 minutes). First run: ' + r.summary, 'RD SK', 12);
+  markScript();
 }
 function turnOffEmailImport(quiet) {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'processEmails') ScriptApp.deleteTrigger(t); });
   if (quiet !== true) SpreadsheetApp.getActive().toast('Email import is off.', 'RD SK');
+  markScript();
 }
 function importEmailsNow() { SpreadsheetApp.getActive().toast(importEmails(30).summary, 'RD SK', 10); }
-function processEmails() { importEmails(3); }
+function processEmails() { importEmails(3); markScript(); }
 
 function logSheet(ss, name, head) {
   var sh = ss.getSheetByName(name);
@@ -500,7 +529,7 @@ function importEmails(days) {
       } else { action = 'Needs confirmation'; counts.confirm++; }
       var sub = res.sub || {};
       logRows.push([when, from, subject, sub.paper || '', sub.journal || '', res.status || res.event, res.dtype, res.reviews || '', res.msid,
-                    action, link, m.getId(), undoData]);
+                    action, link, m.getId(), undoData, body.replace(/\r/g, '').slice(0, 4000)]);
       if (/Rejected|Revision requested|Accepted|Returned by office/.test(res.event))
         decRows.push([when, sub.paper || '', sub.journal || '', res.event, res.dtype, res.reviews || '', res.msid,
                       body.replace(/\r/g, '').slice(0, 45000), link, m.getId()]);
@@ -694,7 +723,7 @@ var AI_HEAD = ['Date', 'Paper', 'Approach', 'Question', 'Journal', 'Details', 'A
 
 /** One question from the app: {id, prompt, paper, approach, kind, journal, question}. The prompt is built on the phone. */
 function aiAsk(a) {
-  var props = PropertiesService.getScriptProperties(), gKey = props.getProperty('GEMINI_API_KEY'), cKey = props.getProperty('CLAUDE_API_KEY');
+  var props = PropertiesService.getScriptProperties(), gKey = geminiKey(), cKey = props.getProperty('CLAUDE_API_KEY');
   if (!gKey && !cKey) return { ok: false, error: "No AI key in the sheet yet. In the Google Sheet: RD SK menu → Set free Gemini API key." };
   var prompt = String(a.prompt || '').slice(0, 60000), r = null, err = '';
   if (gKey) { r = geminiText(gKey, prompt); if (r.error) { err = r.error; r = null; } }
@@ -795,13 +824,15 @@ function turnOnDailyInsights() {
   ScriptApp.newTrigger('dailyInsights').timeBased().everyDays(1).atHour(7).create();
   var r = runInsights();
   SpreadsheetApp.getActive().toast('Daily insights are on (about 7 am). ' + r.summary, 'RD SK', 12);
+  markScript();
 }
 function turnOffDailyInsights(quiet) {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyInsights') ScriptApp.deleteTrigger(t); });
   if (quiet !== true) SpreadsheetApp.getActive().toast('Daily insights are off.', 'RD SK');
+  markScript();
 }
 function insightsNow() { SpreadsheetApp.getActive().toast(runInsights().summary, 'RD SK', 12); }
-function dailyInsights() { runInsights(); }
+function dailyInsights() { runInsights(); markScript(); }
 
 function setClaudeKey() {
   var ui = SpreadsheetApp.getUi();
@@ -844,7 +875,7 @@ function runInsights() {
       try { items = items.concat(rdCrossrefItems(JSON.parse(r.getContentText()), batch[k])); } catch (e) { failed++; }
     });
   }
-  var props = PropertiesService.getScriptProperties(), gKey = props.getProperty('GEMINI_API_KEY'), cKey = props.getProperty('CLAUDE_API_KEY');
+  var props = PropertiesService.getScriptProperties(), gKey = geminiKey(), cKey = props.getProperty('CLAUDE_API_KEY');
   var picked = rdRankInsights(items, papers, seen, gKey || cKey ? 15 : 5), by = 'RD SK', ai = null;
   if (picked.length && gKey) { ai = geminiIdeas(gKey, picked, papers); if (ai) by = 'Gemini'; }
   if (picked.length && !ai && cKey) { ai = claudeIdeas(cKey, picked, papers); if (ai) by = 'Claude'; }

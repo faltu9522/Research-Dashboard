@@ -82,6 +82,28 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
 
 Data is stored on the phone; GitHub sync (or *More → Save backup*) keeps a copy off the phone.
 
+## Google sign-in setup (one time, free, ~15 minutes)
+RD SK signs in with Google and keeps its master sheet in your own Drive. It asks only for **drive.file** (access to
+the files RD SK creates), so the rest of your Drive stays private. Google needs to know the app once:
+
+1. Open <https://console.cloud.google.com>, signed in with the account that should hold the sheet (the one that gets
+   your journal emails), and create a project, e.g. **RD SK**.
+2. **APIs & Services → Library**: enable **Google Sheets API** and **Google Drive API**.
+3. **Google Auth Platform** (OAuth consent screen) → *Get started*: app name **RD SK**, your email as support and
+   contact email, audience **External** → *Create*.
+4. **Data access → Add or remove scopes**: tick `.../auth/drive.file` → *Update* → *Save*.
+5. **Audience → Publish app** (status *In production*). drive.file is a non-sensitive permission, so no Google
+   review should be needed. (If you stay in *Testing*, add yourself as a test user; Google then asks you to sign in
+   again every 7 days.)
+6. **Clients → Create client → Android**: package name `com.sk.rd`, SHA-1 certificate fingerprint
+   `A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3` → *Create*. There is no secret to copy.
+7. In the app: **More → Google account → Sign in with Google**, pick the account, allow access, then **Create my RD SK
+   sheet** (your current data, including what's in a web-app sheet, is copied in). After a reinstall or on another
+   phone: sign in and pick the sheet.
+8. Optional, once: **More → Email import & daily insights** shows how to paste the helper script into the new sheet
+   (Extensions → Apps Script → paste → Save → RD SK menu → turn on email import / daily insights). No deployment.
+9. **More → Ask AI**: paste a free Gemini key (aistudio.google.com/apikey) for *Ask here*.
+
 ## Rebuilding
 - Clean record from a new tracker: `python3 tools/sheet2_import.py SK_Research_Updates_2026.xlsx data/current-data.json`
   (yellow + date = under review, yellow without date = planned, red = earlier attempt, other journals = shortlist in
