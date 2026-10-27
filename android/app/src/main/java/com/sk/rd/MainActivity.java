@@ -191,6 +191,14 @@ public class MainActivity extends Activity {
                 });
     }
 
+    /** Phone details that help tell a setup problem from a phone problem. */
+    private String googleDiag() {
+        String gms = "?";
+        try { gms = getPackageManager().getPackageInfo("com.google.android.gms", 0).versionName; } catch (Exception e) { /* not installed */ }
+        return "\n\nDetails: account " + prefs().getString("account", "") + " · Play services " + gms + " · Android " + Build.VERSION.RELEASE
+                + " (SDK " + Build.VERSION.SDK_INT + ") · app " + getPackageName();
+    }
+
     /** Google's long-standing token service (GoogleAuthUtil): a fallback that also explains setup problems by name. */
     private void legacyToken(String id, boolean interactive, String firstError) {
         String email = prefs().getString("account", "");
@@ -210,11 +218,11 @@ public class MainActivity extends Activity {
                 if (m.contains("UNREGISTERED_ON_API_CONSOLE") || m.contains("INVALID_AUDIENCE") || m.contains("INVALID_CLIENT"))
                     googleDone(id, false, "setup|Google says RD SK is not registered (" + m + "). In Google Cloud → Clients there must be an Android client with package name com.sk.rd "
                             + "and SHA-1 A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3, and the consent screen must be set up in the same project.");
-                else googleDone(id, false, "setup|Google sign-in failed: " + m + " (" + firstError.replace("setup|", "") + ")");
+                else googleDone(id, false, firstError + "\n\nSecond try: " + ge.getClass().getSimpleName() + ": " + m + googleDiag());
             } catch (java.io.IOException io) {
-                googleDone(id, false, "No connection to Google: " + io.getMessage());
+                googleDone(id, false, firstError + "\n\nSecond try: no connection to Google (" + io.getMessage() + ")" + googleDiag());
             } catch (Exception x) {
-                googleDone(id, false, firstError);
+                googleDone(id, false, firstError + "\n\nSecond try: " + x.getClass().getSimpleName() + ": " + x.getMessage() + googleDiag());
             }
         }).start();
     }
