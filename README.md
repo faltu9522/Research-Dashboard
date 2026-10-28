@@ -115,6 +115,7 @@ the files RD SK creates), so the rest of your Drive stays private. Google needs 
   and `python3 tools/make_gscript.py`.
 - Seed data from a newer workbook: `python3 tools/excel_to_seed.py Research_Dashboard.xlsx android/app/src/main/assets/seed.js`
   (seed data is only used on first launch or after *Reset*; to load a new workbook on the phone use *Import*).
+- After each build copy the APK to `apk/RD-SK.apk` and `docs/RD-SK.apk` (the home page's download button).
 - Build: `cd android && ./gradlew assembleRelease` (needs the Android SDK), or run the *Build RD SK APK* GitHub
   Action. The APK is signed with `android/app/rdsk.keystore`, so new builds install over the old one and keep data.
 
