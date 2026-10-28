@@ -396,11 +396,12 @@ function viewMore(){
       <button data-act="sharejson">Share backup…</button>
       <button data-act="import">Import .xlsx or .json</button>
     </div>
-    <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Data lives only on this phone, so save a backup now and then (and before uninstalling). Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
+    <div class="hint">Files are saved to your phone's <b>Downloads</b> folder. Your data is on this phone and, once you sign in with Google, in your own Google Sheet; a backup file is still handy before uninstalling. Importing an .xlsx reads the <b>Papers</b> and <b>Submissions</b> sheets of your dashboard workbook and replaces the app's data.</div>
   </div>
   <h2>Google account <small>your data in your own Google Drive</small></h2>
   <div class="card">${googleCard()}</div>
-  ${gDirect()?`<h2>Email import &amp; daily insights <small>optional, install once</small></h2><div class="card">${helperCard()}</div>`:""}
+  ${gDirect()&&!GS.drive.shared?`<h2>Co-authors <small>share only their papers</small></h2><div class="card">${coauthorCard()}</div>`:""}
+  ${gDirect()&&!GS.drive.shared?`<h2>Email import &amp; daily insights <small>optional, install once</small></h2><div class="card">${helperCard()}</div>`:""}
   <h2>Ask AI <small>free Gemini key</small></h2>
   <div class="card">${geminiCard()}</div>
   ${GS.url||!gDirect()?`<details class="card"><summary class="t">Older way: web-app link${GS.url?" (in use)":""}</summary><div style="margin-top:8px">${gsCard()}</div></details>`:""}
@@ -421,6 +422,7 @@ function bindMore(){
   const c=$("#chase"); if(c) c.onchange=()=>{ S.settings.chaseDays=Math.max(1,+c.value||90); persist(); render(); toast("Saved"); };
   const n=$("#myname"); if(n) n.onchange=()=>{ S.settings.myName=n.value.trim(); persist(false); toast("Saved"); };
   const ga=$("#gsauto"); if(ga) ga.onchange=()=>{ GS.auto=ga.checked; gsStore(); };
+  document.querySelectorAll(".coemail").forEach(el=>el.onchange=()=>{ S.settings.coEmails=Object.assign({},S.settings.coEmails||{},{[el.dataset.k]:el.value.trim()}); persist(false); gsSchedule(); toast("Saved"); });
   const r=$("#remind"); if(r) r.onchange=()=>{ S.settings.reminders=r.checked; persist(false); if(r.checked) askNotifications(); render(); };
 }
 function bindSearch(){
@@ -467,6 +469,9 @@ document.addEventListener("click",e=>{
     case "gssync": gsSync("normal",true); break;
     case "gsforget": if(confirm("Disconnect Google Sheets? Your data stays on the phone and in the sheet.")){ GS.url=""; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
     case "gsignin": googleSignIn(); break;
+    case "coshare": shareDialog(a.dataset.k); break;
+    case "costop": shareStop(a.dataset.k); break;
+    case "come": S.settings.me=a.dataset.k; persist(false); render(); break;
     case "copysetup": copyOut((a.dataset.msg?"Error: "+a.dataset.msg+"\n\n":"")+"RD SK Google sign-in setup\nPackage name: com.sk.rd\nSHA-1: A5:16:32:A3:02:C3:E4:C1:BC:F6:EF:FA:07:12:CB:F9:BB:C9:43:C3\nScope: https://www.googleapis.com/auth/drive.file\nAPIs: Google Sheets API, Google Drive API"); break;
     case "gsignout": if(confirm("Sign out of Google? Your data stays on the phone and in your sheet; sign in again any time to carry on.")){ if(window.Android&&Android.googleSignOut) Android.googleSignOut(); gTok={token:"",at:0}; GS.drive={}; GS.lastSync=0; GS.deleted=[]; gsStore(); render(); } break;
     case "gopen": openBrowser("https://docs.google.com/spreadsheets/d/"+GS.drive.id+"/edit"); break;
@@ -912,8 +917,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.5", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.6", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.6","28 Oct 2026",["Co-authors: share only the papers you write together; each co-author gets their own sheet, kept in step with yours both ways","Co-authors open it once in Google's file picker (More → Google account → Open a sheet shared with me)"]],
   ["3.5","27 Oct 2026",["Sign-in problems: the screen shows both of Google's answers and phone details, and Copy includes them, so the cause can be pinned down"]],
   ["3.4","27 Oct 2026",["Google sign-in: if Google's newer sign-in service fails (e.g. error 8), RD SK tries Google's older token service, which works on more phones and names setup problems exactly"]],
   ["3.3","27 Oct 2026",["Sign in with Google: when Google doesn't finish sign-in, RD SK now says why (Google's error code) and lists the Google Cloud settings to check, instead of doing nothing"]],
@@ -1408,8 +1414,8 @@ async function gApi(method,path,body,retry){
   return j;
 }
 /** A new Google Sheet in your Drive, made from the built-in master template (all tabs, formulas and the ABDC list). */
-async function gCreateSheet(title){
-  const meta=rdgCreateMeta(title), token=await googleToken(false);
+async function gCreateSheet(title,share){
+  const meta=rdgCreateMeta(title,share), token=await googleToken(false);
   let r;
   if(window.Android&&Android.driveCreateFromAsset) r=await new Promise(res=>{ const id="h"+(++httpSeq); httpWaiters[id]=res; Android.driveCreateFromAsset(id,token,"master-template.xlsx",meta); });
   else {
@@ -1451,32 +1457,37 @@ async function googleSignIn(){
       email=r.email; gTok={token:r.val,at:Date.now()};
     }
     toast("Signed in as "+email+" · looking for your RD SK sheet…");
-    const found=await rdgFind(gApi);
+    const found=await rdgFind(gApi), shared=await rdgFind(gApi,"share").catch(()=>[]);
     GS.drive={account:email,id:"",name:""}; gsStore();
-    chooseSheet(email,found);
+    chooseSheet(email,found,shared);
   }catch(err){ alert("Google sign-in: "+err.message); }
 }
-function chooseSheet(email,found){
+function chooseSheet(email,found,shared){
+  shared=shared||[];
   const n=S.papers.length, m=S.subs.length;
   openSheet(`<h3>Your RD SK sheet <button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="m" style="color:var(--ink)">Signed in as <b>${esc(email)}</b>.</div>
     ${found.length?`<div class="m" style="margin-top:8px">RD SK sheets in this account's Drive:</div>`+found.slice(0,4).map((f,i)=>`<div class="card tap" data-gfile="${i}"><div class="t">Use “${esc(f.name)}”${i===0?" (latest)":""}</div><div class="m">last changed ${esc(new Date(f.modifiedTime).toLocaleString())}${S.settings.fresh?" · loads your papers onto this phone":""}</div></div>`).join("")
       :`<div class="m" style="margin-top:8px">No RD SK sheet in this account yet.</div>`}
+    ${shared.map((f,i)=>`<div class="card tap" data-gshared="${i}"><div class="t">Open “${esc(f.name)}” (shared with you)</div><div class="m">a co-author's papers with you · last changed ${esc(new Date(f.modifiedTime).toLocaleString())}</div></div>`).join("")}
+    <div class="card tap" id="gpick"><div class="t">Open a sheet shared with me…</div><div class="m">A co-author shared their RD SK sheet with this account? Choose it once in Google's file picker.</div></div>
     <div class="card tap" id="gnew"><div class="t">${found.length?"Create a new RD SK sheet instead":"Create my RD SK sheet"}</div>
       <div class="m">“RD SK Master” is made in ${esc(email)}'s Google Drive (all tabs, formulas and the ABDC list) and this phone's ${n} papers and ${m} submissions are copied in.${GS.url?" Your current web-app sheet is read one last time first, then left as it is.":""}</div></div>
     <div class="hint">RD SK can only see the files it creates; the rest of your Drive stays private.</div>`);
-  $("#sheet").onclick=e=>{ const c=e.target.closest("[data-gfile]"); if(c){ closeSheet(); useSheet(email,found[+c.dataset.gfile]); } };
+  $("#sheet").onclick=e=>{ const c=e.target.closest("[data-gfile]"); if(c){ closeSheet(); useSheet(email,found[+c.dataset.gfile]); }
+    const d=e.target.closest("[data-gshared]"); if(d){ closeSheet(); useSheet(email,Object.assign({shared:true},shared[+d.dataset.gshared])); } };
+  $("#gpick").onclick=()=>{ closeSheet(); pickShared(email); };
   $("#gnew").onclick=()=>{ closeSheet(); createSheet(email); };
 }
 async function useSheet(email,f){
   const go=async mode=>{
     if(GS.url){ GS.oldUrl=GS.url; GS.url=""; }
-    GS.drive={account:email,id:f.id,name:f.name}; GS.lastSync=0; GS.deleted=[]; GS.epoch=""; GS.lastError=""; gsStore(); baseline();
+    GS.drive={account:email,id:f.id,name:f.name,shared:!!f.shared}; if(f.shared) GS.shares=[]; GS.lastSync=0; GS.deleted=[]; GS.epoch=""; GS.lastError=""; gsStore(); baseline();
     await gsSync(mode,true);
     if(GS.lastError) return alert("Couldn't load from the sheet: "+GS.lastError);
     delete S.settings.fresh; persist(false); setTab(tab==="more"?"more":"home"); toast("Using “"+f.name+"” ✓");
   };
-  if(S.settings.fresh) return go("link");
+  if(S.settings.fresh||f.shared) return go("link"); // a co-author's sheet always wins over what is on this phone
   openSheet(`<h3>First sync with “${esc(f.name)}” <button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="card tap" id="gkeep"><div class="t">Load the sheet's data (recommended)</div><div class="m">The phone takes the sheet's papers and submissions; this phone's manuscript IDs and journal statuses are added where the sheet has none.</div></div>
     <div class="card tap" id="gphone"><div class="t">Use this phone's data</div><div class="m">The phone's papers and submissions are written into the sheet (matching rows overwritten, missing ones added).</div></div>`);
@@ -1501,7 +1512,7 @@ function googleCard(){
   if(!gDirect()) return `<div class="m" style="color:var(--ink)">Sign in with one of your Google accounts and RD SK keeps all your papers, submissions, links and AI answers in a Google Sheet in <b>that account's Drive</b>, made and synced by the app. No scripts, no web-app link. After a reinstall or on a new phone, just sign in again.</div>
     <div class="actions"><button class="primary" data-act="gsignin">Sign in with Google</button></div>
     <div class="hint">One-time setup by you in Google Cloud (free) is needed before this works: see “Google sign-in setup” in the RD SK repo README. RD SK asks only for access to the files it creates.</div>`;
-  return `<div class="m" style="color:var(--ink)">✓ Signed in as <b>${esc(GS.drive.account||"")}</b> · sheet <b>${esc(GS.drive.name||"")}</b>. Changes here reach the sheet within seconds; changes in the sheet arrive when you open the app or tap Sync now.</div>
+  return `${GS.drive.shared?`<div class="banner">Shared sheet: you see the papers a co-author shares with you. Your changes reach them when they next open RD SK.</div>`:""}<div class="m" style="color:var(--ink)">✓ Signed in as <b>${esc(GS.drive.account||"")}</b> · sheet <b>${esc(GS.drive.name||"")}</b>. Changes here reach the sheet within seconds; changes in the sheet arrive when you open the app or tap Sync now.</div>
     <div class="hint">${GS.lastText?"Last synced: <b>"+esc(GS.lastText)+"</b>":"Not synced yet."}${GS.lastError?`<br><span style="color:var(--need)">Last error: ${esc(GS.lastError)}</span>`:""}</div>
     <label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)"><input type="checkbox" id="gsauto" style="width:auto" ${GS.auto?"checked":""}> Sync automatically</label>
     <div class="actions"><button class="primary" data-act="gssync">Sync now ⇅</button><button data-act="gopen">Open sheet ↗</button><button data-act="gsignin">Switch account or sheet</button><button class="danger ghost" data-act="gsignout">Sign out</button></div>`;
@@ -1561,6 +1572,121 @@ async function geminiAsk(key,prompt){
 }
 const GEMINI_PHONE=["gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash"];
 
+/* ---------- co-authors: each gets a sheet with only the papers they co-author, kept in step both ways ---------- */
+const PICKER_URL="https://faltu9522.github.io/Research-Dashboard/pick.html";
+/** "Kaushal, S., Guha. A., Nyoni, A.M." -> [{key:"kaushal s", label:"Kaushal, S."}, …] */
+function authorList(str){
+  const out=[], re=/([A-Z][A-Za-z'’\-]+)\s*[,.]\s*((?:[A-Z]\.?\s*){1,3})/g; let m;
+  while((m=re.exec(str||""))){ const ini=m[2].replace(/[^A-Z]/g,""); const key=(m[1]+" "+ini.charAt(0)).toLowerCase(); if(!out.some(a=>a.key===key)) out.push({key,label:m[1]+", "+ini.split("").join(".")+"."}); }
+  return out;
+}
+function allAuthors(){
+  const m={}; S.papers.forEach(p=>authorList(p.authors).forEach(a=>{ (m[a.key]=m[a.key]||{key:a.key,label:a.label,papers:[]}).papers.push(p.id); }));
+  return Object.values(m).sort((a,b)=>b.papers.length-a.papers.length);
+}
+function meKey(){ const all=allAuthors(); return S.settings.me||(all[0]||{}).key||""; }
+function sharePapers(key){ return S.papers.filter(p=>authorList(p.authors).some(a=>a.key===key)); }
+function coauthorCard(){
+  const all=allAuthors(), me=meKey(), others=all.filter(a=>a.key!==me);
+  if(!all.length) return `<div class="m">Add authors to your papers (Edit paper → Authors) to share papers with co-authors.</div>`;
+  return `<div class="m" style="color:var(--ink)">Share with a co-author and RD SK makes a sheet with <b>only the papers you write together</b>, shares it with their Gmail, and keeps it in step with yours both ways (when you open RD SK or tap Sync now).</div>
+    <div class="m" style="margin-top:6px">You are: ${all.slice(0,6).map(a=>`<button class="${a.key===me?"primary":""}" style="padding:3px 9px;font-size:12.5px" data-act="come" data-k="${esc(a.key)}">${esc(a.label)}</button>`).join(" ")}</div>
+    ${others.map(a=>{ const sh=(GS.shares||[]).find(x=>x.author===a.key);
+      return `<div class="row" style="margin-top:10px;align-items:flex-start"><div class="grow"><div class="t">${esc(a.label)}</div><div class="m">${a.papers.length} paper${a.papers.length>1?"s":""}${sh?` · shared with ${esc(sh.email)}${sh.lastError?` · <span style="color:var(--need)">${esc(sh.lastError)}</span>`:sh.lastText?" · synced "+esc(sh.lastText):""}`:""}</div></div>
+        ${sh?`<button class="ghost danger" data-act="costop" data-k="${esc(a.key)}">Stop sharing</button>`:`<button data-act="coshare" data-k="${esc(a.key)}">Share…</button>`}</div>
+        ${sh?"":`<input class="coemail" data-k="${esc(a.key)}" type="email" autocapitalize="off" placeholder="their Gmail (saved for sharing)" value="${esc((S.settings.coEmails||{})[a.key]||"")}" style="margin-top:6px">`}`; }).join("")}
+    <div class="hint">They install RD SK from <b>faltu9522.github.io/Research-Dashboard</b>, sign in with that Gmail and choose “Open a sheet shared with me”. Their account must be a test user in your Google Cloud project while the app is in Testing.</div>`;
+}
+function shareDialog(key){
+  const a=allAuthors().find(x=>x.key===key); if(!a) return;
+  const ps=sharePapers(key);
+  openSheet(`<h3>Share with ${esc(a.label)} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m" style="color:var(--ink)">They will see and can edit these ${ps.length} paper${ps.length>1?"s":""} and their submissions (nothing else):</div>
+    <ul class="m" style="color:var(--ink);padding-left:20px">${ps.map(p=>`<li>${esc(p.key)}</li>`).join("")}</ul>
+    <label for="coemail">Their Gmail address</label><input id="coemail" type="email" autocapitalize="off" placeholder="name@gmail.com" value="${esc((S.settings.coEmails||{})[key]||"")}">
+    <div class="actions"><button class="primary" id="cogo">Create and share</button></div>
+    <div class="hint">Google emails them that you shared “RD SK – ${esc(a.label)}”. Papers you add later with them as an author are added automatically.</div>`);
+  $("#cogo").onclick=async()=>{ const em=$("#coemail").value.trim(); if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return toast("Type their Gmail address");
+    S.settings.coEmails=Object.assign({},S.settings.coEmails||{},{[key]:em}); persist(false);
+    closeSheet(); await shareCreate(a,em); };
+}
+async function shareCreate(a,email){
+  try{
+    toast("Creating a sheet for "+a.label+"…");
+    const f=await gCreateSheet("RD SK – "+a.label+" (shared by "+((S.settings.myName||GS.drive.account||"").trim())+")",true);
+    const ps=sharePapers(a.key), ids=new Set(ps.map(p=>p.id));
+    await rdgReplace(gApi,f.id,ps,S.subs.filter(x=>ids.has(x.paper)));
+    await rdgShare(gApi,f.id,email,"I've shared our papers with you in RD SK. Install it from https://faltu9522.github.io/Research-Dashboard/ , sign in with this Gmail, then choose More → Google account → “Open a sheet shared with me” and pick this sheet.");
+    const base={}; ps.forEach(p=>base[p.id]=sigP(p)); S.subs.filter(x=>ids.has(x.paper)).forEach(x=>base[x.id]=sigS(x));
+    GS.shares=(GS.shares||[]).concat([{author:a.key,label:a.label,email,id:f.id,name:f.name,base,lastSync:Date.now(),lastText:new Date().toLocaleString()}]);
+    gsStore(); render(); gsSync("normal",false); toast("Shared with "+email+" ✓");
+  }catch(err){ alert("Couldn't share: "+err.message); }
+}
+async function shareStop(key){
+  const sh=(GS.shares||[]).find(x=>x.author===key); if(!sh) return;
+  if(!confirm("Stop sharing with "+sh.email+"? Their shared sheet is deleted; your own data stays as it is.")) return;
+  try{ await rdgDelete(gApi,sh.id); }catch(err){ if(!/not found/i.test(err.message)) return alert("Couldn't stop sharing: "+err.message); }
+  GS.shares=GS.shares.filter(x=>x!==sh); gsStore(); render(); gsSchedule(); toast("Stopped sharing with "+sh.email);
+}
+/** Brings each co-author sheet up to date with a three-way merge against what both sides agreed on last time (sh.base):
+ *  changed only in their sheet → comes in; changed only here (by you or the email helper) → goes out; changed on both → newer wins. */
+async function shareSyncAll(manual){
+  for(const sh of (GS.shares||[])){
+    try{ await shareSyncOne(sh); sh.lastError=""; sh.lastText=new Date().toLocaleString(); }
+    catch(err){ sh.lastError=err.message; if(manual) toast("Co-author sheet ("+sh.label+"): "+err.message); }
+  }
+  gsStore();
+}
+function remoteSub(r,pid){ return {paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live:r.live?{text:r.live,at:r.liveAt||today()}:undefined}; }
+function remotePaper(r,l){ return {key:l?l.key:r.key,title:r.title,authors:r.authors,type:r.type||"Journal article",override:r.override||"",notes:r.notes,approach:r.approach||""}; }
+async function shareSyncOne(sh){
+  const opts={abdc:window.RD_ABDC||[],suggest:window.rdSuggest}, base=sh.base||{};
+  const scoped=sharePapers(sh.author), ids=new Set(scoped.map(p=>p.id)), keyToId={}; scoped.forEach(p=>keyToId[p.key]=p.id);
+  // 1. read their sheet
+  const j=await rdgSync(gApi,sh.id,{},opts);
+  const remote={};
+  (j.papers||[]).forEach(r=>{ const l=paperById(r.id); if(l&&ids.has(l.id)) remote[r.id]={sig:sigP(Object.assign({},l,remotePaper(r,l))),mod:r.mod||0,apply:()=>Object.assign(l,remotePaper(r,l))}; });
+  let added=0, taken=0;
+  (j.subs||[]).forEach(r=>{ const pid=keyToId[r.paper]; if(!pid) return;
+    const nv=remoteSub(r,pid), l=S.subs.find(x=>x.id===r.id);
+    if(!l){ if(!base[r.id]){ S.subs.push(Object.assign({id:r.id},nv)); added++; } return; } // a submission they added
+    remote[r.id]={sig:sigS(Object.assign({},l,nv)),mod:r.mod||0,apply:()=>{ const live=nv.live; Object.assign(l,nv); l.live=live?Object.assign({},l.live||{},live):undefined; }}; });
+  // 2. decide record by record
+  const local=[].concat(scoped.map(p=>({id:p.id,rec:p,sig:sigP(p)})), S.subs.filter(x=>ids.has(x.paper)).map(x=>({id:x.id,rec:x,sig:sigS(x)})));
+  const push=new Set();
+  local.forEach(o=>{ const r=remote[o.id];
+    if(!r){ push.add(o.id); return; }                         // not in their sheet yet
+    if(r.sig===o.sig) return;
+    const theirsChanged=r.sig!==base[o.id], mineChanged=o.sig!==base[o.id];
+    if(theirsChanged&&!mineChanged) { r.apply(); taken++; }
+    else if(!theirsChanged&&mineChanged) push.add(o.id);
+    else if((r.mod||0)>Math.max(o.rec.mod||0,o.rec.smod||0)) { r.apply(); taken++; }
+    else push.add(o.id); });
+  if(added||taken){ persist(); toast((added+taken)+" change"+(added+taken>1?"s":"")+" from "+sh.label); }
+  // 3. send ours, remove what left their scope (or you deleted)
+  const now=Date.now(), localIds=new Set(local.map(o=>o.id));
+  const body={overwrite:true,
+    papers:scoped.filter(p=>push.has(p.id)).map(p=>outPaper(p,now)),
+    subs:S.subs.filter(x=>ids.has(x.paper)&&push.has(x.id)).map(x=>outSub(x,paperById(x.paper).key,now)),
+    deleted:Object.keys(base).filter(id=>!localIds.has(id))};
+  if(body.papers.length||body.subs.length||body.deleted.length) await rdgSync(gApi,sh.id,body,opts);
+  // 4. both sides now agree on this
+  const nb={}; scoped.forEach(p=>nb[p.id]=sigP(p)); S.subs.filter(x=>ids.has(x.paper)).forEach(x=>nb[x.id]=sigS(x));
+  sh.base=nb; sh.lastSync=Date.now();
+}
+async function pickShared(email){
+  try{
+    const token=await googleToken(false);
+    let r;
+    if(window.RDSK_TEST_PICK) r=await window.RDSK_TEST_PICK();
+    else { if(!(window.Android&&Android.pickSharedSheet)) return toast("Works in the phone app");
+      r=await new Promise(res=>{ const id="p"+(++gSeq); gWait[id]=res; Android.pickSharedSheet(id,token,PICKER_URL); }); }
+    if(!r.id){ if(r.error) alert(r.error); return; }
+    useSheet(email,{id:r.id,name:r.name||"Shared RD SK sheet",shared:true});
+  }catch(err){ alert("Couldn't open the shared sheet: "+err.message); }
+}
+window.rdPicked=(id,fileId,name,error)=>{ const w=gWait[id]; delete gWait[id]; if(w) w({id:fileId,name,error}); };
+
 /* ---------- restore on a new phone / after reinstalling ---------- */
 function restoreLink(){ return "rdsk://connect?url="+encodeURIComponent(GS.url); }
 function restoreFromLink(t){
@@ -1616,15 +1742,18 @@ function trackChanges(){
 }
 let gsTimer=null, gsBusy=false;
 function gsSchedule(){ if(!gsOn()||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
+function outPaper(p,mod){ return {id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,approach:p.approach||"",mod:mod||(p.mod||0)}; }
+function outSub(x,paperKey,mod){ return {id:x.id,paper:paperKey,journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mod||(x.mod||0)}; }
 function gsPayload(mode){
   const pk=id=>(paperById(id)||{}).key||"";
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
-  const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>({id:p.id,key:p.key,oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,approach:p.approach||"",mod:mode==="overwrite"?now:(p.mod||0)}));
-  const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>({id:x.id,paper:pk(x.paper),journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mode==="overwrite"?now:(x.mod||0)}));
+  const papers=S.papers.filter(p=>mode!=="normal"||(p.mod||0)>since).map(p=>Object.assign(outPaper(p,mode==="overwrite"?now:0),{oldKey:p.syncedKey&&p.syncedKey!==p.key?p.syncedKey:undefined}));
+  const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>outSub(x,pk(x.paper),mode==="overwrite"?now:0));
   return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),aiLog:(S.ai||[]).filter(x=>!x.sent).map(aiPlainEntry),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
-      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false},
-      secrets:mode!=="link"&&GS.gemini?{gemini:GS.gemini}:undefined}};
+      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false,coEmails:S.settings.coEmails||{},me:S.settings.me||""},
+      secrets:mode!=="link"&&GS.gemini&&!(GS.drive&&GS.drive.shared)?{gemini:GS.gemini}:undefined, // never into a co-author's sheet
+      shares:mode!=="link"&&!(GS.drive&&GS.drive.shared)&&(GS.shares||[]).length?GS.shares.map(x=>({author:x.author,label:x.label,email:x.email,id:x.id,name:x.name})):undefined}};
 }
 async function gsSync(mode,manual){
   if(!gsOn()) return manual&&toast("Sign in with Google first (More → Google account)");
@@ -1644,6 +1773,7 @@ async function gsSync(mode,manual){
     }
     if(!fresh&&gsEditCount!==startEdits){ gsBusy=false; return gsSync("normal",false); } // you edited meanwhile: send that too first
     gsApply(j);
+    if(gDirect()&&!GS.drive.shared&&(GS.shares||[]).length) await shareSyncAll(manual);
     (S.ai||[]).forEach(x=>{ if((body.aiLog||[]).some(y=>y.id===x.id)) x.sent=true; }); aiMerge(j.ai);
     GS.deleted=GS.deleted.filter(id=>!sentDeleted.includes(id));
     GS.savedInsights=(GS.savedInsights||[]).filter(d=>!(body.savedInsights||[]).includes(d));
@@ -1658,7 +1788,7 @@ function gsApply(j){
   const oldS={}; S.subs.forEach(x=>oldS[x.id]=x);
   const oldByKey={}; S.papers.forEach(p=>oldByKey[p.key]=p);
   const created=[];
-  const papers=j.papers.map(p=>({id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type||"Journal article",override:p.override,notes:p.notes,syncedKey:p.key,
+  const papers=j.papers.map(p=>({id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type||"Journal article",override:p.override,notes:p.notes,syncedKey:p.key,smod:p.mod||0,
     approach:p.approach!==undefined?p.approach:((oldByKey[p.key]||{}).approach||"")}));
   const byKey={}; papers.forEach(p=>byKey[p.key]=p.id);
   const subs=j.subs.map(r=>{
@@ -1669,14 +1799,17 @@ function gsApply(j){
       papers.push(np); created.push(np); byKey[r.paper]=pid; }
     const o=oldS[r.id]||{};
     const live=r.live?{text:r.live,at:r.liveAt||today(),prev:o.live&&o.live.text===r.live?o.live.prev||"":(o.live&&o.live.text)||"",changedAt:o.live&&o.live.text===r.live?o.live.changedAt||"":(o.live?today():"")}:undefined;
-    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live,liveLog:o.liveLog};
+    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live,liveLog:o.liveLog,smod:r.mod||0};
   });
   S.papers=papers; S.subs=subs;
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
   if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
   if(j.app){ if(j.app.secrets&&j.app.secrets.gemini&&!GS.gemini) GS.gemini=j.app.secrets.gemini; if(j.app.script) GS.script=j.app.script;
+    if(Array.isArray(j.app.shares)&&!(GS.shares||[]).length&&!(GS.drive&&GS.drive.shared)) GS.shares=j.app.shares.map(x=>Object.assign({base:{}},x)); // restored: no common base, so newer edit wins
     if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
-    if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
+    if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName;
+      if(j.app.settings.coEmails&&!Object.keys(S.settings.coEmails||{}).length) S.settings.coEmails=j.app.settings.coEmails;
+      if(j.app.settings.me&&!S.settings.me) S.settings.me=j.app.settings.me; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
   if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
   if(created.length){ const t=Date.now(); created.forEach(p=>{ p.mod=t; delete H[p.id]; }); trackChanges(); gsSchedule(); }

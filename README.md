@@ -107,6 +107,20 @@ the files RD SK creates), so the rest of your Drive stays private. Google needs 
    (Extensions → Apps Script → paste → Save → RD SK menu → turn on email import / daily insights). No deployment.
 9. **More → Ask AI**: paste a free Gemini key (aistudio.google.com/apikey) for *Ask here*.
 
+## Sharing with co-authors
+More → **Co-authors** lists everyone in your papers' Authors fields. Type a co-author's Gmail and tap **Share**: RD SK
+creates “RD SK – <name>” with only the papers you write together, shares it with them (edit access) and keeps it in step
+with your master on every sync (three-way merge: their changes come in, yours go out, both changed → newer wins).
+They install RD SK, sign in, choose **Open a sheet shared with me** and pick it once in Google's file picker.
+
+One-time setup for the picker (free), in the same Google Cloud project:
+1. **APIs & Services → Library**: enable **Google Picker API**.
+2. **APIs & Services → Credentials → Create credentials → API key**. Edit it: Application restrictions **Websites**,
+   add `https://faltu9522.github.io/*`; API restrictions **Google Picker API** → Save.
+3. Note the **project number** (Cloud console home → Project info).
+4. Put both in `docs/picker-config.js` (`apiKey`, `appId` = project number). They are public by design.
+5. While the app is in Testing, add each co-author's Gmail under **Audience → Test users**.
+
 ## Rebuilding
 - Clean record from a new tracker: `python3 tools/sheet2_import.py SK_Research_Updates_2026.xlsx data/current-data.json`
   (yellow + date = under review, yellow without date = planned, red = earlier attempt, other journals = shortlist in

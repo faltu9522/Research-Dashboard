@@ -32,7 +32,8 @@ import java.nio.charset.StandardCharsets;
 
 /** Hosts the offline dashboard (assets/index.html) in a WebView; data is kept in the WebView's localStorage. */
 public class MainActivity extends Activity {
-    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8, GOOGLE_AUTH_LEGACY = 9;
+    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8, GOOGLE_AUTH_LEGACY = 9, PICK_SHARED = 10;
+    private String pendingPick = null;
     private static final String SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
     private String pendingGoogle = null;
     private WebView web;
@@ -252,6 +253,15 @@ public class MainActivity extends Activity {
             googleToken(id, true);
             return;
         }
+        if (requestCode == PICK_SHARED) {
+            String id = pendingPick; pendingPick = null;
+            String fid = data != null ? data.getStringExtra("id") : null, name = data != null ? data.getStringExtra("name") : null;
+            String err = data != null ? data.getStringExtra("error") : null;
+            String js = "window.rdPicked && rdPicked(" + JSONObject.quote(id) + "," + JSONObject.quote(fid == null ? "" : fid) + ","
+                    + JSONObject.quote(name == null ? "" : name) + "," + JSONObject.quote(err == null ? "" : err) + ")";
+            web.evaluateJavascript(js, null);
+            return;
+        }
         if (requestCode == GOOGLE_AUTH_LEGACY) {
             String id = pendingGoogle; pendingGoogle = null;
             if (resultCode == RESULT_OK) legacyToken(id, false, "closed");
@@ -430,6 +440,15 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String googleAccount() { return prefs().getString("account", ""); }
+
+        /** Opens Google's file picker (RD SK website) so a co-author can open a sheet shared with them. */
+        @JavascriptInterface
+        public void pickSharedSheet(String id, String token, String url) {
+            runOnUiThread(() -> {
+                pendingPick = id;
+                startActivityForResult(new Intent(MainActivity.this, PickerActivity.class).putExtra("token", token).putExtra("url", url), PICK_SHARED);
+            });
+        }
 
         @JavascriptInterface
         public void googleClearToken(String token) {

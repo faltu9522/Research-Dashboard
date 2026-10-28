@@ -6,3 +6,6 @@
 -keepclassmembers class com.sk.rd.BrowserActivity$Reporter {
     @android.webkit.JavascriptInterface <methods>;
 }
+-keepclassmembers class com.sk.rd.PickerActivity$Bridge {
+    @android.webkit.JavascriptInterface <methods>;
+}

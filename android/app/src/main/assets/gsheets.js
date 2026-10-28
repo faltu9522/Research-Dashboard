@@ -21,7 +21,7 @@ var RDG_ADD_SUB = { msid: "Manuscript ID", live: "Status on journal site", liveA
 var RDG_DATES = { submitted: 1, decided: 1, liveAt: 1 };
 var RDG_APP = "RD SK app", RDG_AI = "AI chat", RDG_EMAILS = "Emails", RDG_DECISIONS = "Decisions & reviews", RDG_INSIGHTS = "Research insights";
 var RDG_AI_HEAD = ["Date", "Paper", "Approach", "Question", "Journal", "Details", "Answer", "By", "ID"];
-var RDG_MARK = "rdsk-master";
+var RDG_MARK = "rdsk-master", RDG_SHARE = "rdsk-share";
 
 function rdgStr(x) { return x === null || x === undefined ? "" : String(x).trim(); }
 function rdgNorm(x) { return rdgStr(x).toLowerCase().replace(/\s+/g, " "); }
@@ -45,6 +45,8 @@ function rdgDay(x) {                                    // cell -> "YYYY-MM-DD" 
 }
 function rdgMs(x, tz) {                                 // Updated cell -> epoch ms (0 if empty)
   if (typeof x === "number" && x > 0) { var local = RDG_EPOCH + x * 864e5; return local - rdgTzOffset(tz, local); }
+  var m = rdgStr(x).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);   // our own stamps: the sheet's local time
+  if (m) { var l2 = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)); return l2 - rdgTzOffset(tz, l2); }
   var t = Date.parse(rdgStr(x)); return isNaN(t) ? 0 : t;
 }
 function rdgStamp(ms, tz) { return new Date(ms + rdgTzOffset(tz, ms)).toISOString().slice(0, 19).replace("T", " "); }
@@ -256,6 +258,7 @@ async function rdgSync(api, id, body, opts) {
   if (inc) {
     ["portals", "contacts"].forEach(function (k) { if (inc[k]) { var m = Object.assign({}, app[k] || {}, inc[k]); if (JSON.stringify(m) !== JSON.stringify(app[k] || {})) { app[k] = m; appDirty = true; } } });
     if (inc.chaseDays && inc.chaseDays !== app.chaseDays) { app.chaseDays = inc.chaseDays; appDirty = true; }
+    if (inc.shares && JSON.stringify(inc.shares) !== JSON.stringify(app.shares || [])) { app.shares = inc.shares; appDirty = true; }
     ["settings", "secrets"].forEach(function (k) { if (inc[k]) { var m = Object.assign({}, app[k] || {}, inc[k]); if (JSON.stringify(m) !== JSON.stringify(app[k] || {})) { app[k] = m; appDirty = true; } } });
     if (J && J.journal) {
       var at = {}; jb.v.forEach(function (r, i) { if (rdgStr(r[J.journal - 1])) at[rdgNorm(r[J.journal - 1])] = i; });
@@ -350,7 +353,7 @@ async function rdgSync(api, id, body, opts) {
     { values: appendAi.map(function (r) { return r.map(function (x, i) { return i === 0 ? x : rdgCell(x); }); }) });
 
   var outApp = { portals: Object.assign({}, app.portals || {}), contacts: Object.assign({}, app.contacts || {}), abdc: {},
-                 chaseDays: app.chaseDays, settings: app.settings, secrets: app.secrets, script: app.script };
+                 chaseDays: app.chaseDays, settings: app.settings, secrets: app.secrets, script: app.script, shares: app.shares };
   if (jb && J && J.journal) jb.v.forEach(function (r) {
     var name = rdgStr(r[J.journal - 1]); if (!name) return;
     if (J.link && rdgStr(r[J.link - 1])) outApp.portals[name] = rdgStr(r[J.link - 1]);
@@ -361,13 +364,15 @@ async function rdgSync(api, id, body, opts) {
     ok: true, now: now, sheet: (meta.properties || {}).title || "", app: outApp, pending: pending, insights: insights, ai: ai,
     papers: pb.v.filter(function (r) { return rdgStr(g(r, P, "key")); }).map(function (r) {
       return { id: rdgStr(g(r, P, "id")), key: rdgStr(g(r, P, "key")), title: rdgStr(g(r, P, "title")), authors: rdgStr(g(r, P, "authors")),
-               type: rdgStr(g(r, P, "type")), override: rdgStr(g(r, P, "override")), notes: rdgStr(g(r, P, "notes")), approach: rdgStr(g(r, P, "approach")) };
+               type: rdgStr(g(r, P, "type")), override: rdgStr(g(r, P, "override")), notes: rdgStr(g(r, P, "notes")), approach: rdgStr(g(r, P, "approach")),
+               mod: rdgMs(g(r, P, "updated"), tz) };
     }),
     subs: sb.v.filter(isSub).map(function (r) {
       return { id: rdgStr(g(r, S, "id")), paper: rdgStr(g(r, S, "paper")), journal: rdgStr(g(r, S, "journal")), rating: rdgStr(g(r, S, "rating")),
                abdc: rdgStr(g(r, S, "abdc")), status: rdgStr(g(r, S, "status")), submitted: rdgDay(g(r, S, "submitted")),
                decided: rdgDay(g(r, S, "decided")), notes: rdgStr(g(r, S, "notes")), titleUsed: rdgStr(g(r, S, "titleUsed")),
-               msid: rdgStr(g(r, S, "msid")), live: rdgStr(g(r, S, "live")), liveAt: rdgDay(g(r, S, "liveAt")), dtype: rdgStr(g(r, S, "dtype")) };
+               msid: rdgStr(g(r, S, "msid")), live: rdgStr(g(r, S, "live")), liveAt: rdgDay(g(r, S, "liveAt")), dtype: rdgStr(g(r, S, "dtype")),
+               mod: rdgMs(g(r, S, "updated"), tz) };
     })
   };
 }
@@ -412,15 +417,25 @@ async function rdgReplace(api, id, papers, subs, approachOf) {
   return { papers: papers.length, subs: subs.length };
 }
 
-/** Sheets this app created in the signed-in account's Drive (marked with an app property), newest first. */
-async function rdgFind(api) {
-  var q = encodeURIComponent("appProperties has { key='" + RDG_MARK + "' and value='1' } and trashed=false");
+/** Sheets this app created in the signed-in account's Drive (marked with an app property), newest first.
+ *  kind "share" = sheets a co-author shared with you (visible once picked in Google's file picker). */
+async function rdgFind(api, kind) {
+  var q = encodeURIComponent("appProperties has { key='" + (kind === "share" ? RDG_SHARE : RDG_MARK) + "' and value='1' } and trashed=false");
   var r = await api("GET", "https://www.googleapis.com/drive/v3/files?q=" + q + "&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)&spaces=drive");
   return r.files || [];
 }
-function rdgCreateMeta(title) {
-  return JSON.stringify({ name: title, mimeType: "application/vnd.google-apps.spreadsheet", appProperties: { "rdsk-master": "1" } });
+function rdgCreateMeta(title, share) {
+  var props = {}; props[share ? RDG_SHARE : RDG_MARK] = "1";
+  return JSON.stringify({ name: title, mimeType: "application/vnd.google-apps.spreadsheet", appProperties: props });
 }
+/** Gives a co-author edit access; Google emails them with the message. */
+async function rdgShare(api, id, email, message) {
+  return api("POST", "https://www.googleapis.com/drive/v3/files/" + id + "/permissions?sendNotificationEmail=true&emailMessage=" +
+    encodeURIComponent(message || ""), { type: "user", role: "writer", emailAddress: email });
+}
+/** Deletes a sheet RD SK created (used when you stop sharing with a co-author). */
+async function rdgDelete(api, id) { return api("DELETE", "https://www.googleapis.com/drive/v3/files/" + id); }
 
 if (typeof module !== "undefined") module.exports = { rdgSync: rdgSync, rdgReplace: rdgReplace, rdgFind: rdgFind, rdgCreateMeta: rdgCreateMeta,
+  rdgShare: rdgShare, rdgDelete: rdgDelete,
   rdgDay: rdgDay, rdgMs: rdgMs, rdgStamp: rdgStamp, rdgTzOffset: rdgTzOffset, rdgCell: rdgCell };
