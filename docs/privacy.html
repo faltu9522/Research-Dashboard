@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RD SK Privacy Policy</title>
+<meta name="description" content="How the RD SK research submissions app handles your data.">
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--ink:#1d1c1a;--muted:#6b6862;--line:#e3e0d8;--accent:#2f5d8a}
+@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1e1d1b;--ink:#ecebe7;--muted:#a3a09a;--line:#34322e;--accent:#8db6e0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:28px;line-height:1.2;margin:0 0 4px}
+h2{font-size:19px;margin:32px 0 8px}
+.sub{color:var(--muted);margin:0 0 24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:16px 0}
+ul{padding-left:22px}li{margin:4px 0}
+code{font-size:14px;overflow-wrap:anywhere}
+footer{color:var(--muted);font-size:14px;margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<main>
+<p><a href="./">← RD SK home</a></p>
+<h1>RD SK Privacy Policy</h1>
+<p class="sub">Effective 28 October 2026</p>
+
+<div class="card">
+<b>In short:</b> RD SK keeps your research submission records on your phone and, if you sign in with Google, in a
+Google Sheet in <b>your own</b> Google Drive. The developer runs no server and never receives your data. There are no
+ads, no analytics and no tracking.
+</div>
+
+<h2>What RD SK is</h2>
+<p>RD SK is a free, open-source Android app for tracking academic paper submissions: papers, journals, submission
+dates, decisions and related notes. The source code is public at
+<a href="https://github.com/faltu9522/Research-Dashboard">github.com/faltu9522/Research-Dashboard</a>.</p>
+
+<h2>Data stored on your phone</h2>
+<p>Everything you enter (papers, titles, authors, journals, dates, statuses, notes, manuscript IDs, journal login
+links, editorial-office emails, saved AI answers and settings) is stored in the app's private storage on your device.
+Uninstalling the app or clearing its data deletes it from the phone.</p>
+
+<h2>Google sign-in and Google Drive</h2>
+<p>If you choose <b>Sign in with Google</b>, RD SK asks for one permission:</p>
+<ul>
+<li><code>https://www.googleapis.com/auth/drive.file</code>: access only to the files RD SK creates (or files you
+explicitly open with it). RD SK cannot see, read or change any other file in your Google Drive.</li>
+</ul>
+<p>With this permission RD SK creates one Google Sheet (“RD SK Master”) in your Drive and keeps it in sync with the
+app, using the Google Sheets and Google Drive APIs directly from your phone. The sheet belongs to you; you can open,
+edit, share or delete it in Google Drive like any other file. RD SK uses your Google account's email address only to
+show which account is signed in.</p>
+<p><b>Limited Use.</b> RD SK's use and transfer to any other app of information received from Google APIs will adhere
+to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
+Policy</a>, including the Limited Use requirements. Data obtained through Google APIs is used only to provide the
+features you see in the app. It is not sold, not used for advertising, not transferred to third parties except as
+described below at your request, and not read by any person.</p>
+
+<h2>Optional features that contact other services</h2>
+<p>These run only when you use them, and send only what the feature needs, directly from your phone (or your own
+Google account) to that service:</p>
+<ul>
+<li><b>Ask AI (Google Gemini):</b> if you add your own Gemini API key, your question is sent to Google's Gemini API.
+The question includes the selected paper's title, approach, notes and submission history. On Google's free tier,
+Google may use this content to improve its products. Your key is stored on your phone and in your sheet's hidden
+settings tab.</li>
+<li><b>Ask in Gemini app:</b> the question is copied to your clipboard and passed to the Gemini app on your phone.
+That app's own privacy terms apply.</li>
+<li><b>Journal checks (Crossref):</b> journal names are sent to the public Crossref API to see what the journals
+published recently. No personal data is sent.</li>
+<li><b>Journal websites:</b> the in-app browser opens journal submission sites. You sign in to them yourself, and
+Google Password Manager may fill in your details. RD SK does not store your journal passwords.</li>
+<li><b>Email import and daily insights (optional helper script):</b> if you install the RD SK helper script in your
+own sheet, it runs inside your own Google account (Google Apps Script). It reads journal-related emails in that
+account's Gmail to update submission statuses, and writes daily research insights from Crossref (and Gemini or Claude
+if you set a key). It runs under your authorization; the developer has no access to it or to your email.</li>
+<li><b>GitHub sync (optional):</b> if you add a GitHub token, RD SK saves a backup of your data to the GitHub
+repository you choose.</li>
+</ul>
+
+<h2>What the developer receives</h2>
+<p>Nothing. RD SK has no backend server, no accounts with the developer, no analytics, crash reporting, advertising
+or tracking libraries.</p>
+
+<h2>Removing your data and access</h2>
+<ul>
+<li>Phone: uninstall RD SK or clear its storage in Android settings.</li>
+<li>Google Drive: delete the “RD SK Master” sheet.</li>
+<li>Google access: remove RD SK at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>,
+or tap <b>Sign out</b> in the app.</li>
+<li>Helper script: in the sheet, open Extensions → Apps Script and delete the project, or turn off its triggers from
+the RD SK menu.</li>
+</ul>
+
+<h2>Children</h2>
+<p>RD SK is a tool for researchers and is not directed at children under 13.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the new version will be posted on this page with a new effective date.</p>
+
+<h2>Contact</h2>
+<p>Questions or requests: open an issue at
+<a href="https://github.com/faltu9522/Research-Dashboard/issues">github.com/faltu9522/Research-Dashboard/issues</a>.</p>
+
+<footer>RD SK · free and open source (MIT License)</footer>
+</main>
+</body>
+</html>

@@ -92,6 +92,9 @@ the files RD SK creates), so the rest of your Drive stays private. Google needs 
 3. **Google Auth Platform** (OAuth consent screen) → *Get started*: app name **RD SK**, your email as support and
    contact email, audience **External** → *Create*.
 4. **Data access → Add or remove scopes**: tick `.../auth/drive.file` → *Update* → *Save*.
+   To publish, fill **Branding** with the home page `https://faltu9522.github.io/Research-Dashboard/`, privacy
+   policy `https://faltu9522.github.io/Research-Dashboard/privacy.html` and authorized domain `faltu9522.github.io`
+   (pages in `docs/`, served by GitHub Pages: Settings → Pages → Deploy from a branch → `main` / `/docs`).
 5. **Audience → Publish app** (status *In production*). drive.file is a non-sensitive permission, so no Google
    review should be needed. (If you stay in *Testing*, add yourself as a test user; Google then asks you to sign in
    again every 7 days.)
