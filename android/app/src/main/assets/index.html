@@ -232,7 +232,7 @@ function setTab(t){ tab=t; document.querySelectorAll("nav button").forEach(b=>b.
 function openSheet(html){ $("#sheet").innerHTML=html; $("#sheet").classList.add("open"); $("#scrim").classList.add("open"); $("#sheet").scrollTop=0; }
 function closeSheet(){ $("#sheet").classList.remove("open"); $("#scrim").classList.remove("open"); }
 $("#scrim").onclick=closeSheet;
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{ if(b.dataset.tab!==tab) query=""; setTab(b.dataset.tab); });
 $("#fab").onclick=()=>editSub(null);
 window.addEventListener("popstate",()=>{ if($("#sheet").classList.contains("open")) closeSheet(); });
 // Android back button → close sheet first, else go to dashboard, else exit.
@@ -319,8 +319,16 @@ function viewHome(){
   function score(i){ return ({"Revision due":3000,"Needs resubmission":2000,"Not yet submitted":1000}[i.stage]) + Math.min(i.idle||0,999); }
   const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   const stale = S.settings.lastUpdated ? daysBetween(S.settings.lastUpdated,today()) : null;
+  const searchBox=`<input class="search" id="q" placeholder="🔍 Search papers, journals, manuscript IDs…" value="${esc(query)}">`;
+  if(searching()){
+    const ps=S.papers.filter(p=>matches(paperText(p))), ss=S.subs.filter(x=>matches(subText(x))).sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
+    return `${searchBox}
+      <h2>Papers <small>${ps.length}</small></h2>${ps.length?ps.slice(0,20).map(paperCard).join(""):'<div class="empty">No paper matches.</div>'}
+      <h2>Submissions <small>${ss.length}</small></h2>${ss.length?ss.slice(0,30).map(x=>subCard(x)).join(""):'<div class="empty">No submission matches.</div>'}`;
+  }
   return `
   ${welcomeCard()}
+  ${searchBox}
   ${pendingBanner()}
   ${stale!=null&&stale>=10&&!S.settings.fresh?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
   <div class="tiles">
@@ -345,19 +353,26 @@ function viewReview(){
   <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app. Sign in by tapping the user ID box and choosing your saved login from Google Password Manager; the app then opens your submitted manuscripts, reads every paper's status (both papers when a journal has two) and moves to the next journal. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
 }
-function matches(txt){ return !query || txt.toLowerCase().includes(query.toLowerCase()); }
+/** Every typed word must appear somewhere (any order, ignoring case, accents and punctuation). */
+const foldText=t=>String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[‘’'`“”"]/g,"").replace(/[^a-z0-9*]+/g," ");
+function matches(txt){ if(!query.trim()) return true; const hay=" "+foldText(txt)+" "; return foldText(query).split(" ").filter(Boolean).every(w=>hay.includes(w)); }
+function paperText(p){ return [p.key,p.title,p.authors,p.notes,p.approach,p.type].concat(subsOf(p.id).map(x=>x.journal+" "+(x.msid||"")+" "+(x.titleUsed||""))).join(" "); }
+function subText(x){ const p=paperById(x.paper)||{}; return [x.journal,x.msid,x.titleUsed,x.notes,x.status,x.dtype,p.key,p.title,p.authors].join(" "); }
+const searching=()=>!!query.trim();
 function viewPapers(){
   const F=["Active","Waiting on you","Under review","Revision due","Needs resubmission","Not yet submitted","Accepted","Closed","All"];
   let list = S.papers.map(p=>({p,...paperInfo(p)}));
   list = list.filter(i=>{
+    if(searching()) return true; // a search looks through every paper
     const st=i.stage;
     if(paperFilter==="Active") return !CLOSED_STAGES.includes(st);
     if(paperFilter==="Waiting on you") return ["Revision due","Needs resubmission","Not yet submitted"].includes(st);
     if(paperFilter==="Closed") return CLOSED_STAGES.includes(st);
     if(paperFilter==="All") return true;
     return st===paperFilter;
-  }).filter(i=>matches(i.p.key+" "+i.p.title+" "+i.p.authors));
-  return `<input class="search" id="q" placeholder="Search papers…" value="${esc(query)}">
+  }).filter(i=>matches(paperText(i.p)));
+  return `<input class="search" id="q" placeholder="Search title, journal, author, manuscript ID…" value="${esc(query)}">
+  ${searching()?`<div class="m" style="margin:-2px 0 8px">Searching all papers · ${list.length} match${list.length===1?"":"es"}</div>`:""}
   <div class="filters">${F.map(f=>`<button data-pf="${f}" class="${f===paperFilter?"on":""}">${f}</button>`).join("")}</div>
   ${list.length?list.map(i=>paperCard(i.p)).join(""):'<div class="empty">No papers here.</div>'}
   <div class="actions"><button data-act="newpaper">+ New paper</button></div>`;
@@ -365,13 +380,14 @@ function viewPapers(){
 function viewSubs(){
   const F=["Under review","Planned","All sent","Rejected","Revision requested","Accepted","All"];
   let list = S.subs.filter(s=>{
-    if(subFilter==="All") return true;
+    if(searching()||subFilter==="All") return true;
     if(subFilter==="All sent") return isSent(s);
     if(subFilter==="Under review") return isOpen(s);
     return s.status===subFilter;
-  }).filter(s=>{ const p=paperById(s.paper); return matches(s.journal+" "+(p?p.key:"")+" "+s.notes); });
+  }).filter(s=>matches(subText(s)));
   list.sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""));
-  return `<input class="search" id="q" placeholder="Search journal or paper…" value="${esc(query)}">
+  return `<input class="search" id="q" placeholder="Search journal, paper title, manuscript ID…" value="${esc(query)}">
+  ${searching()?`<div class="m" style="margin:-2px 0 8px">Searching all submissions</div>`:""}
   <div class="filters">${F.map(f=>`<button data-sf="${f}" class="${f===subFilter?"on":""}">${f}</button>`).join("")}</div>
   <div class="m" style="margin-bottom:8px">${list.length} submission${list.length===1?"":"s"}</div>
   ${list.length?list.map(s=>subCard(s)).join(""):'<div class="empty">No submissions here.</div>'}`;
@@ -917,8 +933,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.6", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.7", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.7","1 Nov 2026",["Search everywhere: paper titles, journals, authors, manuscript IDs and notes, words in any order, across all papers (also on Home)","Journal emails to confirm: Ignore or one-tap Apply on each email, emails already recorded are marked, and Ignore all / already recorded / older than 30 days"]],
   ["3.6","28 Oct 2026",["Co-authors: share only the papers you write together; each co-author gets their own sheet, kept in step with yours both ways","Co-authors open it once in Google's file picker (More → Google account → Open a sheet shared with me)"]],
   ["3.5","27 Oct 2026",["Sign-in problems: the screen shows both of Google's answers and phone details, and Copy includes them, so the cause can be pinned down"]],
   ["3.4","27 Oct 2026",["Google sign-in: if Google's newer sign-in service fails (e.g. error 8), RD SK tries Google's older token service, which works on more phones and names setup problems exactly"]],
@@ -1191,11 +1208,11 @@ function emailSheet(text, pend){
     <div class="two"><div><label for="ek">Decision type</label><select id="ek">${dtypes.map(o=>`<option value="${o}" ${dt.startsWith(o)&&o?"selected":""}>${o||"—"}</option>`).join("")}</select></div>
     <div><label for="em">Manuscript ID</label><input id="em" value="${esc(r.msid||(pend&&pend.msid)||"")}"></div></div>
     <div class="hint">${text?(match?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it.")+(r.reviews?" "+r.reviews+" reviewer report(s) found.":""):"Paste the email, then tap Read email again."}</div>
-    <div class="actions"><button class="primary" id="esave">Save update</button>${pend?`<button class="danger" id="edismiss">Not about my papers</button>`:""}</div>`);
+    <div class="actions"><button class="primary" id="esave">Save update</button>${pend?`<button class="danger" id="edismiss">Ignore this email</button>`:""}</div>`);
   if($("#eglink")) $("#eglink").onclick=()=>openBrowser(pend.link);
   $("#ere").onclick=()=>{ const v=$("#et").value; if(/rdsk:\/\/add\?/i.test(v)) addLinksSheet(v); else emailSheet(v,pend); };
-  const resolve=(action,info)=>{ if(!pend) return; GS.resolved=(GS.resolved||[]).concat([{id:pend.id,action}]); if(info) GS.emailDecisions=(GS.emailDecisions||[]).concat([Object.assign({id:pend.id},info)]); gsStore(); S.pending=(S.pending||[]).filter(x=>x.id!==pend.id); };
-  if($("#edismiss")) $("#edismiss").onclick=()=>{ resolve("Dismissed in the app"); persist(false); closeSheet(); render(); gsSchedule(); toast("Dismissed"); };
+  const resolve=(action,info)=>{ if(pend) pendResolve(pend,action,info); };
+  if($("#edismiss")) $("#edismiss").onclick=()=>{ resolve("Dismissed in the app"); persist(false); closeSheet(); render(); gsSchedule(); toast("Ignored"); if((S.pending||[]).length) setTimeout(pendingSheet,300); };
   $("#esave").onclick=()=>{
     const x=S.subs.find(y=>y.id===$("#es").value); if(!x) return toast("Choose the submission");
     const st=$("#eo").value, d=$("#ed").value||today(), k=$("#ek").value;
@@ -1211,14 +1228,56 @@ function emailSheet(text, pend){
     else if(st==="Rejected") setTimeout(()=>whatNext(paperById(x.paper),x),400);
   };
 }
+/** Marks a waiting journal email as handled (the sheet's Emails tab records what you chose). */
+function pendResolve(pend,action,info){
+  GS.resolved=(GS.resolved||[]).concat([{id:pend.id,action}]);
+  if(info) GS.emailDecisions=(GS.emailDecisions||[]).concat([Object.assign({id:pend.id},info)]);
+  gsStore(); S.pending=(S.pending||[]).filter(x=>x.id!==pend.id);
+}
+/** The submission an email is about (paper + journal as the sheet matched them), and whether its news is already recorded. */
+function pendInfo(x){
+  const p=S.papers.find(y=>y.key===x.paper), cands=p?S.subs.filter(s=>s.paper===p.id&&normJ(s.journal)===normJ(x.journal)):[];
+  const sub=cands.filter(s=>s.status!=="Planned"&&(s.submitted||"")<=(x.date||"9")).sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""))[0]||cands[0]||null;
+  let done="";
+  if(sub){
+    if(x.guess&&sub.status===x.guess) done="already "+x.guess.toLowerCase();
+    else if(sub.decided&&sub.decided>=(x.date||"")) done="decision already recorded ("+sub.status+", "+fmt(sub.decided)+")";
+    else if(x.guess==="Under review"&&sub.status!=="Planned") done="already recorded as "+sub.status.toLowerCase();
+    else if(!isOpen(sub)&&sub.status!=="Planned"&&x.guess!=="Revision requested"&&x.guess!=="Accepted") done="already closed ("+sub.status+")";
+  }
+  const age=x.date?daysBetween(x.date,today()):0;
+  return {sub,done,age,canApply:!!(sub&&x.guess&&!done&&STATUSES.includes(x.guess))};
+}
+function pendApply(x,info){
+  const s=info.sub, st=x.guess, d=x.date||today();
+  s.status=st;
+  if(st==="Under review"){ if(!s.submitted) s.submitted=d; s.decided=""; } else if(st!=="Planned") s.decided=d;
+  if(x.dtype) s.dtype=x.dtype;
+  if(x.msid&&!s.msid) s.msid=x.msid;
+  const note="Email "+fmt(d)+": "+String(x.subject||"").slice(0,80); s.notes=s.notes?s.notes+" | "+note:note;
+  pendResolve(x,"Confirmed in the app",{paper:x.paper,journal:s.journal,status:st,dtype:s.dtype||""});
+  persist(); gsSchedule();
+}
 function pendingSheet(){
   const list=S.pending||[];
-  if(!list.length){ closeSheet(); return toast("Nothing waiting"); }
+  if(!list.length){ closeSheet(); render(); return toast("Nothing waiting"); }
+  const infos=list.map(pendInfo), doneN=infos.filter(i=>i.done).length, oldN=infos.filter(i=>i.age>30).length;
   openSheet(`<h3>Journal emails to confirm <button class="ghost" onclick="closeSheet()">✕</button></h3>
-    <div class="hint" style="margin-top:0">Read from Gmail by your Google Sheet. These weren't clear enough to apply automatically.</div>
-    ${list.map((x,i)=>`<div class="card tap" data-pend="${i}"><div class="t">${esc(x.subject)}</div><div class="m">${esc(x.from)} · ${fmt(x.date)}</div>
-      <div style="margin-top:5px">${x.guess?`<span class="chip ${stageClass(x.guess)}">${esc(x.guess)}</span> `:""}${x.journal?`<span class="m">${esc(x.journal)}${x.paper?" · "+esc(x.paper):""}</span>`:'<span class="m">paper not recognised</span>'}</div></div>`).join("")}`);
-  $("#sheet").onclick=e=>{ const c=e.target.closest("[data-pend]"); if(!c) return; const x=list[+c.dataset.pend]; emailSheet([x.subject,x.from,x.body].join("\n"),x); };
+    <div class="hint" style="margin-top:0">Read from Gmail by your Google Sheet. For each one: <b>Apply</b> records it on the submission, <b>Ignore</b> leaves your data as it is, or tap the email to check and edit first.</div>
+    <div class="actions" style="margin-top:0">${doneN?`<button data-pa="done">Ignore ${doneN} already recorded</button>`:""}${oldN?`<button data-pa="old">Ignore ${oldN} older than 30 days</button>`:""}<button class="danger ghost" data-pa="all">Ignore all ${list.length}</button></div>
+    ${list.map((x,i)=>{ const f=infos[i]; return `<div class="card"><div class="tap" data-pend="${i}"><div class="t">${esc(x.subject)}</div><div class="m">${esc(x.from)} · ${fmt(x.date)}${f.age>30?` · <b>${f.age} days old</b>`:""}</div>
+      <div style="margin-top:5px">${x.guess?`<span class="chip ${stageClass(x.guess)}">${esc(x.guess)}</span> `:""}${x.journal?`<span class="m">${esc(x.journal)}${x.paper?" · "+esc(x.paper):""}</span>`:'<span class="m">paper not recognised</span>'}</div>
+      ${f.done?`<div class="m" style="margin-top:4px;color:var(--acc)">✓ ${esc(f.done)}</div>`:""}</div>
+      <div class="actions">${f.canApply?`<button class="primary" data-papply="${i}">Apply: ${esc(x.guess)}</button>`:""}<button data-pend="${i}">Check &amp; edit</button><button class="ghost" data-pignore="${i}">Ignore</button></div></div>`; }).join("")}`);
+  $("#sheet").onclick=e=>{
+    const ig=e.target.closest("[data-pignore]"), ap=e.target.closest("[data-papply]"), bulk=e.target.closest("[data-pa]"), c=e.target.closest("[data-pend]");
+    if(ig){ pendResolve(list[+ig.dataset.pignore],"Dismissed in the app"); persist(false); gsSchedule(); toast("Ignored"); return pendingSheet(); }
+    if(ap){ const x=list[+ap.dataset.papply]; pendApply(x,infos[+ap.dataset.papply]); toast("Updated · "+x.journal+" → "+x.guess); return pendingSheet(); }
+    if(bulk){ const k=bulk.dataset.pa, pick=list.filter((x,i)=>k==="all"||(k==="done"&&infos[i].done)||(k==="old"&&infos[i].age>30));
+      if(k==="all"&&!confirm("Ignore all "+pick.length+" emails? Your submissions stay as they are.")) return;
+      pick.forEach(x=>pendResolve(x,"Dismissed in the app")); persist(false); gsSchedule(); toast(pick.length+" ignored"); return pendingSheet(); }
+    if(c){ const x=list[+c.dataset.pend]; emailSheet([x.subject,x.from,x.body].join("\n"),x); }
+  };
 }
 const pendingBanner=()=>(S.pending||[]).length?`<button class="banner" data-act="pending" style="width:100%;text-align:left;border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)">📧 ${S.pending.length} journal email${S.pending.length===1?"":"s"} to confirm →</button>`:"";
 
