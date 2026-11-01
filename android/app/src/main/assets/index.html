@@ -799,6 +799,8 @@ function editSub(s, presetPaper){
     S.contacts=S.contacts||{}; const em=$("#fx").value.trim(); if(em) S.contacts[j]=em; else delete S.contacts[j];
     const u=$("#fu").value.trim();
     if(u) S.portals[j]=/^https?:\/\//i.test(u)?u:"https://"+u; else delete S.portals[j];
+    if(isNew&&S.subs.some(o=>o.paper===s.paper&&sameJournal(o.journal,s.journal)&&o.status===s.status&&(o.submitted||"")===(s.submitted||""))
+      &&!confirm("This paper already has an identical "+s.journal+" row ("+s.status+"). Add another one anyway?")) return;
     if(isNew) S.subs.push(s);
     noteActivity(); persist(); closeSheet(); render(); celebrate(before||(isNew&&s.status==="Under review"?"Planned":s.status),s.status,j);
   };
@@ -824,6 +826,7 @@ function showPaper(p){
       ${i.next&&i.stage!=="Under review"?`<button class="primary" id="pnext">Submit to ${esc(i.next.journal)} today</button>`:""}
       ${revRow?`<button class="primary" id="prev">Resubmit revision today</button>`:""}
       <button id="padd">+ Submission</button><button id="pedit">Edit paper</button><button id="pai">✦ Ask AI</button></div>
+    ${(()=>{ const n=dupRows(p).length; return n?`<div class="banner" style="margin-top:10px">⚠ ${n} duplicate row${n>1?"s":""} (same journal, status and dates). <button class="link" id="pdup">Remove duplicates</button></div>`:""; })()}
     ${journeyMap(p)}
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
     <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
@@ -841,7 +844,14 @@ function showPaper(p){
     noteActivity(); persist(); render(); showPaper(p); celebrate("Revision requested","Under review",revRow.journal); };
   $("#padd").onclick=()=>editSub(null,p.id);
   $("#pedit").onclick=()=>editPaper(p);
+  if($("#pdup")) $("#pdup").onclick=()=>{ const d=new Set(dupRows(p).map(x=>x.id)); S.subs=S.subs.filter(x=>!d.has(x.id)); persist(); render(); showPaper(p); toast(d.size+" duplicate"+(d.size>1?"s":"")+" removed"); };
   $("#pai").onclick=()=>{ AIU.paper=p.id; closeSheet(); setTab("ai"); };
+}
+/** Rows that repeat an earlier row of the same paper exactly (journal, status, submitted, decided). */
+function dupRows(p){
+  const seen=new Set(), out=[];
+  subsOf(p.id).forEach(x=>{ const k=[normJ(x.journal),x.status,x.submitted||"",x.decided||""].join("|"); if(seen.has(k)) out.push(x); else seen.add(k); });
+  return out;
 }
 function movePlanned(pid,sid,dir){
   const idx=S.subs.map((s,k)=>[s,k]).filter(([s])=>s.paper===pid&&s.status==="Planned").map(([,k])=>k);
@@ -1127,8 +1137,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.8", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.9", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.9","3 Nov 2026",["Fixed: a journal email could be applied to another journal's submission of the same paper; emails naming a different journal now offer “Add as a new submission” instead","Warning before adding an identical submission row, and “Remove duplicates” on a paper's page"]],
   ["3.8","1 Nov 2026",["Animations: confetti cannons and fireworks on acceptance, a paper plane on submitting, rising embers after a rejection, streaks, count-ups and more (More → Settings → Animations)","Turnaround from your own history on every journal, plus slowest and fastest journals in Stats","Journal checklists (word limit, referencing, anonymising, cover letter…), filled by Ask AI, ticked off when you submit","Timeline of all submissions and a journey map for each paper","Home-screen widget"]],
   ["3.7","1 Nov 2026",["Search everywhere: paper titles, journals, authors, manuscript IDs and notes, words in any order, across all papers (also on Home)","Journal emails to confirm: Ignore or one-tap Apply on each email, emails already recorded are marked, and Ignore all / already recorded / older than 30 days"]],
   ["3.6","28 Oct 2026",["Co-authors: share only the papers you write together; each co-author gets their own sheet, kept in step with yours both ways","Co-authors open it once in Google's file picker (More → Google account → Open a sheet shared with me)"]],
@@ -1387,7 +1398,12 @@ function parseSubs(){ return S.subs.map(x=>{ const p=paperById(x.paper)||{}; ret
 window.rdSharedText=t=>{ closeSheet(); if(/rdsk:\/\/connect\?/i.test(t)){ restoreFromLink(t); return; } if(/rdsk:\/\/add\?/i.test(t)){ setTab("subs"); addLinksSheet(t); return; } setTab("review"); emailSheet(t); };
 function emailSheet(text, pend){
   const r=text?rdParseEmail({subject:pend?pend.subject:"",from:pend?pend.from:"",body:text,date:pend?pend.date:today()},parseSubs()):{sub:null,msid:"",status:"",dtype:"",reviews:0};
-  const match=r.sub?S.subs.find(x=>x.id===r.sub.id):null, outcome=r.status||"";
+  let match=r.sub?S.subs.find(x=>x.id===r.sub.id):null; const outcome=r.status||"";
+  const ej=text?emailJournal(pend?pend.subject:"",pend?pend.from:"",text):"";
+  const epaper=match?paperById(match.paper):(pend&&pend.paper?S.papers.find(y=>y.key===pend.paper):null);
+  const wrong=!!(ej&&match&&!sameJournal(ej,match.journal));
+  if(wrong) match=S.subs.find(x=>x.paper===match.paper&&sameJournal(x.journal,ej))||null;
+  const newOpt=ej&&epaper&&!S.subs.some(x=>x.paper===epaper.id&&sameJournal(x.journal,ej))?`<option value="new" ${!match?"selected":""}>➕ New submission: ${esc(ej)} · ${esc(epaper.key)}</option>`:"";
   const subs=S.subs.slice().sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
   const firstLine=(pend&&pend.subject)||(text||"").split(/\n/).map(x=>x.trim()).find(x=>x.length>8)||"";
   const dtypes=["","Desk rejection","Rejected after review"];
@@ -1397,11 +1413,12 @@ function emailSheet(text, pend){
     <label for="et">Email text</label><textarea id="et" style="min-height:110px" placeholder="Paste the journal's email here">${esc(text)}</textarea>
     <div class="actions"><button id="ere">Read email again</button></div>
     <label for="es">Submission</label>
-    <select id="es"><option value="">— choose —</option>${subs.map(x=>{ const p=paperById(x.paper)||{}; return `<option value="${x.id}" ${match===x?"selected":""}>${esc(x.journal)} · ${esc(p.key||"")} (${esc(x.status)})</option>`; }).join("")}</select>
+    <select id="es"><option value="">— choose —</option>${newOpt}${subs.map(x=>{ const p=paperById(x.paper)||{}; return `<option value="${x.id}" ${match===x?"selected":""}>${esc(x.journal)} · ${esc(p.key||"")} (${esc(x.status)})</option>`; }).join("")}</select>
     <div class="two"><div><label for="eo">New status</label><select id="eo">${STATUSES.map(o=>`<option ${o===outcome?"selected":""}>${o}</option>`).join("")}</select></div>
     <div><label for="ed">Date</label><input type="date" id="ed" value="${(pend&&pend.date)||today()}"></div></div>
     <div class="two"><div><label for="ek">Decision type</label><select id="ek">${dtypes.map(o=>`<option value="${o}" ${dt.startsWith(o)&&o?"selected":""}>${o||"—"}</option>`).join("")}</select></div>
     <div><label for="em">Manuscript ID</label><input id="em" value="${esc(r.msid||(pend&&pend.msid)||"")}"></div></div>
+    ${ej?`<div class="m" style="margin-top:4px">📨 The email names <b>${esc(ej)}</b>.${wrong?` <span style="color:var(--warn)">It had been matched to another journal's row; that row won't be changed.</span>`:""}</div>`:""}
     <div class="hint">${text?(match?"Matched automatically: check it's right.":"Couldn't tell which submission this is: please choose it.")+(outcome?" Status guessed from the wording: “"+outcome+"”.":" Couldn't tell the outcome: please choose it.")+(r.reviews?" "+r.reviews+" reviewer report(s) found.":""):"Paste the email, then tap Read email again."}</div>
     <div class="actions"><button class="primary" id="esave">Save update</button>${pend?`<button class="danger" id="edismiss">Ignore this email</button>`:""}</div>`);
   if($("#eglink")) $("#eglink").onclick=()=>openBrowser(pend.link);
@@ -1409,7 +1426,9 @@ function emailSheet(text, pend){
   const resolve=(action,info)=>{ if(pend) pendResolve(pend,action,info); };
   if($("#edismiss")) $("#edismiss").onclick=()=>{ resolve("Dismissed in the app"); persist(false); closeSheet(); render(); gsSchedule(); toast("Ignored"); if((S.pending||[]).length) setTimeout(pendingSheet,300); };
   $("#esave").onclick=()=>{
-    const x=S.subs.find(y=>y.id===$("#es").value); if(!x) return toast("Choose the submission");
+    let x=S.subs.find(y=>y.id===$("#es").value);
+    if($("#es").value==="new"){ x=addFromEmail(epaper.id,ej,$("#eo").value,$("#ed").value||today(),pend); x.status="Planned"; }
+    if(!x) return toast("Choose the submission");
     const st=$("#eo").value, d=$("#ed").value||today(), k=$("#ek").value;
     const before=x.status; x.status=st;
     if(st==="Under review"){ if(!x.submitted) x.submitted=d; x.decided=""; } else if(st!=="Planned") x.decided=d;
@@ -1429,10 +1448,27 @@ function pendResolve(pend,action,info){
   if(info) GS.emailDecisions=(GS.emailDecisions||[]).concat([Object.assign({id:pend.id},info)]);
   gsStore(); S.pending=(S.pending||[]).filter(x=>x.id!==pend.id);
 }
+/** The journal an email itself names (subject, sender, opening lines), from your journals and the ABDC list; "" if none. */
+function emailJournal(subject,from,body){
+  const text=rdEmailNorm((subject||"")+" "+(from||"")+" "+String(body||"").slice(0,1500));
+  const names=[...new Set(S.subs.map(s=>s.journal).filter(Boolean).concat((window.RD_ABDC||[]).map(j=>j[0])))];
+  const byNorm={}; names.forEach(n=>{ const k=rdEmailNorm(n).trim(); if(k.length>5&&!byNorm[k]) byNorm[k]=n; });
+  const hits=rdJournalHits(text,Object.keys(byNorm)).sort((a,b)=>text.indexOf(a)-text.indexOf(b));
+  return hits.length?byNorm[hits[0]]:"";
+}
+const sameJournal=(a,b)=>normJ(a)===normJ(b)||rdEmailNorm(a).trim()===rdEmailNorm(b).trim();
+/** A new submission row for the journal an email names (e.g. the first email from a journal you hadn't recorded). */
+function addFromEmail(paperId,journal,status,date,x){
+  const row={id:uid("s"),paper:paperId,journal,rating:"",status,submitted:status==="Under review"||status==="Revision requested"?"":"",decided:"",notes:"",titleUsed:""};
+  if(status==="Under review") row.submitted=date; else { row.decided=date; }
+  if(x&&x.msid) row.msid=x.msid; if(x&&x.dtype) row.dtype=x.dtype;
+  row.notes="Email "+fmt(date)+": "+String((x&&x.subject)||"").slice(0,80);
+  S.subs.push(row); return row;
+}
 /** The submission an email is about (paper + journal as the sheet matched them), and whether its news is already recorded. */
 function pendInfo(x){
-  const p=S.papers.find(y=>y.key===x.paper), cands=p?S.subs.filter(s=>s.paper===p.id&&normJ(s.journal)===normJ(x.journal)):[];
-  const sub=cands.filter(s=>s.status!=="Planned"&&(s.submitted||"")<=(x.date||"9")).sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""))[0]||cands[0]||null;
+  const p=S.papers.find(y=>y.key===x.paper); let cands=p?S.subs.filter(s=>s.paper===p.id&&normJ(s.journal)===normJ(x.journal)):[];
+  let sub=cands.filter(s=>s.status!=="Planned"&&(s.submitted||"")<=(x.date||"9")).sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""))[0]||cands[0]||null;
   let done="";
   if(sub){
     if(x.guess&&sub.status===x.guess) done="already "+x.guess.toLowerCase();
@@ -1441,7 +1477,16 @@ function pendInfo(x){
     else if(!isOpen(sub)&&sub.status!=="Planned"&&x.guess!=="Revision requested"&&x.guess!=="Accepted") done="already closed ("+sub.status+")";
   }
   const age=x.date?daysBetween(x.date,today()):0;
-  return {sub,done,age,canApply:!!(sub&&x.guess&&!done&&STATUSES.includes(x.guess))};
+  // the email names another journal than the row it was matched to: never apply it to that row
+  const ej=emailJournal(x.subject,x.from,x.body);
+  if(ej&&p&&(!sub||!sameJournal(ej,sub.journal))){ // the paper's own row for the journal the email names, if there is one
+    const own=S.subs.filter(s=>s.paper===p.id&&sameJournal(s.journal,ej)&&s.status!=="Planned").sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""))[0];
+    if(own){ sub=own; done=""; if(x.guess&&own.status===x.guess) done="already "+x.guess.toLowerCase(); else if(own.decided&&own.decided>=(x.date||"")) done="decision already recorded ("+own.status+", "+fmt(own.decided)+")"; }
+  }
+  const mismatch=!!(ej&&sub&&!sameJournal(ej,sub.journal))||!!(ej&&!sub);
+  if(ej&&p){ const own=S.subs.find(s=>s.paper===p.id&&sameJournal(s.journal,ej)&&s.status!=="Planned"); if(own&&x.guess&&own.status===x.guess) done=done||"already "+x.guess.toLowerCase()+" at "+own.journal; }
+  return {sub:mismatch?null:sub,done,age,ej,paper:p,mismatch,canApply:!!(!mismatch&&sub&&x.guess&&!done&&STATUSES.includes(x.guess)),
+    canAdd:!!(mismatch&&p&&x.guess&&!done&&!S.subs.some(s=>s.paper===p.id&&sameJournal(s.journal,ej)&&s.status!=="Planned"))};
 }
 function pendApply(x,info){
   const s=info.sub, st=x.guess, d=x.date||today();
@@ -1462,9 +1507,14 @@ function pendingSheet(){
     <div class="actions" style="margin-top:0">${doneN?`<button data-pa="done">Ignore ${doneN} already recorded</button>`:""}${oldN?`<button data-pa="old">Ignore ${oldN} older than 30 days</button>`:""}<button class="danger ghost" data-pa="all">Ignore all ${list.length}</button></div>
     ${list.map((x,i)=>{ const f=infos[i]; return `<div class="card"><div class="tap" data-pend="${i}"><div class="t">${esc(x.subject)}</div><div class="m">${esc(x.from)} · ${fmt(x.date)}${f.age>30?` · <b>${f.age} days old</b>`:""}</div>
       <div style="margin-top:5px">${x.guess?`<span class="chip ${stageClass(x.guess)}">${esc(x.guess)}</span> `:""}${x.journal?`<span class="m">${esc(x.journal)}${x.paper?" · "+esc(x.paper):""}</span>`:'<span class="m">paper not recognised</span>'}</div>
-      ${f.done?`<div class="m" style="margin-top:4px;color:var(--acc)">✓ ${esc(f.done)}</div>`:""}</div>
-      <div class="actions">${f.canApply?`<button class="primary" data-papply="${i}">Apply: ${esc(x.guess)}</button>`:""}<button data-pend="${i}">Check &amp; edit</button><button class="ghost" data-pignore="${i}">Ignore</button></div></div>`; }).join("")}`);
+      ${f.done?`<div class="m" style="margin-top:4px;color:var(--acc)">✓ ${esc(f.done)}</div>`:""}
+      ${f.mismatch&&!f.done?`<div class="m" style="margin-top:4px;color:var(--warn)">⚠ This email is from <b>${esc(f.ej)}</b>${x.journal?`, not ${esc(x.journal)}`:""}.</div>`:""}</div>
+      <div class="actions">${f.canApply?`<button class="primary" data-papply="${i}">Apply: ${esc(x.guess)}</button>`:""}${f.canAdd?`<button class="primary" data-padd="${i}">Add ${esc(f.ej)}: ${esc(x.guess)}</button>`:""}<button data-pend="${i}">Check &amp; edit</button><button class="ghost" data-pignore="${i}">Ignore</button></div></div>`; }).join("")}`);
   $("#sheet").onclick=e=>{
+    const ad=e.target.closest("[data-padd]");
+    if(ad){ const x=list[+ad.dataset.padd], f=infos[+ad.dataset.padd]; const row=addFromEmail(f.paper.id,f.ej,x.guess,x.date||today(),x);
+      pendResolve(x,"Confirmed in the app",{paper:f.paper.key,journal:row.journal,status:row.status,dtype:row.dtype||""}); noteActivity(); persist(); gsSchedule();
+      celebrate(x.guess==="Under review"?"Planned":"Under review",x.guess,row.journal); return pendingSheet(); }
     const ig=e.target.closest("[data-pignore]"), ap=e.target.closest("[data-papply]"), bulk=e.target.closest("[data-pa]"), c=e.target.closest("[data-pend]");
     if(ig){ pendResolve(list[+ig.dataset.pignore],"Dismissed in the app"); persist(false); gsSchedule(); toast("Ignored"); return pendingSheet(); }
     if(ap){ const x=list[+ap.dataset.papply], before=infos[+ap.dataset.papply].sub.status; pendApply(x,infos[+ap.dataset.papply]); celebrate(before,x.guess,x.journal); return pendingSheet(); }
