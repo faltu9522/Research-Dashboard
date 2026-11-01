@@ -450,6 +450,24 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** Home-screen widget numbers (JSON from the app). */
+        @JavascriptInterface
+        public void setWidget(String json) { RDWidget.save(MainActivity.this, json); }
+
+        /** A short buzz for celebrations: comma-separated milliseconds, e.g. "0,40,60,80". */
+        @JavascriptInterface
+        public void vibrate(String pattern) {
+            try {
+                String[] parts = pattern.split(",");
+                long[] ms = new long[parts.length];
+                for (int i = 0; i < parts.length; i++) ms[i] = Long.parseLong(parts[i].trim());
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+                if (v == null || !v.hasVibrator()) return;
+                if (Build.VERSION.SDK_INT >= 26) v.vibrate(android.os.VibrationEffect.createWaveform(ms, -1));
+                else v.vibrate(ms, -1);
+            } catch (Exception e) { /* no vibration */ }
+        }
+
         @JavascriptInterface
         public void googleClearToken(String token) {
             new Thread(() -> { try { com.google.android.gms.auth.GoogleAuthUtil.clearToken(MainActivity.this, token); } catch (Exception e) { /* nothing cached */ } }).start();

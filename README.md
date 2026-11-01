@@ -107,6 +107,17 @@ the files RD SK creates), so the rest of your Drive stays private. Google needs 
    (Extensions → Apps Script → paste → Save → RD SK menu → turn on email import / daily insights). No deployment.
 9. **More → Ask AI**: paste a free Gemini key (aistudio.google.com/apikey) for *Ask here*.
 
+## Extras
+- **Animations** (More → Settings → Animations: Full / Calm): confetti cannons, fireworks and an ACCEPTED banner on
+  acceptance; a paper plane when you submit; rising embers and "Rise again" after a rejection; streak flames for weeks
+  with progress; count-up numbers, cards sliding in, light vibrations.
+- **Turnaround**: your own median days to a decision for each journal, on every card and in the journal editor, and the
+  slowest / fastest journals in Stats.
+- **Journal checklists**: word limit, referencing style, anonymising, cover letter, abstract and other rules per journal,
+  filled by Ask AI (Gemini) or by hand, ticked off in the ✈️ Submit flow; synced in the sheet's hidden settings.
+- **Timeline & journeys**: every submission as a bar from submission to decision; each paper's journey across journals.
+- **Home-screen widget**: long-press the home screen → Widgets → RD SK.
+
 ## Sharing with co-authors
 More → **Co-authors** lists everyone in your papers' Authors fields. Type a co-author's Gmail and tap **Share**: RD SK
 creates “RD SK – <name>” with only the papers you write together, shares it with them (edit access) and keeps it in step

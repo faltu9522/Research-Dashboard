@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RD SK</string>
+    <string name="widget_desc">Papers under review, waiting on you and the longest wait</string>
 </resources>

@@ -106,6 +106,39 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .aians a{color:var(--accent)}
 textarea.big{min-height:120px}
 .sugwrap{position:relative}
+/* animations */
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+@keyframes flame{0%,100%{transform:scale(1) rotate(-3deg);filter:drop-shadow(0 0 4px #ff8c42)}50%{transform:scale(1.18) rotate(4deg);filter:drop-shadow(0 0 10px #ffd166)}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes bannerIn{0%{transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0}55%{transform:translate(-50%,-50%) scale(1.15) rotate(3deg);opacity:1}100%{transform:translate(-50%,-50%) scale(1) rotate(0)}}
+@keyframes bannerPulse{0%,100%{text-shadow:0 0 18px currentColor,0 4px 0 rgba(0,0,0,.25)}50%{text-shadow:0 0 42px currentColor,0 4px 0 rgba(0,0,0,.25)}}
+body.motion #view>*{animation:rise .42s cubic-bezier(.2,.8,.2,1) both}
+body.motion #view>*:nth-child(2){animation-delay:.04s}body.motion #view>*:nth-child(3){animation-delay:.08s}body.motion #view>*:nth-child(4){animation-delay:.12s}
+body.motion #view>*:nth-child(5){animation-delay:.16s}body.motion #view>*:nth-child(6){animation-delay:.2s}body.motion #view>*:nth-child(n+7){animation-delay:.24s}
+body.motion .tile b{display:inline-block;animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+body.motion button:active,body.motion .card.tap:active{transform:scale(.97);transition:transform .08s}
+.fx-shake{animation:shake .5s both}
+.fx-banner{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:61;text-align:center;pointer-events:auto;animation:bannerIn .7s cubic-bezier(.2,1.4,.3,1) both;width:92vw}
+.fx-banner .fx-big{font-size:46px;font-weight:900;letter-spacing:1px;animation:bannerPulse 1s ease-in-out infinite;-webkit-text-stroke:1px rgba(0,0,0,.15)}
+.fx-banner .fx-small{margin:10px auto 0;display:inline-block;background:rgba(0,0,0,.72);color:#fff;font-size:15px;padding:8px 14px;border-radius:12px;max-width:86vw}
+.fx-banner.calm .fx-big{font-size:32px;animation:none}
+.fx-banner.out{transition:opacity .5s,transform .5s;opacity:0;transform:translate(-50%,-80%) scale(.9)}
+.streak{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(90deg,#ff8c4222,#ffd16622);border:1px solid #ff8c4255;color:var(--ink);border-radius:999px;padding:5px 12px;font-size:13.5px;font-weight:600;margin:0 0 10px}
+.streak .fl{display:inline-block;animation:flame 1.1s ease-in-out infinite}
+.tl{overflow-x:auto;padding-bottom:6px}
+.tl svg text{font-size:10px;fill:var(--muted)}
+.tl .bar{transform-box:fill-box;transform-origin:left center;animation:grow .8s cubic-bezier(.2,.8,.2,1) both;cursor:pointer}
+.journey{overflow-x:auto;padding:4px 0 8px}
+.journey svg text{font-size:10.5px;fill:var(--ink)}
+.journey .path{stroke-dasharray:6 6;stroke-dashoffset:600;animation:draw 1.6s ease-out forwards}
+.journey .node{animation:pop .5s cubic-bezier(.2,.8,.2,1) both}
+.ta{font-size:12px;color:var(--muted);margin-top:3px}
+.ta b{color:var(--ink)}
+.chk label{display:flex;gap:8px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);margin:8px 0}
+.chk input{width:auto;margin-top:3px}
 .sug{position:absolute;left:0;right:0;top:100%;z-index:30;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;
   box-shadow:0 10px 28px rgba(0,0,0,.35);max-height:280px;overflow-y:auto}
 .sug button{display:flex;gap:8px;align-items:center;justify-content:space-between;width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;
@@ -141,6 +174,7 @@ textarea.big{min-height:120px}
 <script src="watchlist.js"></script>
 <script src="aiassist.js"></script>
 <script src="gsheets.js"></script>
+<script src="fx.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -158,12 +192,154 @@ function load(){
 }
 function persist(touch=true){
   if(touch) S.settings.lastUpdated = today();
+  pushWidget();
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
   if(touch) scheduleAutoSync();
   pushReminders();
   if(trackChanges()) gsSchedule();
 }
 function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/* ---------- motion, celebrations, widget ---------- */
+let lastTap={x:null,y:null};
+document.addEventListener("pointerdown",e=>{ lastTap={x:e.clientX,y:e.clientY}; },true);
+function motionOn(){ return (S.settings.motion||"full")!=="off"; }
+function applyMotion(){ FX.mode=S.settings.motion==="calm"?"calm":"full"; document.body.classList.toggle("motion",S.settings.motion!=="calm"); }
+/** Plays the right animation when a submission's status changes. */
+function celebrate(before,after,journal){
+  if(before===after) { FX.spark(lastTap.x,lastTap.y); return; }
+  if(after==="Accepted") FX.accepted(journal);
+  else if(after==="Under review"&&(before==="Planned"||before==="Revision requested"||!before)) FX.submitted(journal,lastTap.x,lastTap.y);
+  else if(after==="Rejected"||after==="Returned by office") FX.rejected(journal);
+  else if(after==="Revision requested") FX.revision(journal);
+  else FX.spark(lastTap.x,lastTap.y);
+}
+/** Numbers for the home-screen widget. */
+function pushWidget(){
+  if(!(window.Android&&Android.setWidget)) return;
+  try{
+    const st=stats(), open=st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0)), top=open[0], c=+S.settings.chaseDays||90;
+    const over=open.filter(x=>(subDays(x)||0)>=2*c).length, chk=open.filter(x=>(subDays(x)||0)>=c).length, sk=streak();
+    Android.setWidget(JSON.stringify({under:st.under,waiting:st.waiting,
+      longest:top?"⏳ "+top.journal+" · "+subDays(top)+" days ("+((paperById(top.paper)||{}).key||"")+")":"Nothing under review",
+      flag:over?"⚠ "+over+" overdue: chase the editor":chk?"🔎 "+chk+" to check":"", streak:sk.weeks>=2?"🔥 "+sk.weeks+" wk":""}));
+  }catch(e){}
+}
+/** Weeks in a row (up to this week or last) with something sent or decided. */
+function streak(){
+  const wk=d=>Math.floor((dnum(d)+3)/7), now=wk(today()), set=new Set();
+  S.subs.forEach(x=>{ if(x.submitted&&isSent(x)) set.add(wk(x.submitted)); if(x.decided) set.add(wk(x.decided)); });
+  (S.settings.activity||[]).forEach(d=>set.add(wk(d)));
+  let w=set.has(now)?now:now-1, n=0; while(set.has(w)){ n++; w--; }
+  return {weeks:n,thisWeek:set.has(now)};
+}
+function noteActivity(){ const t=today(), a=S.settings.activity||[]; if(a[a.length-1]!==t){ a.push(t); S.settings.activity=a.slice(-120); } }
+
+/* ---------- journal checklists (author guidelines), filled by you or by Ask AI ---------- */
+const CHECK_FIELDS=[["words","Word limit"],["refs","Referencing style"],["anon","Anonymised manuscript"],["cover","Cover letter"],["abstract","Abstract & keywords"],["other","Other requirements"]];
+function checklistOf(j){ const c=S.checklists||{}; return c[j]||c[Object.keys(c).find(k=>normJ(k)===normJ(j))]||null; }
+function checklistSheet(journal,after){
+  const c=checklistOf(journal)||{};
+  openSheet(`<h3>📋 ${esc(journal)} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m">What this journal expects from a submission. ${c.by?`Filled by ${esc(c.by)} · ${fmt((c.at||"").slice(0,10))}.`:""} Check the journal's website before submitting: rules change.</div>
+    ${CHECK_FIELDS.map(([k,l])=>`<label for="ck_${k}">${l}</label><textarea id="ck_${k}" style="min-height:44px">${esc(c[k]||"")}</textarea>`).join("")}
+    <label for="ck_url">Guidelines page</label><input id="ck_url" value="${esc(c.url||"")}" placeholder="https://…" autocapitalize="off">
+    <div class="actions"><button class="primary" id="cksave">Save</button><button id="ckai">✦ Fill with AI</button>${c.url?`<button id="ckopen">Open guidelines ↗</button>`:""}</div>
+    <div class="m" id="ckbusy"></div>`);
+  if($("#ckopen")) $("#ckopen").onclick=()=>openBrowser(c.url);
+  $("#cksave").onclick=()=>{ const o={at:new Date().toISOString(),by:c.by&&c.by!=="you"?c.by+" + you":"you"};
+    CHECK_FIELDS.forEach(([k])=>o[k]=$("#ck_"+k).value.trim()); o.url=$("#ck_url").value.trim();
+    S.checklists=Object.assign({},S.checklists||{},{[journal]:o}); persist(false); gsSchedule(); FX.spark(lastTap.x,lastTap.y); toast("Checklist saved");
+    if(after) after(); else closeSheet(); };
+  $("#ckai").onclick=async()=>{
+    const prompt=`For the academic journal "${journal}"${abdcOf(journal)?" (ABDC "+abdcOf(journal)+")":""}, summarise its current author guidelines for a new manuscript submission. `+
+      `Answer ONLY with JSON: {"words":"word limit and what it includes","refs":"referencing style","anon":"whether the manuscript must be anonymised for blind review","cover":"cover letter requirements","abstract":"abstract length and number of keywords","other":"other key requirements (title page, ORCID, data/ethics statements, highlights, file formats)","url":"author guidelines page"}. `+
+      `Keep each value under 25 words. Write "not sure" when you don't know; never guess numbers.`;
+    if(!GS.gemini){ toGemini(prompt); return toast("No Gemini key here: the question went to the Gemini app"); }
+    $("#ckbusy").textContent="⏳ Asking Gemini (10–30 s)…"; $("#ckai").disabled=true;
+    try{ const r=await geminiAsk(GS.gemini,prompt), m=r.text.match(/\{[\s\S]*\}/); if(!m) throw new Error("Gemini didn't answer in the expected form");
+      const j=JSON.parse(m[0]); CHECK_FIELDS.forEach(([k])=>{ if(j[k]) $("#ck_"+k).value=String(j[k]); }); if(j.url&&/^https?:/.test(j.url)) $("#ck_url").value=j.url;
+      c.by="Gemini"; $("#ckbusy").textContent="✓ Filled by Gemini: check it, then Save."; FX.spark(); }
+    catch(err){ $("#ckbusy").textContent="Couldn't fill it: "+err.message; }
+    $("#ckai").disabled=false;
+  };
+}
+/** Submitting: tick the journal's checklist, then mark it submitted (with a paper plane). */
+function submitFlow(sub){
+  const c=checklistOf(sub.journal), p=paperById(sub.paper)||{}, items=c?CHECK_FIELDS.filter(([k])=>c[k]&&!/^not sure$/i.test(c[k])):[];
+  openSheet(`<h3>✈️ Submit to ${esc(sub.journal)} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m">${esc(p.key||"")}${abdcOf(sub.journal)?" · ABDC "+esc(abdcOf(sub.journal)):""}</div>${turnaroundLine(sub.journal,null)}
+    ${items.length?`<div class="chk" style="margin-top:8px">${items.map(([k,l])=>`<label><input type="checkbox" class="cki"> <span><b>${l}:</b> ${esc(c[k])}</span></label>`).join("")}</div>`
+      :`<div class="card" style="background:var(--accent-soft);border:0;margin-top:10px"><div class="m" style="color:var(--ink)">No checklist for this journal yet. Make one (Ask AI can fill it) so nothing is missed.</div><div class="actions"><button id="sfmake">📋 Make a checklist</button></div></div>`}
+    <div class="actions"><button class="primary" id="sfgo">Mark submitted today</button><button data-act="portal" data-id="${sub.id}">Open journal site ↗</button></div>`);
+  if($("#sfmake")) $("#sfmake").onclick=()=>checklistSheet(sub.journal,()=>submitFlow(sub));
+  $("#sfgo").onclick=()=>{ const boxes=[...document.querySelectorAll(".cki")], left=boxes.filter(b=>!b.checked).length;
+    if(left&&!confirm(left+" checklist item"+(left>1?"s are":" is")+" not ticked. Mark submitted anyway?")) return;
+    const before=sub.status; sub.status="Under review"; sub.submitted=today(); sub.decided=""; noteActivity(); persist(); closeSheet(); render(); celebrate(before==="Under review"?"Planned":before,"Under review",sub.journal); };
+}
+
+/* ---------- timeline: every paper's journey across the months ---------- */
+const TL_COLOR={"Under review":"var(--ur)","Rejected":"var(--need)","Accepted":"var(--acc)","Revision requested":"var(--rev)","Revision resubmitted":"var(--closed)","Returned by office":"var(--warn)","Withdrawn":"var(--closed)"};
+let tlMonths=18;
+function viewTimeline(){
+  const end=dnum(today())+20, start=end-tlMonths*30.44-20, rowH=30, L=4, labelW=0;
+  const papers=S.papers.filter(p=>subsOf(p.id).some(x=>isSent(x)&&x.submitted&&(x.decided?dnum(x.decided):end)>=start))
+    .sort((a,b)=>{ const f=p=>Math.max(...subsOf(p.id).filter(x=>x.submitted).map(x=>dnum(x.submitted))); return f(b)-f(a); });
+  const pxPerDay=4.2, W=Math.round((end-start)*pxPerDay)+20, H=papers.length*rowH*2+40;
+  const x=d=>Math.round((d-start)*pxPerDay)+L;
+  let months="", y=24;
+  for(let m=0;m<=tlMonths+1;m++){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-tlMonths+m); const iso=d.toISOString().slice(0,10), xx=x(dnum(iso));
+    if(xx<0||xx>W) continue; months+=`<line x1="${xx}" x2="${xx}" y1="14" y2="${H}" stroke="var(--line)"/><text x="${xx+3}" y="11">${MON[d.getMonth()]}${d.getMonth()===0?" "+d.getFullYear():""}</text>`; }
+  let rows="";
+  papers.forEach((p,i)=>{ const y0=24+i*rowH*2;
+    rows+=`<text x="${x(dnum(today()))-6}" y="${y0+11}" text-anchor="end" style="fill:var(--ink);font-weight:600">${esc(p.key)}</text>`;
+    subsOf(p.id).filter(s=>isSent(s)&&s.submitted).forEach((s,k)=>{ const a=Math.max(dnum(s.submitted),start), b=Math.min(s.decided?dnum(s.decided):dnum(today()),end); if(b<start) return;
+      const w=Math.max(6,x(b)-x(a)), col=TL_COLOR[s.status]||"var(--closed)";
+      rows+=`<g data-act="editsub" data-id="${s.id}"><rect class="bar" x="${x(a)}" y="${y0+16}" width="${w}" height="16" rx="5" fill="${col}" opacity="${isOpen(s)?1:.75}" style="animation-delay:${(i*0.05+k*0.03).toFixed(2)}s"><title>${esc(s.journal)} · ${esc(s.status)} · ${fmt(s.submitted)}${s.decided?" → "+fmt(s.decided):""}</title></rect>
+        ${w>60?`<text x="${x(a)+5}" y="${y0+28}" style="fill:#fff;font-size:9.5px;pointer-events:none">${esc(s.journal.slice(0,Math.floor(w/5.6)))}</text>`:""}</g>`; });
+  });
+  return `<div class="row" style="margin-bottom:6px"><button class="ghost" data-go="home">← Dashboard</button></div>
+    <h2>Timeline <small>tap a bar to open it</small></h2>
+    <div class="filters">${[6,12,18,36].map(n=>`<button data-tlm="${n}" class="${n===tlMonths?"on":""}">${n} months</button>`).join("")}</div>
+    <div class="legend m" style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 8px">${["Under review","Revision requested","Rejected","Accepted"].map(k=>`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TL_COLOR[k]};margin-right:4px"></i>${k}</span>`).join("")}</div>
+    <div class="card tl" id="tlbox">${papers.length?`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${months}<line x1="${x(dnum(today()))}" x2="${x(dnum(today()))}" y1="14" y2="${H}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>${rows}</svg>`:'<div class="empty">Nothing submitted in this period.</div>'}</div>
+    <div class="hint">Each bar runs from submission to decision (or today). Scroll sideways for earlier months.</div>`;
+}
+function bindTimeline(){
+  const b=$("#tlbox"); if(b) b.scrollLeft=b.scrollWidth;
+  document.querySelectorAll("[data-tlm]").forEach(el=>el.onclick=()=>{ tlMonths=+el.dataset.tlm; render(); });
+}
+/** A paper's journey: each journal it went to, in order, ending at "next" or the trophy. */
+function journeyMap(p){
+  const ss=subsOf(p.id).filter(x=>isSent(x)&&x.submitted).sort((a,b)=>a.submitted.localeCompare(b.submitted));
+  if(!ss.length) return "";
+  const next=paperInfo(p).next, acc=ss.some(x=>x.status==="Accepted");
+  const nodes=ss.map(x=>({label:x.journal,status:x.status,date:x.submitted})).concat(acc?[]:[{label:next?next.journal:"next journal",status:"next"}]);
+  const gap=110, W=nodes.length*gap+70, H=118;
+  const pos=i=>({x:62+i*gap,y:i%2?74:40});
+  let path="M"+pos(0).x+","+pos(0).y; for(let i=1;i<nodes.length;i++){ const a=pos(i-1),b=pos(i); path+=` C${a.x+gap/2},${a.y} ${b.x-gap/2},${b.y} ${b.x},${b.y}`; }
+  const icon=st=>({"Accepted":"🏆","Rejected":"✕","Under review":"⏳","Revision requested":"✍","Revision resubmitted":"↻","Returned by office":"↩","Withdrawn":"–","next":"★"}[st]||"•");
+  const col=st=>st==="next"?"var(--accent)":(TL_COLOR[st]||"var(--closed)");
+  return `<h2>Journey <small>${ss.length} journal${ss.length>1?"s":""}</small></h2><div class="journey"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <path class="path" d="${path}" fill="none" stroke="var(--muted)" stroke-width="2"/>
+    ${nodes.map((n,i)=>{ const q=pos(i); return `<g class="node" style="animation-delay:${(0.15+i*0.12).toFixed(2)}s;transform-origin:${q.x}px ${q.y}px"><circle cx="${q.x}" cy="${q.y}" r="${n.status==="Accepted"?17:13}" fill="${col(n.status)}" ${n.status==="next"?'stroke="var(--accent)" stroke-dasharray="3 3" fill-opacity=".15"':""}/>
+      <text x="${q.x}" y="${q.y+4}" text-anchor="middle" style="fill:${n.status==="next"?"var(--accent)":"#fff"};font-size:12px;font-weight:700">${icon(n.status)}</text>
+      <text x="${q.x}" y="${i%2?q.y+30:q.y-20}" text-anchor="middle">${esc(n.label.length>17?n.label.slice(0,16)+"…":n.label)}</text></g>`; }).join("")}
+  </svg></div>`;
+}
+
+/* ---------- turnaround: how long journals take, from your own history ---------- */
+function turnaround(journal){
+  const n=normJ(journal), ds=S.subs.filter(x=>normJ(x.journal)===n&&isSent(x)&&x.submitted&&x.decided&&DECIDED.includes(x.status)).map(subDays).filter(x=>x!=null);
+  if(!ds.length) return null;
+  const desk=ds.filter(x=>x<=14).length;
+  return {med:median(ds),n:ds.length,min:Math.min(...ds),max:Math.max(...ds),desk};
+}
+function turnaroundLine(journal,days){
+  const t=turnaround(journal); if(!t) return "";
+  const slow=days!=null&&days>t.max&&t.n>=1;
+  return `<div class="ta">⏱ Your history here: <b>${t.med} days</b> to a decision${t.n>1?` (median of ${t.n}, ${t.min}–${t.max})`:""}${t.desk?` · ${t.desk} quick (≤14 d)`:""}${slow?` · <b style="color:var(--warn)">longer than ever before</b>`:""}</div>`;
+}
 
 /* ---------- dates ---------- */
 function today(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -253,7 +429,7 @@ function subCard(s, opts={}){
       <button data-act="decide" data-id="${s.id}">Record decision</button>
       ${s.status==="Under review"&&d!=null&&d>=(+S.settings.chaseDays||90)?`<button data-act="chase" data-id="${s.id}">✉ Email editor</button>`:""}</div>`;
   }else if(s.status==="Planned" && opts.planActions!==false){
-    acts = `<div class="actions"><button data-act="submitnow" data-id="${s.id}">Mark submitted today</button>
+    acts = `<div class="actions"><button class="primary" data-act="submitflow" data-id="${s.id}">✈️ Submit…</button><button data-act="checklist" data-j="${esc(s.journal)}">📋 Checklist</button>
       <button class="ghost" data-act="portal" data-id="${s.id}">Journal site ↗</button></div>`;
   }
   return `<div class="card tap" data-act="editsub" data-id="${s.id}">
@@ -265,6 +441,7 @@ function subCard(s, opts={}){
       ${(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
+    ${open||s.status==="Planned"?turnaroundLine(s.journal,open?d:null):""}
     ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
     ${acts}</div>`;
 }
@@ -283,7 +460,7 @@ function paperCard(p){
 /* ---------- views ---------- */
 function render(){
   $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
-  $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights"||tab==="ai")?"none":"block";
+  $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights"||tab==="ai"||tab==="timeline")?"none":"block";
   const v=$("#view");
   if(tab==="home") v.innerHTML=viewHome();
   else if(tab==="review") v.innerHTML=viewReview();
@@ -292,8 +469,11 @@ function render(){
   else if(tab==="stats") v.innerHTML=viewStats();
   else if(tab==="insights") v.innerHTML=viewInsights();
   else if(tab==="ai") v.innerHTML=viewAI();
+  else if(tab==="timeline") v.innerHTML=viewTimeline();
   else v.innerHTML=viewMore();
-  bindSearch(); bindMore(); bindWelcome(); if(tab==="stats") bindStats(); if(tab==="ai") bindAI();
+  bindSearch(); bindMore(); bindWelcome(); if(tab==="stats") bindStats(); if(tab==="ai") bindAI(); if(tab==="timeline") bindTimeline();
+  if(tab==="home"){ FX.countUp(v); const k=streak().weeks, seen=+S.settings.streakSeen||0;
+    if(k>seen&&[2,4,8,12,26,52].includes(k)){ S.settings.streakSeen=k; persist(false); setTimeout(()=>FX.streak(k),500); } else if(k<seen){ S.settings.streakSeen=k; persist(false); } }
 }
 function stats(){
   const infos = S.papers.map(p=>({p,...paperInfo(p)}));
@@ -329,18 +509,19 @@ function viewHome(){
   return `
   ${welcomeCard()}
   ${searchBox}
+  ${(()=>{ const k=streak(); return k.weeks>=1?`<div class="streak"><span class="fl">🔥</span>${k.weeks}-week streak${k.thisWeek?"":" · record something this week to keep it"}</div>`:""; })()}
   ${pendingBanner()}
   ${stale!=null&&stale>=10&&!S.settings.fresh?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
   <div class="tiles">
-    <button class="tile" data-go="papers:Active"><b>${st.tracked}</b><span>Papers tracked</span><i>excl. closed/parked</i></button>
-    <button class="tile" data-go="papers:Waiting on you"><b>${st.waiting}</b><span>Waiting on you</span><i>to (re)submit/revise</i></button>
-    <button class="tile" data-go="review"><b>${st.under}</b><span>Under review</span><i>${st.openSubs.length} open submissions</i></button>
-    <button class="tile" data-go="papers:Revision due"><b>${st.revdue}</b><span>Revisions due</span><i>revise &amp; resubmit</i></button>
-    <button class="tile" data-go="subs:All sent"><b>${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
-    <button class="tile" data-go="subs:Accepted"><b>${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
+    <button class="tile" data-go="papers:Active"><b data-count="${st.tracked}" data-key="tracked">${st.tracked}</b><span>Papers tracked</span><i>excl. closed/parked</i></button>
+    <button class="tile" data-go="papers:Waiting on you"><b data-count="${st.waiting}" data-key="waiting">${st.waiting}</b><span>Waiting on you</span><i>to (re)submit/revise</i></button>
+    <button class="tile" data-go="review"><b data-count="${st.under}" data-key="under">${st.under}</b><span>Under review</span><i>${st.openSubs.length} open submissions</i></button>
+    <button class="tile" data-go="papers:Revision due"><b data-count="${st.revdue}" data-key="revdue">${st.revdue}</b><span>Revisions due</span><i>revise &amp; resubmit</i></button>
+    <button class="tile" data-go="subs:All sent"><b data-count="${st.sent}" data-key="sent">${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
+    <button class="tile" data-go="subs:Accepted"><b data-count="${st.accepted}" data-key="accepted">${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
   </div>
   ${insightCard()}
-  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button></div>
+  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button><button class="card tap" data-act="timeline" style="width:100%;text-align:center;font:inherit;color:inherit;margin-top:8px">🗓 Timeline &amp; journeys →</button></div>
   <h2>Under review now <small>longest wait first</small></h2>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
   <h2>Waiting on you <small>most urgent first</small></h2>
@@ -401,6 +582,8 @@ function viewMore(){
     <div class="hint">Under-review submissions older than this are flagged “Check status”; at twice this they're “Overdue”.</div>
     <label for="myname">Your name (signs chase emails)</label>
     <input id="myname" value="${esc(S.settings.myName||"")}" placeholder="e.g. Dr S. Kaushal">
+    <label>Animations</label>
+    <div class="filters" style="flex-wrap:wrap">${[["full","🎆 Full"],["calm","🌙 Calm"]].map(([k,l])=>`<button data-act="motion" data-v="${k}" class="${(S.settings.motion||"full")===k?"on":""}">${l}</button>`).join("")}</div>
   </div>
   <h2>Reminders</h2>
   <div class="card">${remindCard()}</div>
@@ -500,7 +683,11 @@ document.addEventListener("click",e=>{
     case "pasteemail": { const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(/rdsk:\/\/add\?/i.test(c)) addLinksSheet(c); else if(c.trim()) emailSheet(c); else if(navigator.clipboard) navigator.clipboard.readText().then(t=>t.trim()?emailSheet(t):emailSheet(""),()=>emailSheet("")); else emailSheet(""); break; }
     case "testnotif": if(window.Android&&Android.testReminder){ if(!Android.notificationsAllowed()) { askNotifications(true); toast("Allow notifications for RD SK first"); } else { Android.testReminder(); toast("Test notification sent"); } } else toast("Works in the phone app"); break;
     case "asknotif": askNotifications(true); break;
-    case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); persist(); render(); toast("Marked under review · "+s.journal); break;
+    case "submitnow": e.stopPropagation(); s.status="Under review"; s.submitted=today(); noteActivity(); persist(); render(); celebrate("Planned","Under review",s.journal); break;
+    case "submitflow": e.stopPropagation(); submitFlow(s); break;
+    case "checklist": e.stopPropagation(); checklistSheet(a.dataset.j); break;
+    case "timeline": setTab("timeline"); break;
+    case "motion": S.settings.motion=a.dataset.v; persist(false); applyMotion(); render(); if(a.dataset.v!=="calm") FX.confetti(120); break;
     case "editsub": editSub(s); break;
     case "paper": showPaper(paperById(id)); break;
     case "newpaper": editPaper(null); break;
@@ -536,9 +723,10 @@ function decide(s){
   hint();
   $("#dg").onclick=e=>{ const b=e.target.closest("[data-o]"); if(!b) return; pick=b.dataset.o; document.querySelectorAll("#dg button").forEach(x=>x.classList.toggle("on",x===b)); hint(); };
   $("#dsave").onclick=()=>{
+    const before=s.status;
     s.status=pick; s.decided = pick==="Under review" ? "" : ($("#dd").value||today()); s.notes=$("#dn").value.trim();
-    persist(); closeSheet(); render(); toast("Saved · "+pick);
-    if(pick==="Rejected"||pick==="Returned by office") setTimeout(()=>whatNext(paperById(s.paper),s),350);
+    noteActivity(); persist(); closeSheet(); render(); celebrate(before,pick,s.journal);
+    if(pick==="Rejected"||pick==="Returned by office") setTimeout(()=>whatNext(paperById(s.paper),s),pick==="Rejected"?2600:350);
   };
 }
 
@@ -598,21 +786,21 @@ function editSub(s, presetPaper){
       ${!isNew&&s.status==="Under review"?`<button id="fchase">✉ Email editor</button>`:""}
       ${isNew?"":`<button class="danger" id="fdel">Delete</button>`}</div>`);
   if($("#fchase")) $("#fchase").onclick=()=>chaseEmail(s);
-  const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); const g=j&&abdcOf(j); $("#fjabdc").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list"):""; if(!j) return; const po=portalFor(j);
+  const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); const g=j&&abdcOf(j); $("#fjabdc").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list")+turnaroundLine(j,null)+` <button class="link" data-act="checklist" data-j="${esc(j)}">📋 ${(S.checklists||{})[j]?"Journal checklist":"Make a checklist"}</button>`:""; if(!j) return; const po=portalFor(j);
     $("#fuh").innerHTML = u?"Using your link.":po.src==="built-in"?"✓ Found automatically: "+esc(po.url):po.src==="yours"?"Using your saved link: "+esc(po.url):`Not known yet: <button class="link" id="ffind">Find it ↗</button>, copy the login page address, then paste it above.`;
     const f=$("#ffind"); if(f) f.onclick=()=>openBrowser(findLinkUrl(j)); };
   journalPicker($("#fj")); $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
   $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
   $("#fsave").onclick=()=>{
-    const pid=$("#fp").value, j=$("#fj").value.trim();
+    const pid=$("#fp").value, j=$("#fj").value.trim(), before=isNew?"":s.status;
     if(!pid) return toast("Choose a paper"); if(!j) return toast("Enter a journal");
     Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim(), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim(), msid:$("#fm").value.trim()});
     S.contacts=S.contacts||{}; const em=$("#fx").value.trim(); if(em) S.contacts[j]=em; else delete S.contacts[j];
     const u=$("#fu").value.trim();
     if(u) S.portals[j]=/^https?:\/\//i.test(u)?u:"https://"+u; else delete S.portals[j];
     if(isNew) S.subs.push(s);
-    persist(); closeSheet(); render(); toast(isNew?"Added":"Saved");
+    noteActivity(); persist(); closeSheet(); render(); celebrate(before||(isNew&&s.status==="Under review"?"Planned":s.status),s.status,j);
   };
   if($("#fdel")) $("#fdel").onclick=()=>{ if(confirm("Delete this submission row?")){ S.subs=S.subs.filter(x=>x!==s); persist(); closeSheet(); render(); } };
 }
@@ -636,6 +824,7 @@ function showPaper(p){
       ${i.next&&i.stage!=="Under review"?`<button class="primary" id="pnext">Submit to ${esc(i.next.journal)} today</button>`:""}
       ${revRow?`<button class="primary" id="prev">Resubmit revision today</button>`:""}
       <button id="padd">+ Submission</button><button id="pedit">Edit paper</button><button id="pai">✦ Ask AI</button></div>
+    ${journeyMap(p)}
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
     <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
       <div style="display:flex;flex-direction:column;gap:4px"><button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">No journals queued.</div>'}
@@ -646,10 +835,10 @@ function showPaper(p){
     const mv=e.target.closest("[data-mv]"); if(!mv) return; e.stopPropagation();
     const [sid,dir]=mv.dataset.mv.split(":"); movePlanned(p.id,sid,+dir); showPaper(p);
   };
-  if($("#pnext")) $("#pnext").onclick=()=>{ const n=i.next; n.status="Under review"; n.submitted=today(); persist(); render(); showPaper(p); toast("Submitted to "+n.journal); };
+  if($("#pnext")) $("#pnext").onclick=()=>{ closeSheet(); submitFlow(i.next); };
   if($("#prev")) $("#prev").onclick=()=>{ revRow.status="Revision resubmitted"; if(!revRow.decided) revRow.decided=today();
     S.subs.push({id:uid("s"),paper:p.id,journal:revRow.journal,rating:revRow.rating,status:"Under review",submitted:today(),decided:"",notes:"Revised version resubmitted",titleUsed:""});
-    persist(); render(); showPaper(p); toast("Revision resubmitted"); };
+    noteActivity(); persist(); render(); showPaper(p); celebrate("Revision requested","Under review",revRow.journal); };
   $("#padd").onclick=()=>editSub(null,p.id);
   $("#pedit").onclick=()=>editPaper(p);
   $("#pai").onclick=()=>{ AIU.paper=p.id; closeSheet(); setTab("ai"); };
@@ -908,6 +1097,11 @@ function viewStats(){
     <table class="tbl">${OUT.map(k=>`<tr><td style="width:42%"><span class="chip ${stageClass(k)}">${k}</span></td><td><div class="hbar" style="width:${Math.max(2,100*D.out[k]/maxO)}%"></div></td><td class="n" style="width:12%">${D.out[k]}</td></tr>`).join("")}</table>
   </div>
 
+  ${(()=>{ const t=D.journals.filter(j=>j.med!=null&&j.days.length).slice().sort((a,b)=>b.med-a.med); if(t.length<3) return "";
+    const row=j=>`<tr><td>${esc(j.name)}</td><td class="n">${j.med} d</td><td class="n">${j.days.length}</td></tr>`;
+    return `<h2>Turnaround <small>median days to a decision, your history</small></h2><div class="card" style="padding:6px 10px">
+      <div class="m" style="margin:4px 0">🐢 Slowest</div><table class="tbl">${t.slice(0,5).map(row).join("")}</table>
+      <div class="m" style="margin:10px 0 4px">⚡ Fastest</div><table class="tbl">${t.slice(-5).reverse().map(row).join("")}</table></div>`; })()}
   <h2>Journals <small>by number of tries</small></h2>
   <div class="card" style="padding:6px 10px">
     <table class="tbl"><tr><th>Journal</th><th class="n">ABDC</th><th class="n">Tries</th><th class="n">Median days</th><th class="n">Result</th></tr>
@@ -933,8 +1127,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.7", APP_BUILD="22 Oct 2026";
+const APP_VERSION="3.8", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["3.8","1 Nov 2026",["Animations: confetti cannons and fireworks on acceptance, a paper plane on submitting, rising embers after a rejection, streaks, count-ups and more (More → Settings → Animations)","Turnaround from your own history on every journal, plus slowest and fastest journals in Stats","Journal checklists (word limit, referencing, anonymising, cover letter…), filled by Ask AI, ticked off when you submit","Timeline of all submissions and a journey map for each paper","Home-screen widget"]],
   ["3.7","1 Nov 2026",["Search everywhere: paper titles, journals, authors, manuscript IDs and notes, words in any order, across all papers (also on Home)","Journal emails to confirm: Ignore or one-tap Apply on each email, emails already recorded are marked, and Ignore all / already recorded / older than 30 days"]],
   ["3.6","28 Oct 2026",["Co-authors: share only the papers you write together; each co-author gets their own sheet, kept in step with yours both ways","Co-authors open it once in Google's file picker (More → Google account → Open a sheet shared with me)"]],
   ["3.5","27 Oct 2026",["Sign-in problems: the screen shows both of Google's answers and phone details, and Copy includes them, so the cause can be pinned down"]],
@@ -1216,14 +1411,14 @@ function emailSheet(text, pend){
   $("#esave").onclick=()=>{
     const x=S.subs.find(y=>y.id===$("#es").value); if(!x) return toast("Choose the submission");
     const st=$("#eo").value, d=$("#ed").value||today(), k=$("#ek").value;
-    x.status=st;
+    const before=x.status; x.status=st;
     if(st==="Under review"){ if(!x.submitted) x.submitted=d; x.decided=""; } else if(st!=="Planned") x.decided=d;
     if(k) x.dtype=k+(k==="Rejected after review"&&r.reviews>1?" ("+r.reviews+" reviews)":"");
     if($("#em").value.trim()) x.msid=$("#em").value.trim();
     const note="Email "+fmt(d)+": "+firstLine.slice(0,80);
     x.notes=x.notes?x.notes+" | "+note:note;
     resolve("Confirmed in the app",{paper:(paperById(x.paper)||{}).key,journal:x.journal,status:st,dtype:x.dtype||""});
-    persist(); closeSheet(); render(); toast("Updated · "+x.journal+" → "+st);
+    noteActivity(); persist(); closeSheet(); render(); celebrate(before,st,x.journal);
     if(pend&&(S.pending||[]).length) setTimeout(pendingSheet,400);
     else if(st==="Rejected") setTimeout(()=>whatNext(paperById(x.paper),x),400);
   };
@@ -1272,7 +1467,7 @@ function pendingSheet(){
   $("#sheet").onclick=e=>{
     const ig=e.target.closest("[data-pignore]"), ap=e.target.closest("[data-papply]"), bulk=e.target.closest("[data-pa]"), c=e.target.closest("[data-pend]");
     if(ig){ pendResolve(list[+ig.dataset.pignore],"Dismissed in the app"); persist(false); gsSchedule(); toast("Ignored"); return pendingSheet(); }
-    if(ap){ const x=list[+ap.dataset.papply]; pendApply(x,infos[+ap.dataset.papply]); toast("Updated · "+x.journal+" → "+x.guess); return pendingSheet(); }
+    if(ap){ const x=list[+ap.dataset.papply], before=infos[+ap.dataset.papply].sub.status; pendApply(x,infos[+ap.dataset.papply]); celebrate(before,x.guess,x.journal); return pendingSheet(); }
     if(bulk){ const k=bulk.dataset.pa, pick=list.filter((x,i)=>k==="all"||(k==="done"&&infos[i].done)||(k==="old"&&infos[i].age>30));
       if(k==="all"&&!confirm("Ignore all "+pick.length+" emails? Your submissions stay as they are.")) return;
       pick.forEach(x=>pendResolve(x,"Dismissed in the app")); persist(false); gsSchedule(); toast(pick.length+" ignored"); return pendingSheet(); }
@@ -1812,6 +2007,7 @@ function gsPayload(mode){
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
       settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false,coEmails:S.settings.coEmails||{},me:S.settings.me||""},
       secrets:mode!=="link"&&GS.gemini&&!(GS.drive&&GS.drive.shared)?{gemini:GS.gemini}:undefined, // never into a co-author's sheet
+      checklists:mode!=="link"&&Object.keys(S.checklists||{}).length?S.checklists:undefined,
       shares:mode!=="link"&&!(GS.drive&&GS.drive.shared)&&(GS.shares||[]).length?GS.shares.map(x=>({author:x.author,label:x.label,email:x.email,id:x.id,name:x.name})):undefined}};
 }
 async function gsSync(mode,manual){
@@ -1865,7 +2061,8 @@ function gsApply(j){
   if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
   if(j.app){ if(j.app.secrets&&j.app.secrets.gemini&&!GS.gemini) GS.gemini=j.app.secrets.gemini; if(j.app.script) GS.script=j.app.script;
     if(Array.isArray(j.app.shares)&&!(GS.shares||[]).length&&!(GS.drive&&GS.drive.shared)) GS.shares=j.app.shares.map(x=>Object.assign({base:{}},x)); // restored: no common base, so newer edit wins
-    if(j.app.abdc) S.abdc=j.app.abdc; S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
+    if(j.app.abdc) S.abdc=j.app.abdc;
+    if(j.app.checklists){ const mine=S.checklists||{}; Object.keys(j.app.checklists).forEach(k=>{ const t=j.app.checklists[k]; if(!mine[k]||(t.at||"")>(mine[k].at||"")) mine[k]=t; }); S.checklists=mine; } S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
     if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName;
       if(j.app.settings.coEmails&&!Object.keys(S.settings.coEmails||{}).length) S.settings.coEmails=j.app.settings.coEmails;
       if(j.app.settings.me&&!S.settings.me) S.settings.me=j.app.settings.me; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
@@ -1998,7 +2195,7 @@ async function ghPull(){
   }catch(err){ alert("Load failed: "+err.message); }
 }
 
-load(); baseline(); render(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
+load(); applyMotion(); baseline(); render(); pushWidget(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
 if(gsOn()&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&gsOn()&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
 </script>

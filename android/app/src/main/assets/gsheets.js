@@ -259,6 +259,9 @@ async function rdgSync(api, id, body, opts) {
     ["portals", "contacts"].forEach(function (k) { if (inc[k]) { var m = Object.assign({}, app[k] || {}, inc[k]); if (JSON.stringify(m) !== JSON.stringify(app[k] || {})) { app[k] = m; appDirty = true; } } });
     if (inc.chaseDays && inc.chaseDays !== app.chaseDays) { app.chaseDays = inc.chaseDays; appDirty = true; }
     if (inc.shares && JSON.stringify(inc.shares) !== JSON.stringify(app.shares || [])) { app.shares = inc.shares; appDirty = true; }
+    if (inc.checklists) { var cl = Object.assign({}, app.checklists || {});
+      Object.keys(inc.checklists).forEach(function (k) { var t = inc.checklists[k]; if (!cl[k] || (t.at || "") > (cl[k].at || "")) cl[k] = t; });
+      if (JSON.stringify(cl) !== JSON.stringify(app.checklists || {})) { app.checklists = cl; appDirty = true; } }
     ["settings", "secrets"].forEach(function (k) { if (inc[k]) { var m = Object.assign({}, app[k] || {}, inc[k]); if (JSON.stringify(m) !== JSON.stringify(app[k] || {})) { app[k] = m; appDirty = true; } } });
     if (J && J.journal) {
       var at = {}; jb.v.forEach(function (r, i) { if (rdgStr(r[J.journal - 1])) at[rdgNorm(r[J.journal - 1])] = i; });
@@ -353,7 +356,7 @@ async function rdgSync(api, id, body, opts) {
     { values: appendAi.map(function (r) { return r.map(function (x, i) { return i === 0 ? x : rdgCell(x); }); }) });
 
   var outApp = { portals: Object.assign({}, app.portals || {}), contacts: Object.assign({}, app.contacts || {}), abdc: {},
-                 chaseDays: app.chaseDays, settings: app.settings, secrets: app.secrets, script: app.script, shares: app.shares };
+                 chaseDays: app.chaseDays, settings: app.settings, secrets: app.secrets, script: app.script, shares: app.shares, checklists: app.checklists };
   if (jb && J && J.journal) jb.v.forEach(function (r) {
     var name = rdgStr(r[J.journal - 1]); if (!name) return;
     if (J.link && rdgStr(r[J.link - 1])) outApp.portals[name] = rdgStr(r[J.link - 1]);
