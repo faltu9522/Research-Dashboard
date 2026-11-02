@@ -509,6 +509,7 @@ function viewHome(){
   return `
   ${welcomeCard()}
   ${searchBox}
+  ${mailNowBtn()}
   ${(()=>{ const k=streak(); return k.weeks>=1?`<div class="streak"><span class="fl">🔥</span>${k.weeks}-week streak${k.thisWeek?"":" · record something this week to keep it"}</div>`:""; })()}
   ${pendingBanner()}
   ${stale!=null&&stale>=10&&!S.settings.fresh?`<div class="banner">⚠ Not updated for ${stale} days. Any submissions, decisions or editor emails to record?</div>`:""}
@@ -529,10 +530,42 @@ function viewHome(){
 }
 function viewReview(){
   const open = S.subs.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
-  return `${pendingBanner()}<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
+  return `${pendingBanner()}${mailNowBtn()}<div class="actions" style="margin:0 0 8px"><button class="primary" data-act="checkall" style="flex:1">🔄 Check all statuses on journal sites</button></div>
   <div class="actions" style="margin:0 0 12px"><button data-act="pasteemail" style="flex:1">📋 Paste an email</button><button data-act="scanqr" style="flex:1">📷 Scan QR</button></div>
   <div class="hint" style="margin:0 0 10px">Check all statuses opens each journal's site in the app. Sign in by tapping the user ID box and choosing your saved login from Google Password Manager; the app then opens your submitted manuscripts, reads every paper's status (both papers when a journal has two) and moves to the next journal. Or share/paste a journal email to update a submission.</div>
   ${open.length?open.map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}`;
+}
+/* ---------- "Check emails now": ask the sheet's helper to read Gmail right away ---------- */
+let mailBusy="";
+function mailNowBtn(){
+  if(!(GS.url||(gDirect()&&!GS.drive.shared))) return "";
+  return `<div class="actions" style="margin:0 0 12px"><button class="primary" data-act="mailnow" style="flex:1" ${mailBusy?"disabled":""}>${mailBusy?"⏳ "+esc(mailBusy):"📧 Check journal emails now"}</button></div>`;
+}
+async function checkEmailsNow(){
+  if(mailBusy) return;
+  const sc=GS.script||{};
+  if(!GS.url&&(!sc.version||sc.version<"3.3"||!sc.instant)){
+    return alert(sc.version?"Your sheet's helper script needs a quick update for “Check now” (version 3.3):\n\n1. More → Email import & daily insights → Copy the script, then Open sheet\n2. Extensions → Apps Script: replace everything, Save\n3. Reload the sheet → RD SK menu → Turn on email import (once more)\n\nUntil then, emails are still read automatically every 15 minutes."
+      :"Email import isn't set up in your sheet yet: More → Email import & daily insights shows the 3 steps.");
+  }
+  const t0=Date.now(), done=msg=>{ mailBusy=""; GS.importReq=null; gsStore(); render(); toast(msg); if((S.pending||[]).length) setTimeout(pendingSheet,500); };
+  try{
+    if(GS.url){ mailBusy="Reading Gmail…"; render();
+      const r=await httpCall("POST",GS.url,"",JSON.stringify({importNow:true})); let j={}; try{ j=JSON.parse(r.text); }catch(e){}
+      if(!j.ok) throw new Error(j.error||"The web app didn't answer (redeploy the latest script)");
+      await gsSync("normal",false); FX.spark(lastTap.x,lastTap.y); return done("📧 "+j.summary);
+    }
+    GS.importReq={at:t0}; gsStore(); mailBusy="Asking your sheet to read Gmail…"; render();
+    await gsSync("normal",false);
+    for(let k=0;k<14;k++){ // the helper looks every minute
+      await new Promise(ok=>setTimeout(ok,8000));
+      mailBusy="Reading Gmail… "+Math.round((Date.now()-t0)/1000)+" s"; render();
+      await gsSync("normal",false);
+      const res=GS.importResult;
+      if(res&&+res.request===t0){ FX.spark(lastTap.x,lastTap.y); return done("📧 "+res.summary); }
+    }
+    done("The helper hasn't answered yet: it may still be running. New emails will appear on the next sync.");
+  }catch(err){ mailBusy=""; GS.importReq=null; gsStore(); render(); alert("Couldn't check emails: "+err.message); }
 }
 /** Every typed word must appear somewhere (any order, ignoring case, accents and punctuation). */
 const foldText=t=>String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[‘’'`“”"]/g,"").replace(/[^a-z0-9*]+/g," ");
@@ -644,6 +677,7 @@ document.addEventListener("click",e=>{
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
     case "pending": pendingSheet(); break;
+    case "mailnow": checkEmailsNow(); break;
     case "doi": e.stopPropagation(); openBrowser("https://doi.org/"+a.dataset.doi); break;
     case "star": { e.stopPropagation(); const it=(S.insights||[]).find(x=>x.doi===a.dataset.doi); if(it){ it.saved=!it.saved; if(it.saved){ GS.savedInsights=(GS.savedInsights||[]).concat([it.doi]); gsStore(); gsSchedule(); } persist(false); render(); toast(it.saved?"Saved to your ideas":"Removed"); } break; }
     case "insfilter": insFilter=a.dataset.f; render(); break;
@@ -1137,8 +1171,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="3.9", APP_BUILD="22 Oct 2026";
+const APP_VERSION="4.0", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["4.0","2 Nov 2026",["📧 Check journal emails now (Home and In review): the sheet's helper reads Gmail within about a minute and the app updates itself; needs helper script 3.3"]],
   ["3.9","3 Nov 2026",["Fixed: a journal email could be applied to another journal's submission of the same paper; emails naming a different journal now offer “Add as a new submission” instead","Warning before adding an identical submission row, and “Remove duplicates” on a paper's page"]],
   ["3.8","1 Nov 2026",["Animations: confetti cannons and fireworks on acceptance, a paper plane on submitting, rising embers after a rejection, streaks, count-ups and more (More → Settings → Animations)","Turnaround from your own history on every journal, plus slowest and fastest journals in Stats","Journal checklists (word limit, referencing, anonymising, cover letter…), filled by Ask AI, ticked off when you submit","Timeline of all submissions and a journey map for each paper","Home-screen widget"]],
   ["3.7","1 Nov 2026",["Search everywhere: paper titles, journals, authors, manuscript IDs and notes, words in any order, across all papers (also on Home)","Journal emails to confirm: Ignore or one-tap Apply on each email, emails already recorded are marked, and Ignore all / already recorded / older than 30 days"]],
@@ -1508,7 +1543,7 @@ function pendingSheet(){
     ${list.map((x,i)=>{ const f=infos[i]; return `<div class="card"><div class="tap" data-pend="${i}"><div class="t">${esc(x.subject)}</div><div class="m">${esc(x.from)} · ${fmt(x.date)}${f.age>30?` · <b>${f.age} days old</b>`:""}</div>
       <div style="margin-top:5px">${x.guess?`<span class="chip ${stageClass(x.guess)}">${esc(x.guess)}</span> `:""}${x.journal?`<span class="m">${esc(x.journal)}${x.paper?" · "+esc(x.paper):""}</span>`:'<span class="m">paper not recognised</span>'}</div>
       ${f.done?`<div class="m" style="margin-top:4px;color:var(--acc)">✓ ${esc(f.done)}</div>`:""}
-      ${f.mismatch&&!f.done?`<div class="m" style="margin-top:4px;color:var(--warn)">⚠ This email is from <b>${esc(f.ej)}</b>${x.journal?`, not ${esc(x.journal)}`:""}.</div>`:""}</div>
+      ${f.mismatch&&!f.done?(x.journal?`<div class="m" style="margin-top:4px;color:var(--warn)">⚠ This email is from <b>${esc(f.ej)}</b>, not ${esc(x.journal)}.</div>`:`<div class="m" style="margin-top:4px">📨 Email from <b>${esc(f.ej)}</b></div>`):""}</div>
       <div class="actions">${f.canApply?`<button class="primary" data-papply="${i}">Apply: ${esc(x.guess)}</button>`:""}${f.canAdd?`<button class="primary" data-padd="${i}">Add ${esc(f.ej)}: ${esc(x.guess)}</button>`:""}<button data-pend="${i}">Check &amp; edit</button><button class="ghost" data-pignore="${i}">Ignore</button></div></div>`; }).join("")}`);
   $("#sheet").onclick=e=>{
     const ad=e.target.closest("[data-padd]");
@@ -1823,7 +1858,7 @@ function googleCard(){
 }
 function helperCard(){
   const sc=GS.script||{};
-  return `<div class="m" style="color:var(--ink)">${sc.version?`✓ Helper script installed (version ${esc(sc.version)})${sc.email?" · email import on":" · email import off"}${sc.insights?" · daily insights on":""}.${sc.version!==HELPER_VERSION?` <b>A newer helper (${HELPER_VERSION}) is available</b>: repeat steps 1–3 below when convenient.`:""}`:"Optional: a small script in your sheet reads journal emails from this Google account's Gmail every 15 minutes and writes daily research insights, even when your phone is off."}</div>
+  return `<div class="m" style="color:var(--ink)">${sc.version?`✓ Helper script installed (version ${esc(sc.version)})${sc.email?" · email import on"+(sc.instant?" (every 15 min + Check now)":""):" · email import off"}${sc.insights?" · daily insights on":""}.${sc.version!==HELPER_VERSION?` <b>A newer helper (${HELPER_VERSION}) is available</b>: repeat steps 1–3 below when convenient.`:""}`:"Optional: a small script in your sheet reads journal emails from this Google account's Gmail every 15 minutes and writes daily research insights, even when your phone is off."}</div>
     ${sc.version===HELPER_VERSION?"":`<ol class="m" style="color:var(--ink);padding-left:20px;margin:10px 0">
       <li>Tap <b>Copy the script</b>, then <b>Open sheet</b>.</li>
       <li>In the sheet: <b>Extensions → Apps Script</b>, delete what's there, paste, tap <b>Save</b>. (No deployment needed.)</li>
@@ -1839,7 +1874,7 @@ function geminiCard(){
     <div class="actions"><button data-act="gkeyget">Get a free key ↗</button></div>
     <div class="hint">Kept on this phone and in your sheet's hidden settings tab, so it comes back after a reinstall and the helper script can use it for insights. On Google's free tier, what you send may be used to improve Google's products.</div>`;
 }
-const HELPER_VERSION="3.2";
+const HELPER_VERSION="3.3";
 /** Gemini straight from the phone: Google Search grounding first, a busy model is retried, then the other free models. */
 async function geminiAsk(key,prompt){
   const base="https://generativelanguage.googleapis.com/v1beta/models", started=Date.now();
@@ -2058,6 +2093,7 @@ function gsPayload(mode){
       settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false,coEmails:S.settings.coEmails||{},me:S.settings.me||""},
       secrets:mode!=="link"&&GS.gemini&&!(GS.drive&&GS.drive.shared)?{gemini:GS.gemini}:undefined, // never into a co-author's sheet
       checklists:mode!=="link"&&Object.keys(S.checklists||{}).length?S.checklists:undefined,
+      importRequest:mode!=="link"&&GS.importReq?GS.importReq:undefined,
       shares:mode!=="link"&&!(GS.drive&&GS.drive.shared)&&(GS.shares||[]).length?GS.shares.map(x=>({author:x.author,label:x.label,email:x.email,id:x.id,name:x.name})):undefined}};
 }
 async function gsSync(mode,manual){
@@ -2110,6 +2146,7 @@ function gsApply(j){
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
   if(j.insights){ const keep=new Set((GS.savedInsights||[])); S.insights=j.insights.map(x=>Object.assign(x,keep.has(x.doi)?{saved:true}:{})); }
   if(j.app){ if(j.app.secrets&&j.app.secrets.gemini&&!GS.gemini) GS.gemini=j.app.secrets.gemini; if(j.app.script) GS.script=j.app.script;
+    if(j.app.importResult) GS.importResult=j.app.importResult;
     if(Array.isArray(j.app.shares)&&!(GS.shares||[]).length&&!(GS.drive&&GS.drive.shared)) GS.shares=j.app.shares.map(x=>Object.assign({base:{}},x)); // restored: no common base, so newer edit wins
     if(j.app.abdc) S.abdc=j.app.abdc;
     if(j.app.checklists){ const mine=S.checklists||{}; Object.keys(j.app.checklists).forEach(k=>{ const t=j.app.checklists[k]; if(!mine[k]||(t.at||"")>(mine[k].at||"")) mine[k]=t; }); S.checklists=mine; } S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;

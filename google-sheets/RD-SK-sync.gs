@@ -36,7 +36,7 @@ var EMAIL_FROM_DEFAULT = '2026-10-01';
 function emailFromDate() { return PropertiesService.getScriptProperties().getProperty('EMAIL_FROM_DATE') || EMAIL_FROM_DEFAULT; }
 var EMAILS_SHEET = 'Emails', DECISIONS_SHEET = 'Decisions & reviews', MAIL_LABEL = 'RD-SK';
 var EMAIL_HEAD = ['Received', 'From', 'Subject', 'Paper', 'Journal', 'Detected', 'Decision type', 'Reviews', 'Manuscript ID', 'Action', 'Gmail link', 'Message ID', 'Undo data', 'Text'];
-var SCRIPT_VERSION = '3.2';
+var SCRIPT_VERSION = '3.3';
 var DECISION_HEAD = ['Decision date', 'Paper', 'Journal', 'Decision', 'Decision type', 'Reviews', 'Manuscript ID', 'Decision letter & reviewer comments', 'Gmail link', 'Message ID'];
 var JOURNAL_SENDERS = ['manuscriptcentral.com', 'scholarone.com', 'editorialmanager.com', 'ariessys.com', 'aries-mail.com',
   'tandfonline.com', 'taylorandfrancis.com', 'sagepub.com', 'sagepub.co.uk', 'elsevier.com', 'springernature.com', 'springer.com',
@@ -48,6 +48,7 @@ function doGet() { return out(handle({})); }
 function doPost(e) {
   var body = {};
   try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) {}
+  if (body.importNow) { var r = importEmails(3); markScript(); return out({ ok: true, summary: r.summary, counts: r.counts }); }
   return out(body.ask ? aiAsk(body.ask) : handle(body));
 }
 
@@ -55,7 +56,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('RD SK')
     .addItem('Refresh suggested journals', 'refreshSuggestions')
     .addSeparator()
-    .addItem('Turn on email import (every 15 min)', 'turnOnEmailImport')
+    .addItem('Turn on email import (every 15 min + “Check now” from the app)', 'turnOnEmailImport')
     .addItem('Import journal emails now', 'importEmailsNow')
     .addItem('Turn off email import', 'turnOffEmailImport')
     .addItem('Repair: undo email changes and re-read emails', 'repairEmailImport')
@@ -178,7 +179,8 @@ function fillFormulas(sh, C, dataFields, rows) {
 function markScript() {
   try {
     var ss = SpreadsheetApp.getActive(), names = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); });
-    var info = { version: SCRIPT_VERSION, email: names.indexOf('processEmails') >= 0, insights: names.indexOf('dailyInsights') >= 0, at: new Date().toISOString() };
+    var info = { version: SCRIPT_VERSION, email: names.indexOf('processEmails') >= 0, instant: names.indexOf('checkRequests') >= 0,
+                 insights: names.indexOf('dailyInsights') >= 0, at: new Date().toISOString() };
     var sh = ss.getSheetByName(APP_SHEET);
     if (!sh) { sh = ss.insertSheet(APP_SHEET); sh.hideSheet(); sh.getRange(1, 1, 1, 2).setValues([['setting', 'value (JSON)']]); }
     var v = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 2).getValues(), row = -1;
@@ -458,18 +460,39 @@ function date(s) { if (!s) return ''; var p = s.split('-'); return new Date(+p[0
 function turnOnEmailImport() {
   turnOffEmailImport(true);
   ScriptApp.newTrigger('processEmails').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('checkRequests').timeBased().everyMinutes(1).create(); // "Check emails now" from the app
   if (!GmailApp.getUserLabelByName(MAIL_LABEL)) GmailApp.createLabel(MAIL_LABEL);
   var r = importEmails(400);
   SpreadsheetApp.getActive().toast('Email import is on (every 15 minutes). First run: ' + r.summary, 'RD SK', 12);
   markScript();
 }
 function turnOffEmailImport(quiet) {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'processEmails') ScriptApp.deleteTrigger(t); });
+  ScriptApp.getProjectTriggers().forEach(function (t) { var h = t.getHandlerFunction(); if (h === 'processEmails' || h === 'checkRequests') ScriptApp.deleteTrigger(t); });
   if (quiet !== true) SpreadsheetApp.getActive().toast('Email import is off.', 'RD SK');
   markScript();
 }
 function importEmailsNow() { SpreadsheetApp.getActive().toast(importEmails(30).summary, 'RD SK', 10); }
 function processEmails() { importEmails(3); markScript(); }
+
+/**
+ * Every minute: has the app asked to "Check emails now"? (A cheap look at one cell; Gmail is read only when asked.)
+ * The app writes importRequest {at} in the hidden settings tab; the answer goes to importResult {at, request, summary}.
+ */
+function checkRequests() {
+  var sh = SpreadsheetApp.getActive().getSheetByName(APP_SHEET);
+  if (!sh || sh.getLastRow() < 2) return;
+  var v = sh.getRange(1, 1, sh.getLastRow(), 2).getValues(), req = null, resRow = -1;
+  v.forEach(function (r, i) { if (str(r[0]) === 'importRequest') { try { req = JSON.parse(r[1]); } catch (e) {} } if (str(r[0]) === 'importResult') resRow = i + 1; });
+  if (!req || !req.at) return;
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('LAST_IMPORT_REQUEST') === String(req.at)) return;
+  props.setProperty('LAST_IMPORT_REQUEST', String(req.at));
+  var r = importEmails(3);
+  var res = JSON.stringify({ at: new Date().toISOString(), request: req.at, summary: r.summary, counts: r.counts });
+  if (resRow < 0) resRow = sh.getLastRow() + 1;
+  sh.getRange(resRow, 1, 1, 2).setValues([['importResult', res]]);
+  markScript();
+}
 
 function logSheet(ss, name, head) {
   var sh = ss.getSheetByName(name);
