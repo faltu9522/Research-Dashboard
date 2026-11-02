@@ -309,7 +309,7 @@ def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed
             pw.cell(i, c).alignment = Alignment(vertical="top", wrap_text=c in (2, 6, 12))
     pw.column_dimensions["O"].hidden = pw.column_dimensions["M"].hidden = pw.column_dimensions["N"].hidden = True
     dv_o = DataValidation(type="list", formula1='",Closed – rejected,Parked,Published,Withdrawn"', allow_blank=True)
-    dv_t = DataValidation(type="list", formula1='"Journal article,EPW / short piece,Book chapter,Other"', allow_blank=True)
+    dv_t = DataValidation(type="list", formula1='"Journal article,EPW / short piece,Book chapter,Book proposal,Edited book,Other"', allow_blank=True)
     pw.add_data_validation(dv_o); dv_o.add("E2:E200")
     pw.add_data_validation(dv_t); dv_t.add("D2:D200")
     dv_a = DataValidation(type="list", formula1='"Conceptual,Literature review,Empirical – qualitative,Empirical – quantitative,Empirical – mixed methods"', allow_blank=True)
