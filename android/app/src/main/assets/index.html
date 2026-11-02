@@ -107,6 +107,11 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 textarea.big{min-height:120px}
 .sugwrap{position:relative}
 .sortbar{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.bookcard{border-left:4px solid #9b5de5}
+.bkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.bk{background:var(--bg);border-radius:10px;padding:8px 6px;text-align:center}
+.bk b{display:block;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.bk span{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
 .sortbar .m{flex:1}
 .sortbar label{margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--muted)}
 .sortbar select{width:auto;max-width:56%;padding:6px 8px;font-size:13px}
@@ -514,8 +519,8 @@ function render(){
     if(k>seen&&[2,4,8,12,26,52].includes(k)){ S.settings.streakSeen=k; persist(false); setTimeout(()=>FX.streak(k),500); } else if(k<seen){ S.settings.streakSeen=k; persist(false); } }
 }
 function stats(){
-  const infos = S.papers.map(p=>({p,...paperInfo(p)}));
-  const accepted = S.subs.filter(s=>s.status==="Accepted");
+  const infos = S.papers.filter(p=>!isBook(p)).map(p=>({p,...paperInfo(p)})), jsubs=S.subs.filter(x=>!subIsBook(x));
+  const accepted = jsubs.filter(s=>s.status==="Accepted");
   const accDays = accepted.map(subDays).filter(d=>d!=null);
   return {
     infos,
@@ -523,16 +528,33 @@ function stats(){
     waiting: infos.filter(i=>["Revision due","Needs resubmission","Not yet submitted"].includes(i.stage)).length,
     under: infos.filter(i=>i.stage==="Under review").length,
     revdue: infos.filter(i=>i.stage==="Revision due").length,
-    sent: S.subs.filter(isSent).length,
-    rejected: S.subs.filter(s=>s.status==="Rejected").length,
+    sent: jsubs.filter(isSent).length,
+    rejected: jsubs.filter(s=>s.status==="Rejected").length,
     accepted: accepted.length,
     accAvg: accDays.length?Math.round(accDays.reduce((a,b)=>a+b,0)/accDays.length):null,
-    openSubs: S.subs.filter(isOpen),
+    openSubs: jsubs.filter(isOpen),
   };
+}
+/** Books on their own: proposals, publishers still to answer, contracts, declines and the longest wait. */
+function bookStats(){
+  const books=S.papers.filter(isBook), rows=S.subs.filter(subIsBook);
+  const waiting=rows.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
+  return {books, waiting, contracts:rows.filter(x=>x.status==="Accepted").length, declined:rows.filter(x=>x.status==="Rejected").length,
+    toSend:rows.filter(x=>x.status==="Planned").length};
+}
+function bookCard(){
+  const b=bookStats();
+  if(!b.books.length) return `<button class="card tap wide" data-act="newbook" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px"><div class="t">📚 Book proposals</div><div class="m">Track book proposals and the publishers they went to. Tap to add one.</div></button>`;
+  const top=b.waiting[0], cell=(n,l,k)=>`<div class="bk"><b data-count="${n}" data-key="${k}">${n}</b><span>${l}</span></div>`;
+  return `<button class="card tap wide bookcard" data-go="papers:📚 Books" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px">
+    <div class="row"><div class="t grow">📚 Book proposals</div><span class="m">open →</span></div>
+    <div class="bkgrid">${cell(b.books.length,"Books","bk")}${cell(b.waiting.length,"Awaiting response","bkw")}${cell(b.contracts,"Contracts","bkc")}${cell(b.declined,"Declined","bkd")}</div>
+    ${top?`<div class="m" style="margin-top:6px">⏳ Longest wait: <b style="color:var(--ink)">${esc(top.journal)}</b> · ${subDays(top)} days (${esc((paperById(top.paper)||{}).key||"")})</div>`:""}
+  </button>`;
 }
 function viewHome(){
   const st=stats();
-  const waitList = st.infos.filter(i=>["Revision due","Needs resubmission","Not yet submitted"].includes(i.stage))
+  const waitList = st.infos.filter(i=>["Revision due","Needs resubmission","Not yet submitted"].includes(i.stage)) // journal papers only
     .sort((a,b)=>score(b)-score(a));
   function score(i){ return ({"Revision due":3000,"Needs resubmission":2000,"Not yet submitted":1000}[i.stage]) + Math.min(i.idle||0,999); }
   const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
@@ -559,6 +581,7 @@ function viewHome(){
     <button class="tile" data-go="subs:All sent"><b data-count="${st.sent}" data-key="sent">${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
     <button class="tile" data-go="subs:Accepted"><b data-count="${st.accepted}" data-key="accepted">${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
   </div>
+  ${bookCard()}
   ${insightCard()}
   <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button><button class="card tap" data-act="timeline" style="width:100%;text-align:center;font:inherit;color:inherit;margin-top:8px">🗓 Timeline &amp; journeys →</button></div>
   <h2>Under review now <small>longest wait first</small></h2>
@@ -1292,8 +1315,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.2", APP_BUILD="22 Oct 2026";
+const APP_VERSION="4.3", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["4.3","3 Nov 2026",["Home: a separate 📚 Book proposals card (books, awaiting response, contracts, declined, longest wait); the dashboard tiles now count journal articles only"]],
   ["4.2","3 Nov 2026",["📚 Book proposals: add a book and the publishers it went to (one or several), track each publisher's response (Awaiting response, Changes requested, Contract offered, Declined), Books filter, and a Book proposals section on Home"]],
   ["4.1","3 Nov 2026",["Sort papers (name, last/first submitted, most submissions or rejections, longest idle, stage) and submissions (date submitted or decided, days, journal, paper, ABDC rating, status); ↑↓ reverses, choice is remembered","Tablets: cards in columns, side navigation rail on large screens, centred dialogs"]],
   ["4.0","2 Nov 2026",["📧 Check journal emails now (Home and In review): the sheet's helper reads Gmail within about a minute and the app updates itself; needs helper script 3.3"]],
