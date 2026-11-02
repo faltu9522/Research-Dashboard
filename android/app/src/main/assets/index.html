@@ -106,6 +106,35 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .aians a{color:var(--accent)}
 textarea.big{min-height:120px}
 .sugwrap{position:relative}
+.sortbar{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.sortbar .m{flex:1}
+.sortbar label{margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--muted)}
+.sortbar select{width:auto;max-width:56%;padding:6px 8px;font-size:13px}
+.sortbar button{padding:5px 10px;font-size:15px}
+/* tablets: wider content, cards in columns, centred dialogs */
+@media (min-width:700px){
+  main{max-width:1180px;margin:0 auto;padding:16px 24px}
+  header{padding-left:24px;padding-right:24px}
+  #view.v-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));column-gap:14px;align-items:start}
+  #view.v-list>*:not(.card),#view.v-list>.wide{grid-column:1/-1}
+  #view.v-list>.card{margin-bottom:14px}
+  #view.v-narrow{max-width:760px;margin:0 auto}
+  .tiles{grid-template-columns:repeat(6,1fr)}
+  .sheet{left:50%;right:auto;top:50%;bottom:auto;width:min(680px,92vw);max-height:86vh;border-radius:18px;
+    transform:translate(-50%,-46%) scale(.97);opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .sheet.open{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+  .fx-banner .fx-big{font-size:68px}
+  .toast{bottom:110px}
+}
+/* large tablets / landscape: navigation becomes a side rail */
+@media (min-width:900px){
+  body{padding-bottom:16px;padding-left:96px}
+  nav{top:0;bottom:0;right:auto;width:96px;flex-direction:column;justify-content:center;gap:6px;border-top:0;border-right:1px solid var(--line);padding-bottom:0}
+  nav button{flex:0 0 auto;padding:14px 4px;border-radius:12px;margin:0 8px;white-space:normal}
+  nav button.on{background:var(--accent-soft)}
+  .fab{bottom:28px;right:28px}
+  .toast{bottom:40px}
+}
 /* animations */
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
@@ -462,6 +491,7 @@ function render(){
   $("#hSub").textContent = "As of "+fmt(today())+" · last updated "+fmt(S.settings.lastUpdated);
   $("#fab").style.display = (tab==="more"||tab==="stats"||tab==="insights"||tab==="ai"||tab==="timeline")?"none":"block";
   const v=$("#view");
+  v.className=["home","review","papers","subs","insights"].includes(tab)?"v-list":["more","ai","stats"].includes(tab)?"v-narrow":"";
   if(tab==="home") v.innerHTML=viewHome();
   else if(tab==="review") v.innerHTML=viewReview();
   else if(tab==="papers") v.innerHTML=viewPapers();
@@ -573,6 +603,33 @@ function matches(txt){ if(!query.trim()) return true; const hay=" "+foldText(txt
 function paperText(p){ return [p.key,p.title,p.authors,p.notes,p.approach,p.type].concat(subsOf(p.id).map(x=>x.journal+" "+(x.msid||"")+" "+(x.titleUsed||""))).join(" "); }
 function subText(x){ const p=paperById(x.paper)||{}; return [x.journal,x.msid,x.titleUsed,x.notes,x.status,x.dtype,p.key,p.title,p.authors].join(" "); }
 const searching=()=>!!query.trim();
+/* ---------- sorting (remembered per list; ↑↓ flips the order) ---------- */
+const P_SORTS={default:"Sheet order",name:"Name A–Z",last:"Last submitted",first:"First submitted",sent:"Most submissions",rejected:"Most rejections",idle:"Longest idle",stage:"Stage"};
+const S_SORTS={submitted:"Date submitted",decided:"Date of decision",days:"Days taken / waiting",journal:"Journal A–Z",paper:"Paper A–Z",abdc:"ABDC rating",status:"Status"};
+const STAGE_ORDER=["Revision due","Under review","Needs resubmission","Not yet submitted","Accepted","Published","Parked","Closed – rejected","Withdrawn"];
+const ABDC_RANK={"A*":4,"A":3,"B":2,"C":1};
+const sortKey=t=>String(t||"").replace(/^[^\p{L}\p{N}]+/u,""); // ‘One dies’ sorts under O
+const cmpText=(a,b)=>sortKey(a).localeCompare(sortKey(b),undefined,{sensitivity:"base",numeric:true});
+function sortPapers(list){
+  const k=S.settings.sortP||"default", dir=S.settings.sortPDir===-1?-1:1, firstSent=i=>i.subs.filter(x=>isSent(x)&&x.submitted).map(x=>x.submitted).sort()[0]||"";
+  const f={ default:(a,b)=>S.papers.indexOf(a.p)-S.papers.indexOf(b.p), name:(a,b)=>cmpText(a.p.key,b.p.key),
+    last:(a,b)=>cmpText((b.last||{}).submitted,(a.last||{}).submitted), first:(a,b)=>cmpText(firstSent(a)||"9",firstSent(b)||"9"),
+    sent:(a,b)=>b.sent-a.sent, rejected:(a,b)=>b.rejections-a.rejections,
+    idle:(a,b)=>(b.idle??((b.last&&isOpen(b.last))?subDays(b.last):-1))-(a.idle??((a.last&&isOpen(a.last))?subDays(a.last):-1)),
+    stage:(a,b)=>STAGE_ORDER.indexOf(a.stage)-STAGE_ORDER.indexOf(b.stage) }[k]||(()=>0);
+  return list.slice().sort((a,b)=>dir*f(a,b)||cmpText(a.p.key,b.p.key));
+}
+function sortSubs(list){
+  const k=S.settings.sortS||"submitted", dir=S.settings.sortSDir===-1?-1:1, pk=x=>(paperById(x.paper)||{}).key;
+  const f={ submitted:(a,b)=>cmpText(b.submitted,a.submitted), decided:(a,b)=>cmpText(b.decided,a.decided), days:(a,b)=>(subDays(b)??-1)-(subDays(a)??-1),
+    journal:(a,b)=>cmpText(a.journal,b.journal), paper:(a,b)=>cmpText(pk(a),pk(b)), abdc:(a,b)=>(ABDC_RANK[abdcOf(b.journal)]||0)-(ABDC_RANK[abdcOf(a.journal)]||0),
+    status:(a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status) }[k]||(()=>0);
+  return list.slice().sort((a,b)=>dir*f(a,b)||cmpText(b.submitted,a.submitted));
+}
+function sortBar(id,opts,cur,dir,count){
+  return `<div class="sortbar"><span class="m">${count}</span><label for="${id}">Sort</label><select id="${id}">${Object.entries(opts).map(([k,l])=>`<option value="${k}" ${k===cur?"selected":""}>${l}</option>`).join("")}</select>
+    <button class="ghost" data-sortdir="${id}" title="Reverse order" aria-label="Reverse order">${dir===-1?"↑":"↓"}</button></div>`;
+}
 function viewPapers(){
   const F=["Active","Waiting on you","Under review","Revision due","Needs resubmission","Not yet submitted","Accepted","Closed","All"];
   let list = S.papers.map(p=>({p,...paperInfo(p)}));
@@ -585,9 +642,11 @@ function viewPapers(){
     if(paperFilter==="All") return true;
     return st===paperFilter;
   }).filter(i=>matches(paperText(i.p)));
+  list=sortPapers(list);
   return `<input class="search" id="q" placeholder="Search title, journal, author, manuscript ID…" value="${esc(query)}">
   ${searching()?`<div class="m" style="margin:-2px 0 8px">Searching all papers · ${list.length} match${list.length===1?"":"es"}</div>`:""}
   <div class="filters">${F.map(f=>`<button data-pf="${f}" class="${f===paperFilter?"on":""}">${f}</button>`).join("")}</div>
+  ${sortBar("sortp",P_SORTS,S.settings.sortP||"default",S.settings.sortPDir,list.length+" paper"+(list.length===1?"":"s"))}
   ${list.length?list.map(i=>paperCard(i.p)).join(""):'<div class="empty">No papers here.</div>'}
   <div class="actions"><button data-act="newpaper">+ New paper</button></div>`;
 }
@@ -599,11 +658,11 @@ function viewSubs(){
     if(subFilter==="Under review") return isOpen(s);
     return s.status===subFilter;
   }).filter(s=>matches(subText(s)));
-  list.sort((a,b)=>(b.submitted||"").localeCompare(a.submitted||""));
+  list=sortSubs(list);
   return `<input class="search" id="q" placeholder="Search journal, paper title, manuscript ID…" value="${esc(query)}">
   ${searching()?`<div class="m" style="margin:-2px 0 8px">Searching all submissions</div>`:""}
   <div class="filters">${F.map(f=>`<button data-sf="${f}" class="${f===subFilter?"on":""}">${f}</button>`).join("")}</div>
-  <div class="m" style="margin-bottom:8px">${list.length} submission${list.length===1?"":"s"}</div>
+  ${sortBar("sorts",S_SORTS,S.settings.sortS||"submitted",S.settings.sortSDir,list.length+" submission"+(list.length===1?"":"s"))}
   ${list.length?list.map(s=>subCard(s)).join(""):'<div class="empty">No submissions here.</div>'}`;
 }
 function viewMore(){
@@ -657,7 +716,14 @@ function bindMore(){
   document.querySelectorAll(".coemail").forEach(el=>el.onchange=()=>{ S.settings.coEmails=Object.assign({},S.settings.coEmails||{},{[el.dataset.k]:el.value.trim()}); persist(false); gsSchedule(); toast("Saved"); });
   const r=$("#remind"); if(r) r.onchange=()=>{ S.settings.reminders=r.checked; persist(false); if(r.checked) askNotifications(); render(); };
 }
+function bindSort(){
+  const sp=$("#sortp"), ss=$("#sorts");
+  if(sp) sp.onchange=()=>{ S.settings.sortP=sp.value; S.settings.sortPDir=1; persist(false); render(); };
+  if(ss) ss.onchange=()=>{ S.settings.sortS=ss.value; S.settings.sortSDir=1; persist(false); render(); };
+  document.querySelectorAll("[data-sortdir]").forEach(b=>b.onclick=()=>{ const k=b.dataset.sortdir==="sortp"?"sortPDir":"sortSDir"; S.settings[k]=S.settings[k]===-1?1:-1; persist(false); render(); });
+}
 function bindSearch(){
+  bindSort();
   const q=$("#q"); if(!q) return;
   q.oninput=()=>{ query=q.value; const pos=q.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(pos,pos); };
 
@@ -1171,8 +1237,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.0", APP_BUILD="22 Oct 2026";
+const APP_VERSION="4.1", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["4.1","3 Nov 2026",["Sort papers (name, last/first submitted, most submissions or rejections, longest idle, stage) and submissions (date submitted or decided, days, journal, paper, ABDC rating, status); ↑↓ reverses, choice is remembered","Tablets: cards in columns, side navigation rail on large screens, centred dialogs"]],
   ["4.0","2 Nov 2026",["📧 Check journal emails now (Home and In review): the sheet's helper reads Gmail within about a minute and the app updates itself; needs helper script 3.3"]],
   ["3.9","3 Nov 2026",["Fixed: a journal email could be applied to another journal's submission of the same paper; emails naming a different journal now offer “Add as a new submission” instead","Warning before adding an identical submission row, and “Remove duplicates” on a paper's page"]],
   ["3.8","1 Nov 2026",["Animations: confetti cannons and fireworks on acceptance, a paper plane on submitting, rising embers after a rejection, streaks, count-ups and more (More → Settings → Animations)","Turnaround from your own history on every journal, plus slowest and fastest journals in Stats","Journal checklists (word limit, referencing, anonymising, cover letter…), filled by Ask AI, ticked off when you submit","Timeline of all submissions and a journey map for each paper","Home-screen widget"]],
@@ -2044,7 +2111,7 @@ async function restoreFrom(u){
 }
 function welcomeCard(){
   if(!S.settings.fresh||gsOn()) return "";
-  return `<div class="card" style="border:2px solid var(--accent)"><div class="t">👋 New install? Restore your data</div>
+  return `<div class="card wide" style="border:2px solid var(--accent)"><div class="t">👋 New install? Restore your data</div>
     <div class="actions"><button class="primary" data-act="gsignin">Sign in with Google</button></div>
     <div class="m" style="margin:8px 0 2px">Signed in before? Your papers load from your Google Drive. Or use the older restore link:</div>
     <div class="m" style="color:var(--ink);margin-top:4px">Tap your <b>RD SK restore link</b> (the rdsk://connect… link you saved in your email or notes), or paste your Google Sheet's web-app URL here.</div>
