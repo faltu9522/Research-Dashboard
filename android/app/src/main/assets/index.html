@@ -108,6 +108,7 @@ textarea.big{min-height:120px}
 .sugwrap{position:relative}
 .sortbar{display:flex;align-items:center;gap:8px;margin:0 0 10px}
 .bookcard{border-left:4px solid #9b5de5}
+.mediacard{border-left-color:#ff8c42}
 .bkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
 .bk{background:var(--bg);border-radius:10px;padding:8px 6px;text-align:center}
 .bk b{display:block;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -214,12 +215,20 @@ body.motion button:active,body.motion .card.tap:active{transform:scale(.97);tran
 const STORE_KEY = "rdsk.state.v1";
 const STATUSES = ["Planned","Under review","Revision requested","Revision resubmitted","Rejected","Returned by office","Accepted","Withdrawn"];
 const OVERRIDES = ["","Closed – rejected","Parked","Published","Withdrawn"];
-const TYPES = ["Journal article","EPW / short piece","Book chapter","Book proposal","Edited book","Other"];
+const TYPES = ["Journal article","EPW / short piece","Book chapter","Book proposal","Edited book","Newspaper / op-ed","Magazine article","Website / blog article","Other"];
 /* ---------- books: proposals go to publishers; same rows as journal submissions, book wording ---------- */
 const isBook=p=>!!p&&/^(book proposal|edited book|book)$/i.test(p.type||"");
+const isMedia=p=>!!p&&/^(newspaper|magazine|website|blog|op-?ed)/i.test(p.type||"");
+/** "journal" (papers to journals), "book" (proposals to publishers) or "media" (pieces pitched to newspapers, magazines, websites). */
+const kindOf=p=>isBook(p)?"book":isMedia(p)?"media":"journal";
+const subKind=x=>kindOf(paperById(x.paper));
 const subIsBook=x=>isBook(paperById(x.paper));
+const isJournalSub=x=>subKind(x)==="journal";
+const KIND={journal:{icon:"",venue:"Journal",label:"Journal articles"},book:{icon:"📚",venue:"Publisher",label:"Book proposals"},media:{icon:"📰",venue:"Outlet",label:"Newspaper & web articles"}};
+const MEDIA_WORDS={"Under review":"Awaiting reply","Rejected":"Declined","Accepted":"Accepted for publication","Revision requested":"Edits requested","Revision resubmitted":"Edited & resent","Planned":"To pitch","Returned by office":"Returned","Needs resubmission":"Pitch elsewhere","Not yet submitted":"Not pitched yet","Revision due":"Edits due"};
+const OUTLETS=["The Hindu","The Indian Express","Hindustan Times","The Times of India","Deccan Herald","The Tribune","The Telegraph (India)","Mint","The Economic Times","Business Standard","The Wire","Scroll.in","ThePrint","The Quint","Firstpost","Newslaundry","Frontline","Outlook","India Today","Down To Earth","The Conversation","LSE Business Review","LSE Impact Blog","LSE South Asia Blog","Times Higher Education","University World News","Project Syndicate","Al Jazeera (Opinion)","The Guardian (Opinion)","Medium","Substack","EPW Engage"];
 const BOOK_WORDS={"Under review":"Awaiting response","Rejected":"Declined","Accepted":"Contract offered","Revision requested":"Changes requested","Revision resubmitted":"Revised & resent","Planned":"To send","Returned by office":"Returned","Needs resubmission":"Find a publisher","Not yet submitted":"Not sent yet","Revision due":"Changes due"};
-const statusText=(st,book)=>book?(BOOK_WORDS[st]||st):st;
+const statusText=(st,kind)=>kind===true||kind==="book"?(BOOK_WORDS[st]||st):kind==="media"?(MEDIA_WORDS[st]||st):st;
 const PUBLISHERS=["Routledge","Palgrave Macmillan","Springer","Bloomsbury Academic","Edward Elgar","SAGE Publications","Oxford University Press","Cambridge University Press","Emerald Publishing","De Gruyter","Rowman & Littlefield","Lexington Books","Bristol University Press","Policy Press","Manchester University Press","Edinburgh University Press","Brill","Polity","Wiley-Blackwell","Taylor & Francis","Orient BlackSwan","SAGE India","Routledge India","Oxford University Press India","Springer Nature Singapore"];
 const CLOSED_STAGES = ["Parked","Closed – rejected","Withdrawn","Published"];
 
@@ -330,24 +339,35 @@ function viewTimeline(){
   let months="", y=24;
   for(let m=0;m<=tlMonths+1;m++){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-tlMonths+m); const iso=d.toISOString().slice(0,10), xx=x(dnum(iso));
     if(xx<0||xx>W) continue; months+=`<line x1="${xx}" x2="${xx}" y1="14" y2="${H}" stroke="var(--line)"/><text x="${xx+3}" y="11">${MON[d.getMonth()]}${d.getMonth()===0?" "+d.getFullYear():""}</text>`; }
-  let rows="";
-  papers.forEach((p,i)=>{ const y0=24+i*rowH*2;
-    rows+=`<text x="${x(dnum(today()))-6}" y="${y0+11}" text-anchor="end" style="fill:var(--ink);font-weight:600">${esc(p.key)}</text>`;
-    subsOf(p.id).filter(s=>isSent(s)&&s.submitted).forEach((s,k)=>{ const a=Math.max(dnum(s.submitted),start), b=Math.min(s.decided?dnum(s.decided):dnum(today()),end); if(b<start) return;
-      const w=Math.max(6,x(b)-x(a)), col=TL_COLOR[s.status]||"var(--closed)";
-      rows+=`<g data-act="editsub" data-id="${s.id}"><rect class="bar" x="${x(a)}" y="${y0+16}" width="${w}" height="16" rx="5" fill="${col}" opacity="${isOpen(s)?1:.75}" style="animation-delay:${(i*0.05+k*0.03).toFixed(2)}s"><title>${esc(s.journal)} · ${esc(s.status)} · ${fmt(s.submitted)}${s.decided?" → "+fmt(s.decided):""}</title></rect>
-        ${w>60?`<text x="${x(a)+5}" y="${y0+28}" style="fill:#fff;font-size:9.5px;pointer-events:none">${esc(s.journal.slice(0,Math.floor(w/5.6)))}</text>`:""}</g>`; });
+  let rows="", y0=24, i=0;
+  const todayX=x(dnum(today()));
+  ["journal","book","media"].forEach(k=>{
+    const group=papers.filter(p=>kindOf(p)===k); if(!group.length) return;
+    rows+=`<rect id="tl-${k}" x="0" y="${y0}" width="${W}" height="22" fill="var(--accent-soft)" opacity=".7"/><text x="${todayX-6}" y="${y0+15}" text-anchor="end" style="fill:var(--accent);font-weight:700;font-size:11px;letter-spacing:.5px">${(KIND[k].icon?KIND[k].icon+" ":"")+KIND[k].label.toUpperCase()}</text>`;
+    y0+=30;
+    group.forEach(p=>{
+      rows+=`<text x="${todayX-6}" y="${y0+11}" text-anchor="end" style="fill:var(--ink);font-weight:600">${esc(p.key)}</text>`;
+      subsOf(p.id).filter(s=>isSent(s)&&s.submitted).forEach((s,kk)=>{ const a=Math.max(dnum(s.submitted),start), b=Math.min(s.decided?dnum(s.decided):dnum(today()),end); if(b<start) return;
+        const w=Math.max(6,x(b)-x(a)), col=TL_COLOR[s.status]||"var(--closed)";
+        rows+=`<g data-act="editsub" data-id="${s.id}"><rect class="bar" x="${x(a)}" y="${y0+16}" width="${w}" height="16" rx="5" fill="${col}" opacity="${isOpen(s)?1:.75}" ${k!=="journal"?'stroke="var(--ink)" stroke-dasharray="3 2" stroke-width="1"':""} style="animation-delay:${(i*0.05+kk*0.03).toFixed(2)}s"><title>${esc(s.journal)} · ${esc(statusText(s.status,k))} · ${fmt(s.submitted)}${s.decided?" → "+fmt(s.decided):""}</title></rect>
+          ${w>60?`<text x="${x(a)+5}" y="${y0+28}" style="fill:#fff;font-size:9.5px;pointer-events:none">${esc(s.journal.slice(0,Math.floor(w/5.6)))}</text>`:""}</g>`; });
+      y0+=rowH*2; i++;
+    });
+    y0+=8;
   });
+  const H2=y0+10;
   return `<div class="row" style="margin-bottom:6px"><button class="ghost" data-go="home">← Dashboard</button></div>
     <h2>Timeline <small>tap a bar to open it</small></h2>
     <div class="filters">${[6,12,18,36].map(n=>`<button data-tlm="${n}" class="${n===tlMonths?"on":""}">${n} months</button>`).join("")}</div>
+    ${["book","media"].some(k=>papers.some(p=>kindOf(p)===k))?`<div class="filters"><span class="m" style="align-self:center">Jump to:</span>${["journal","book","media"].filter(k=>papers.some(p=>kindOf(p)===k)).map(k=>`<button data-tljump="${k}">${KIND[k].icon||"📄"} ${KIND[k].label}</button>`).join("")}</div>`:""}
     <div class="legend m" style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 8px">${["Under review","Revision requested","Rejected","Accepted"].map(k=>`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${TL_COLOR[k]};margin-right:4px"></i>${k}</span>`).join("")}</div>
-    <div class="card tl" id="tlbox">${papers.length?`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${months}<line x1="${x(dnum(today()))}" x2="${x(dnum(today()))}" y1="14" y2="${H}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>${rows}</svg>`:'<div class="empty">Nothing submitted in this period.</div>'}</div>
+    <div class="card tl" id="tlbox">${papers.length?`<svg width="${W}" height="${H2}" viewBox="0 0 ${W} ${H2}">${months.replace(/y2="\d+"/g,'y2="'+H2+'"')}<line x1="${x(dnum(today()))}" x2="${x(dnum(today()))}" y1="14" y2="${H2}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>${rows}</svg>`:'<div class="empty">Nothing submitted in this period.</div>'}</div>
     <div class="hint">Each bar runs from submission to decision (or today). Scroll sideways for earlier months.</div>`;
 }
 function bindTimeline(){
   const b=$("#tlbox"); if(b) b.scrollLeft=b.scrollWidth;
   document.querySelectorAll("[data-tlm]").forEach(el=>el.onclick=()=>{ tlMonths=+el.dataset.tlm; render(); });
+  document.querySelectorAll("[data-tljump]").forEach(el=>el.onclick=()=>{ const t=document.getElementById("tl-"+el.dataset.tljump); if(t){ const y=t.getBoundingClientRect().top+window.scrollY-90; window.scrollTo({top:y,behavior:"smooth"}); } });
 }
 /** A paper's journey: each journal it went to, in order, ending at "next" or the trophy. */
 function journeyMap(p){
@@ -461,7 +481,7 @@ window.rdBack = function(){
 
 function subCard(s, opts={}){
   const p = paperById(s.paper), d = subDays(s), open = s.status==="Under review"||s.status==="Revision requested";
-  const portal = portalFor(s.journal), book=isBook(p);
+  const portal = portalFor(s.journal), kind=kindOf(p), book=kind!=="journal";
   let acts = "";
   if(open&&book){
     acts = `<div class="actions"><button class="primary" data-act="decide" data-id="${s.id}">Record response</button><button data-act="chase" data-id="${s.id}">✉ Email editor</button></div>`;
@@ -476,10 +496,10 @@ function subCard(s, opts={}){
   }
   return `<div class="card tap" data-act="editsub" data-id="${s.id}">
     <div class="row"><div class="grow">
-      <div class="t">${book?"📚 ":""}${esc(s.journal)}${book?"":abdcChip(abdcOf(s.journal))}${s.rating?` <span class="m">· ${esc(s.rating)}</span>`:""}</div>
+      <div class="t">${book?KIND[kind].icon+" ":""}${esc(s.journal)}${book?"":abdcChip(abdcOf(s.journal))}${s.rating?` <span class="m">· ${esc(s.rating)}</span>`:""}</div>
       ${opts.hidePaper?"":`<div class="m">${esc(p?p.key:"?")}${p&&p.authors?" · "+esc(p.authors):""}</div>`}
       <div class="m">${s.submitted?(book?"Sent ":"Submitted ")+fmt(s.submitted):""}${s.decided?(book?" · answered ":" · decided ")+fmt(s.decided):""}</div>
-      <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(statusText(s.status,book))}</span>${s.dtype&&!open?` <span class="m">${esc(s.dtype)}</span>`:""} ${open?chaseFlag(d):""}
+      <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(statusText(s.status,kind))}</span>${s.dtype&&!open?` <span class="m">${esc(s.dtype)}</span>`:""} ${open?chaseFlag(d):""}
       ${!book&&(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
@@ -488,12 +508,12 @@ function subCard(s, opts={}){
     ${acts}</div>`;
 }
 function paperCard(p){
-  const i = paperInfo(p), book=isBook(p);
+  const i = paperInfo(p), kind=kindOf(p), book=kind!=="journal";
   return `<div class="card tap" data-act="paper" data-id="${p.id}">
-    <div class="row"><div class="grow"><div class="t">${book?`<span class="chip s-acc" style="font-size:11px">📚 ${esc(p.type)}</span> `:""}${esc(p.key)}</div>
+    <div class="row"><div class="grow"><div class="t">${book?`<span class="chip s-acc" style="font-size:11px">${KIND[kind].icon} ${esc(p.type)}</span> `:""}${esc(p.key)}</div>
       <div class="m">${p.authors?"👤 "+esc(p.authors):'<span style="color:var(--warn)">👤 Authors not added</span>'}</div>
-      <div class="m">${book?(()=>{ const out=i.subs.filter(isOpen); return out.length>1?"With "+out.length+" publishers: "+esc(out.map(x=>x.journal).join(", ")):i.last?"Publisher: "+esc(i.last.journal):"Not sent yet"; })():(i.last?"Last: "+esc(i.last.journal):"Never sent out")}${i.next?" · Next: "+esc(i.next.journal):""}</div>
-      <div style="margin-top:5px"><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,book))}</span>
+      <div class="m">${book?(()=>{ const out=i.subs.filter(isOpen); return out.length>1?"With "+out.length+(kind==="book"?" publishers: ":" outlets: ")+esc(out.map(x=>x.journal).join(", ")):i.last?KIND[kind].venue+": "+esc(i.last.journal):"Not sent yet"; })():(i.last?"Last: "+esc(i.last.journal):"Never sent out")}${i.next?" · Next: "+esc(i.next.journal):""}</div>
+      <div style="margin-top:5px"><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,kind))}</span>
       <span class="m">${i.sent} sent · ${i.rejections} rejected</span></div></div>
       ${i.idle!=null?`<div class="days" style="color:${i.idle>=180?"var(--need)":i.idle>=60?"var(--warn)":"inherit"}">${i.idle}<small>idle days</small></div>`:""}
     </div></div>`;
@@ -519,7 +539,7 @@ function render(){
     if(k>seen&&[2,4,8,12,26,52].includes(k)){ S.settings.streakSeen=k; persist(false); setTimeout(()=>FX.streak(k),500); } else if(k<seen){ S.settings.streakSeen=k; persist(false); } }
 }
 function stats(){
-  const infos = S.papers.filter(p=>!isBook(p)).map(p=>({p,...paperInfo(p)})), jsubs=S.subs.filter(x=>!subIsBook(x));
+  const infos = S.papers.filter(p=>kindOf(p)==="journal").map(p=>({p,...paperInfo(p)})), jsubs=S.subs.filter(isJournalSub);
   const accepted = jsubs.filter(s=>s.status==="Accepted");
   const accDays = accepted.map(subDays).filter(d=>d!=null);
   return {
@@ -536,19 +556,19 @@ function stats(){
   };
 }
 /** Books on their own: proposals, publishers still to answer, contracts, declines and the longest wait. */
-function bookStats(){
-  const books=S.papers.filter(isBook), rows=S.subs.filter(subIsBook);
+function bookStats(kind){
+  kind=kind||"book"; const books=S.papers.filter(p=>kindOf(p)===kind), rows=S.subs.filter(x=>subKind(x)===kind);
   const waiting=rows.filter(isOpen).sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   return {books, waiting, contracts:rows.filter(x=>x.status==="Accepted").length, declined:rows.filter(x=>x.status==="Rejected").length,
     toSend:rows.filter(x=>x.status==="Planned").length};
 }
-function bookCard(){
-  const b=bookStats();
-  if(!b.books.length) return `<button class="card tap wide" data-act="newbook" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px"><div class="t">📚 Book proposals</div><div class="m">Track book proposals and the publishers they went to. Tap to add one.</div></button>`;
+function bookCard(kind){
+  kind=kind||"book"; const b=bookStats(kind), K=KIND[kind], media=kind==="media";
+  if(!b.books.length) return media?"":`<button class="card tap wide" data-act="newbook" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px"><div class="t">📚 Book proposals</div><div class="m">Track book proposals and the publishers they went to. Tap to add one.</div></button>`;
   const top=b.waiting[0], cell=(n,l,k)=>`<div class="bk"><b data-count="${n}" data-key="${k}">${n}</b><span>${l}</span></div>`;
-  return `<button class="card tap wide bookcard" data-go="papers:📚 Books" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px">
-    <div class="row"><div class="t grow">📚 Book proposals</div><span class="m">open →</span></div>
-    <div class="bkgrid">${cell(b.books.length,"Books","bk")}${cell(b.waiting.length,"Awaiting response","bkw")}${cell(b.contracts,"Contracts","bkc")}${cell(b.declined,"Declined","bkd")}</div>
+  return `<button class="card tap wide bookcard ${media?"mediacard":""}" data-go="papers:${media?"📰 Media":"📚 Books"}" style="width:100%;text-align:left;font:inherit;color:inherit;margin-top:8px">
+    <div class="row"><div class="t grow">${K.icon} ${K.label}</div><span class="m">open →</span></div>
+    <div class="bkgrid">${cell(b.books.length,media?"Pieces":"Books",kind+"n")}${cell(b.waiting.length,media?"Awaiting reply":"Awaiting response",kind+"w")}${cell(b.contracts,media?"Accepted":"Contracts",kind+"c")}${cell(b.declined,"Declined",kind+"d")}</div>
     ${top?`<div class="m" style="margin-top:6px">⏳ Longest wait: <b style="color:var(--ink)">${esc(top.journal)}</b> · ${subDays(top)} days (${esc((paperById(top.paper)||{}).key||"")})</div>`:""}
   </button>`;
 }
@@ -581,14 +601,19 @@ function viewHome(){
     <button class="tile" data-go="subs:All sent"><b data-count="${st.sent}" data-key="sent">${st.sent}</b><span>Submissions sent</span><i>${st.rejected} rejected</i></button>
     <button class="tile" data-go="subs:Accepted"><b data-count="${st.accepted}" data-key="accepted">${st.accepted}</b><span>Accepted</span><i>${st.accAvg!=null?"avg "+st.accAvg+" days":"—"}</i></button>
   </div>
-  ${bookCard()}
+  ${bookCard("book")}
+  ${bookCard("media")}
   ${insightCard()}
   <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button><button class="card tap" data-act="timeline" style="width:100%;text-align:center;font:inherit;color:inherit;margin-top:8px">🗓 Timeline &amp; journeys →</button></div>
   <h2>Under review now <small>longest wait first</small></h2>
-  ${open.filter(x=>!subIsBook(x)).length?open.filter(x=>!subIsBook(x)).map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
-  ${(()=>{ const bk=S.papers.filter(isBook); if(!bk.length) return `<div class="actions"><button data-act="newbook">📚 + Add a book proposal</button></div>`;
+  ${open.filter(isJournalSub).length?open.filter(isJournalSub).map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
+  ${(()=>{ const md=S.papers.filter(isMedia); if(!md.length) return "";
+    const rows=S.subs.filter(x=>subKind(x)==="media"&&x.status!=="Planned").sort((a,b)=>(isOpen(b)-isOpen(a))||(subDays(b)||0)-(subDays(a)||0));
+    return `<h2>📰 Newspaper &amp; web articles <small><button class="link" data-act="newmedia">+ Add</button></small></h2>${rows.length?rows.map(x=>subCard(x)).join(""):md.map(paperCard).join("")}`; })()}
+  ${(()=>{ const bk=S.papers.filter(isBook); if(!bk.length) return `<div class="actions"><button data-act="newbook">📚 + Add a book proposal</button><button data-act="newmedia">📰 + Add a newspaper / web article</button></div>`;
     const rows=S.subs.filter(x=>subIsBook(x)&&x.status!=="Planned").sort((a,b)=>(isOpen(b)-isOpen(a))||(subDays(b)||0)-(subDays(a)||0));
-    return `<h2>📚 Book proposals <small><button class="link" data-act="newbook">+ Add</button></small></h2>${rows.length?rows.map(x=>subCard(x)).join(""):bk.map(paperCard).join("")}`; })()}
+    return `<h2>📚 Book proposals <small><button class="link" data-act="newbook">+ Add</button></small></h2>${rows.length?rows.map(x=>subCard(x)).join(""):bk.map(paperCard).join("")}
+      ${S.papers.some(isMedia)?"":`<div class="actions"><button data-act="newmedia">📰 + Add a newspaper / web article</button></div>`}`; })()}
   <h2>Waiting on you <small>most urgent first</small></h2>
   ${waitList.length?waitList.map(i=>paperCard(i.p)).join(""):'<div class="empty">Nothing waiting on you. 🎉</div>'}`;
 }
@@ -665,7 +690,7 @@ function sortBar(id,opts,cur,dir,count){
     <button class="ghost" data-sortdir="${id}" title="Reverse order" aria-label="Reverse order">${dir===-1?"↑":"↓"}</button></div>`;
 }
 function viewPapers(){
-  const F=["Active","Waiting on you","Under review","Revision due","Needs resubmission","Not yet submitted","Accepted","📚 Books","Closed","All"];
+  const F=["Active","Waiting on you","Under review","Revision due","Needs resubmission","Not yet submitted","Accepted","📚 Books","📰 Media","Closed","All"];
   let list = S.papers.map(p=>({p,...paperInfo(p)}));
   list = list.filter(i=>{
     if(searching()) return true; // a search looks through every paper
@@ -674,6 +699,7 @@ function viewPapers(){
     if(paperFilter==="Waiting on you") return ["Revision due","Needs resubmission","Not yet submitted"].includes(st);
     if(paperFilter==="Closed") return CLOSED_STAGES.includes(st);
     if(paperFilter==="📚 Books") return isBook(i.p);
+    if(paperFilter==="📰 Media") return isMedia(i.p);
     if(paperFilter==="All") return true;
     return st===paperFilter;
   }).filter(i=>matches(paperText(i.p)));
@@ -683,14 +709,15 @@ function viewPapers(){
   <div class="filters">${F.map(f=>`<button data-pf="${f}" class="${f===paperFilter?"on":""}">${f}</button>`).join("")}</div>
   ${sortBar("sortp",P_SORTS,S.settings.sortP||"default",S.settings.sortPDir,list.length+" paper"+(list.length===1?"":"s"))}
   ${list.length?list.map(i=>paperCard(i.p)).join(""):'<div class="empty">No papers here.</div>'}
-  <div class="actions"><button data-act="newpaper">+ New paper</button><button data-act="newbook">📚 + New book proposal</button></div>`;
+  <div class="actions"><button data-act="newpaper">+ New paper</button><button data-act="newbook">📚 + New book proposal</button><button data-act="newmedia">📰 + Newspaper / web article</button></div>`;
 }
 function viewSubs(){
-  const F=["Under review","Planned","All sent","Rejected","Revision requested","Accepted","📚 Books","All"];
+  const F=["Under review","Planned","All sent","Rejected","Revision requested","Accepted","📚 Books","📰 Media","All"];
   let list = S.subs.filter(s=>{
     if(searching()||subFilter==="All") return true;
     if(subFilter==="All sent") return isSent(s);
     if(subFilter==="📚 Books") return subIsBook(s);
+    if(subFilter==="📰 Media") return subKind(s)==="media";
     if(subFilter==="Under review") return isOpen(s);
     return s.status===subFilter;
   }).filter(s=>matches(subText(s)));
@@ -827,7 +854,8 @@ document.addEventListener("click",e=>{
     case "editsub": editSub(s); break;
     case "paper": showPaper(paperById(id)); break;
     case "newpaper": editPaper(null); break;
-    case "newbook": closeSheet(); newBookSheet(); break;
+    case "newbook": closeSheet(); newBookSheet("book"); break;
+    case "newmedia": closeSheet(); newBookSheet("media"); break;
     case "exportxlsx": exportXlsx(); break;
     case "exportjson": saveFile("RD-SK-backup-"+today()+".json", JSON.stringify(S,null,1), "application/json"); break;
     case "sharejson": shareText(JSON.stringify(S)); break;
@@ -849,10 +877,10 @@ function decide(s){
   const p=paperById(s.paper);
   const opts=["Rejected","Revision requested","Accepted","Returned by office","Withdrawn","Under review"];
   let pick=s.status;
-  const book=isBook(p);
-  openSheet(`<h3>${book?"Record publisher's response":"Record decision"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+  const kind=kindOf(p), book=kind!=="journal";
+  openSheet(`<h3>${kind==="book"?"Record publisher's response":kind==="media"?"Record the outlet's reply":"Record decision"} <button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="t">${esc(s.journal)}</div><div class="m">${esc(p.key)} · submitted ${fmt(s.submitted)}</div>
-    <label>${book?"Response":"Decision"}</label><div class="statusgrid" id="dg">${opts.map(o=>`<button data-o="${o}" class="${o===pick?"on":""}">${esc(statusText(o,book))}</button>`).join("")}</div>
+    <label>${book?"Response":"Decision"}</label><div class="statusgrid" id="dg">${opts.map(o=>`<button data-o="${o}" class="${o===pick?"on":""}">${esc(statusText(o,kind))}</button>`).join("")}</div>
     <label for="dd">Date of decision</label><input type="date" id="dd" value="${s.decided||today()}">
     <label for="dn">Notes</label><textarea id="dn">${esc(s.notes)}</textarea>
     <div id="revhint" class="hint"></div>
@@ -872,8 +900,9 @@ function decide(s){
 let abdcTitles=null;
 function journalOptions(){
   abdcTitles=abdcTitles||(window.RD_ABDC||[]).map(j=>j[0]);
-  if(window.__bookPicker) return [...new Set(S.subs.filter(subIsBook).map(s=>s.journal).concat(PUBLISHERS))].sort((a,b)=>a.localeCompare(b));
-  return [...new Set(S.subs.filter(x=>!subIsBook(x)).map(s=>s.journal).filter(Boolean).concat(abdcTitles))].sort((a,b)=>a.localeCompare(b));
+  if(window.__bookPicker==="book"||window.__bookPicker===true) return [...new Set(S.subs.filter(subIsBook).map(s=>s.journal).concat(PUBLISHERS))].sort((a,b)=>a.localeCompare(b));
+  if(window.__bookPicker==="media") return [...new Set(S.subs.filter(x=>subKind(x)==="media").map(s=>s.journal).concat(OUTLETS))].sort((a,b)=>a.localeCompare(b));
+  return [...new Set(S.subs.filter(isJournalSub).map(s=>s.journal).filter(Boolean).concat(abdcTitles))].sort((a,b)=>a.localeCompare(b));
 }
 /** Journal suggestions under a text box (the app's own list: the WebView's datalist popup is see-through in dark mode).
  *  Your own journals come first, then ABDC titles; names starting with what you typed rank above other matches. */
@@ -910,10 +939,10 @@ function editSub(s, presetPaper){
   openSheet(`<h3>${isNew?"New submission":"Edit submission"} <span>${isNew?`<button data-act="scanqr">📷 Scan QR</button> `:""}<button class="ghost" onclick="closeSheet()">✕</button></span></h3>
     <label for="fp">Paper</label>
     <select id="fp">${isNew&&!s.paper?'<option value="">— choose paper —</option>':""}${papers.map(p=>`<option value="${p.id}" ${p.id===s.paper?"selected":""}>${esc(p.key)}</option>`).join("")}</select>
-    <label for="fj" id="fjl">${subIsBook(s)?"Publisher":"Journal"}</label><input id="fj" value="${esc(s.journal)}" autocomplete="off" autocapitalize="words">
+    <label for="fj" id="fjl">${KIND[subKind(s)].venue}</label><input id="fj" value="${esc(s.journal)}" autocomplete="off" autocapitalize="words">
     <div class="hint" id="fjabdc"></div>
     <div class="two"><div><label for="fr">Rating / index</label><input id="fr" value="${esc(s.rating)}"></div>
-    <div><label for="fs">Status</label><select id="fs">${STATUSES.map(o=>`<option value="${o}" ${o===s.status?"selected":""}>${esc(statusText(o,subIsBook(s)))}</option>`).join("")}</select></div></div>
+    <div><label for="fs">Status</label><select id="fs">${STATUSES.map(o=>`<option value="${o}" ${o===s.status?"selected":""}>${esc(statusText(o,subKind(s)))}</option>`).join("")}</select></div></div>
     <div class="two"><div><label for="fe">Date submitted</label><input type="date" id="fe" value="${esc(s.submitted)}"></div>
     <div><label for="ff">Date of decision</label><input type="date" id="ff" value="${esc(s.decided)}"></div></div>
     <label for="fn">Notes</label><textarea id="fn">${esc(s.notes)}</textarea>
@@ -931,8 +960,8 @@ function editSub(s, presetPaper){
   const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); if(window.__bookPicker){ $("#fjabdc").innerHTML=""; return; } const g=j&&abdcOf(j); $("#fjabdc").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list")+turnaroundLine(j,null)+` <button class="link" data-act="checklist" data-j="${esc(j)}">📋 ${(S.checklists||{})[j]?"Journal checklist":"Make a checklist"}</button>`:""; if(!j) return; const po=portalFor(j);
     $("#fuh").innerHTML = u?"Using your link.":po.src==="built-in"?"✓ Found automatically: "+esc(po.url):po.src==="yours"?"Using your saved link: "+esc(po.url):`Not known yet: <button class="link" id="ffind">Find it ↗</button>, copy the login page address, then paste it above.`;
     const f=$("#ffind"); if(f) f.onclick=()=>openBrowser(findLinkUrl(j)); };
-  const bookMode=()=>{ const b=isBook(paperById($("#fp").value)); window.__bookPicker=b; $("#fjl").textContent=b?"Publisher":"Journal";
-    [...$("#fs").options].forEach(o=>o.textContent=statusText(o.value,b)); };
+  const bookMode=()=>{ const k=kindOf(paperById($("#fp").value)); window.__bookPicker=k==="journal"?false:k; $("#fjl").textContent=KIND[k].venue;
+    [...$("#fs").options].forEach(o=>o.textContent=statusText(o.value,k)); };
   bookMode(); $("#fp").addEventListener("change",bookMode);
   journalPicker($("#fj")); $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
@@ -959,7 +988,7 @@ function showPaper(p){
   const planned=i.subs.filter(s=>s.status==="Planned"), done=ss.filter(s=>s.status!=="Planned");
   const revRow=i.subs.find(s=>s.status==="Revision requested");
   openSheet(`<h3><span>${esc(p.key)}</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
-    <div><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,isBook(p)))}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
+    <div><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,kindOf(p)))}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
     <dl class="kv" style="margin-top:10px">
       <dt>Title</dt><dd>${esc(p.title||"—")}</dd><dt>Authors</dt><dd>${p.authors?esc(p.authors):'<button class="link" onclick="editPaper(paperById(\''+p.id+'\'))">+ Add authors</button>'}</dd><dt>Type</dt><dd>${esc(p.type)}</dd>
       <dt>Approach</dt><dd>${esc(p.approach||rdGuessApproach(p))}${p.approach?"":' <span class="m">(guessed)</span>'}</dd>
@@ -976,7 +1005,7 @@ function showPaper(p){
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
     <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
       <div style="display:flex;flex-direction:column;gap:4px"><button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">No journals queued.</div>'}
-    ${p.override||isBook(p)?"":`<h2>Suggested next journals <small>ABDC 2025</small></h2>${suggestList(p,8)}`}`);
+    ${p.override||kindOf(p)!=="journal"?"":`<h2>Suggested next journals <small>ABDC 2025</small></h2>${suggestList(p,8)}`}`);
   const sh=$("#sheet");
   sh.onclick=e=>{
     if(suggestClick(e,p,()=>showPaper(p))) return;
@@ -999,36 +1028,44 @@ function dupRows(p){
   return out;
 }
 /** A book proposal in one go: the book, and the publishers it was sent to (one row per publisher). */
-function newBookSheet(){
-  openSheet(`<h3>📚 New book proposal <button class="ghost" onclick="closeSheet()">✕</button></h3>
-    <label for="bt">Book title</label><textarea id="bt" style="min-height:52px" placeholder="Working title"></textarea>
+/** A book proposal or a newspaper / web article in one go: the item and the publishers / outlets it went to (one row each). */
+function newBookSheet(kind){
+  kind=kind==="media"?"media":"book";
+  const B=kind==="book", T=B?{head:"📚 New book proposal",title:"Book title",ph:"Working title",types:["Book proposal","Edited book"],authors:"Authors / editors",
+      venue:"Publisher",vph:"e.g. Routledge",more:"+ Another publisher",email:"Editor's email (optional)",eph:"commissioning editor, for follow-ups",
+      notes:"e.g. proposal + 2 sample chapters emailed",save:"Save book",need:"Add at least one publisher",suffix:" (book)"}
+    :{head:"📰 New newspaper / web article",title:"Article title / headline",ph:"Working headline",types:["Newspaper / op-ed","Magazine article","Website / blog article"],authors:"Authors",
+      venue:"Outlet",vph:"e.g. The Hindu, The Conversation",more:"+ Another outlet",email:"Desk or section editor's email (optional)",eph:"opinion desk / commissioning editor",
+      notes:"e.g. 900-word op-ed pitched to the opinion desk; link once published",save:"Save article",need:"Add at least one outlet",suffix:" (article)"};
+  openSheet(`<h3>${T.head} <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <label for="bt">${T.title}</label><textarea id="bt" style="min-height:52px" placeholder="${T.ph}"></textarea>
     <div class="two"><div><label for="bk">Short name</label><input id="bk" placeholder="(from the title)"></div>
-    <div><label for="by">Type</label><select id="by"><option>Book proposal</option><option>Edited book</option></select></div></div>
-    <label for="ba">Authors / editors</label><input id="ba" value="${esc(S.settings.myName?"":"")}" placeholder="e.g. Kaushal, S., Guha, A.">
-    <label for="bp">Publisher</label><input id="bp" autocomplete="off" autocapitalize="words" placeholder="e.g. Routledge">
+    <div><label for="by">Type</label><select id="by">${T.types.map(t=>`<option>${t}</option>`).join("")}</select></div></div>
+    <label for="ba">${T.authors}</label><input id="ba" placeholder="e.g. Kaushal, S., Guha, A.">
+    <label for="bp">${T.venue}</label><input id="bp" autocomplete="off" autocapitalize="words" placeholder="${T.vph}">
     <div id="bplist" class="m" style="margin-top:6px"></div>
-    <div class="actions" style="margin-top:4px"><button id="bpadd">+ Another publisher</button></div>
+    <div class="actions" style="margin-top:4px"><button id="bpadd">${T.more}</button></div>
     <div class="two"><div><label for="bd">Sent on</label><input type="date" id="bd" value="${today()}"></div>
-    <div><label for="bs">Status</label><select id="bs"><option value="Under review">Awaiting response</option><option value="Planned">To send</option></select></div></div>
-    <label for="be">Editor's email (optional)</label><input id="be" type="email" autocapitalize="off" placeholder="commissioning editor, for follow-ups">
-    <label for="bn">Notes</label><textarea id="bn" placeholder="e.g. proposal + 2 sample chapters emailed"></textarea>
-    <div class="actions"><button class="primary" id="bsave">Save book</button></div>`);
-  const pubs=[]; window.__bookPicker=true; journalPicker($("#bp"));
+    <div><label for="bs">Status</label><select id="bs">${["Under review","Planned"].concat(B?[]:["Accepted"]).map(o=>`<option value="${o}">${esc(statusText(o,kind))}</option>`).join("")}</select></div></div>
+    <label for="be">${T.email}</label><input id="be" type="email" autocapitalize="off" placeholder="${T.eph}">
+    <label for="bn">Notes</label><textarea id="bn" placeholder="${T.notes}"></textarea>
+    <div class="actions"><button class="primary" id="bsave">${T.save}</button></div>`);
+  const pubs=[]; window.__bookPicker=kind; journalPicker($("#bp"));
   const draw=()=>{ $("#bplist").innerHTML=pubs.length?"Sending to: <b>"+pubs.map(esc).join("</b>, <b>")+"</b>":""; };
   const take=()=>{ const v=$("#bp").value.trim(); if(v&&!pubs.some(x=>normJ(x)===normJ(v))) pubs.push(v); $("#bp").value=""; draw(); };
   $("#bpadd").onclick=take;
   $("#bsave").onclick=()=>{ take();
-    const title=$("#bt").value.trim(); if(!title) return toast("Add the book's title");
-    if(!pubs.length) return toast("Add at least one publisher");
+    const title=$("#bt").value.trim(); if(!title) return toast("Add the title");
+    if(!pubs.length) return toast(T.need);
     let key=$("#bk").value.trim()||title.split(/[:?]/)[0].trim().slice(0,48);
-    if(S.papers.some(x=>x.key.toLowerCase()===key.toLowerCase())) key+=" (book)";
+    if(S.papers.some(x=>x.key.toLowerCase()===key.toLowerCase())) key+=T.suffix;
     const p={id:uid("p"),key,title,authors:$("#ba").value.trim(),type:$("#by").value,override:"",notes:$("#bn").value.trim()};
     S.papers.push(p);
     const st=$("#bs").value, d=$("#bd").value||today(), em=$("#be").value.trim();
-    pubs.forEach(j=>{ S.subs.push({id:uid("s"),paper:p.id,journal:j,rating:"",status:st,submitted:st==="Planned"?"":d,decided:"",notes:"",titleUsed:""});
-      if(em){ S.contacts=S.contacts||{}; if(pubs.length===1) S.contacts[j]=em; } });
+    pubs.forEach(j=>{ S.subs.push({id:uid("s"),paper:p.id,journal:j,rating:"",status:st,submitted:st==="Planned"?"":d,decided:st==="Accepted"?d:"",notes:"",titleUsed:""});
+      if(em&&pubs.length===1){ S.contacts=S.contacts||{}; S.contacts[j]=em; } });
     window.__bookPicker=false; noteActivity(); persist(); closeSheet(); render();
-    if(st==="Under review") celebrate("Planned","Under review",pubs.join(" & ")); else toast("Book saved");
+    if(st==="Under review") celebrate("Planned","Under review",pubs.join(" & ")); else if(st==="Accepted") celebrate("Under review","Accepted",pubs.join(" & ")); else toast("Saved");
   };
 }
 function movePlanned(pid,sid,dir){
@@ -1315,8 +1352,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.3", APP_BUILD="22 Oct 2026";
+const APP_VERSION="4.4", APP_BUILD="22 Oct 2026";
 const CHANGELOG=[
+  ["4.4","3 Nov 2026",["📰 Newspaper & web articles: op-eds, magazine pieces and blog posts with their outlets (Awaiting reply, Edits requested, Accepted for publication, Declined), their own Home card, filter and add form","Timeline: journal articles, book proposals and newspaper & web articles in separate sections"]],
   ["4.3","3 Nov 2026",["Home: a separate 📚 Book proposals card (books, awaiting response, contracts, declined, longest wait); the dashboard tiles now count journal articles only"]],
   ["4.2","3 Nov 2026",["📚 Book proposals: add a book and the publishers it went to (one or several), track each publisher's response (Awaiting response, Changes requested, Contract offered, Declined), Books filter, and a Book proposals section on Home"]],
   ["4.1","3 Nov 2026",["Sort papers (name, last/first submitted, most submissions or rejections, longest idle, stage) and submissions (date submitted or decided, days, journal, paper, ABDC rating, status); ↑↓ reverses, choice is remembered","Tablets: cards in columns, side navigation rail on large screens, centred dialogs"]],
@@ -1821,7 +1859,7 @@ async function aiRun(mode){
   const approach=p?(p.approach||rdGuessApproach(p)):"";
   const subs=p?subsOf(p.id).slice().sort((a,b)=>(a.submitted||"~").localeCompare(b.submitted||"~")).map(s=>({journal:s.journal,abdc:abdcOf(s.journal),status:s.status,submitted:s.submitted,decided:s.decided,dtype:s.dtype||"",notes:s.notes||""})):[];
   let candidates=[];
-  if(p&&kind!=="cover"&&!isBook(p)){
+  if(p&&kind!=="cover"&&kindOf(p)==="journal"){
     const tried=new Set(subs.map(x=>normJ(x.journal)));
     const own=rdShortlist(p).filter(n=>!tried.has(normJ(n))).slice(0,6).map(n=>{ const j=rdLookup(window.RD_ABDC||[],n); return {title:j?j[0]:n,grade:j?j[1]:"",publisher:j?j[3]:"",mine:true}; });
     const seen=new Set(own.map(c=>normJ(c.title)));
