@@ -589,6 +589,7 @@ function viewHome(){
   return `
   ${welcomeCard()}
   ${searchBox}
+  ${updateBanner()}
   ${mailNowBtn()}
   ${(()=>{ const k=streak(); return k.weeks>=1?`<div class="streak"><span class="fl">🔥</span>${k.weeks}-week streak${k.thisWeek?"":" · record something this week to keep it"}</div>`:""; })()}
   ${pendingBanner()}
@@ -806,6 +807,8 @@ document.addEventListener("click",e=>{
     case "chase": e.stopPropagation(); chaseEmail(s); break;
     case "checkall": checkAllStatuses(); break;
     case "pending": pendingSheet(); break;
+    case "updcheck": checkUpdate(true); break;
+    case "updshow": updateSheet(); break;
     case "mailnow": checkEmailsNow(); break;
     case "doi": e.stopPropagation(); openBrowser("https://doi.org/"+a.dataset.doi); break;
     case "star": { e.stopPropagation(); const it=(S.insights||[]).find(x=>x.doi===a.dataset.doi); if(it){ it.saved=!it.saved; if(it.saved){ GS.savedInsights=(GS.savedInsights||[]).concat([it.doi]); gsStore(); gsSchedule(); } persist(false); render(); toast(it.saved?"Saved to your ideas":"Removed"); } break; }
@@ -1352,8 +1355,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.4", APP_BUILD="22 Oct 2026";
+const APP_VERSION="4.5", APP_BUILD="10 Nov 2026";
 const CHANGELOG=[
+  ["4.5","10 Nov 2026",["🔄 Check for updates (More → About): shows what's new and opens the download page; the app also checks about once a week and shows a note on Home when an update is out"]],
   ["4.4","3 Nov 2026",["📰 Newspaper & web articles: op-eds, magazine pieces and blog posts with their outlets (Awaiting reply, Edits requested, Accepted for publication, Declined), their own Home card, filter and add form","Timeline: journal articles, book proposals and newspaper & web articles in separate sections"]],
   ["4.3","3 Nov 2026",["Home: a separate 📚 Book proposals card (books, awaiting response, contracts, declined, longest wait); the dashboard tiles now count journal articles only"]],
   ["4.2","3 Nov 2026",["📚 Book proposals: add a book and the publishers it went to (one or several), track each publisher's response (Awaiting response, Changes requested, Contract offered, Declined), Books filter, and a Book proposals section on Home"]],
@@ -1407,9 +1411,10 @@ function aboutCard(){
       <dt>Google Sheets</dt><dd>${gsOn()?(GS.lastText?"synced "+esc(GS.lastText):"connected"):"not set up"}</dd>
       <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
     </dl>
-    <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone. It leaves only when you export, share, or sync to your own GitHub repo. Journal passwords are typed into the journals' own pages and never stored by the app; the GitHub token stays on this phone.</div>
+    <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone and, once you sign in with Google, in a sheet in your own Google Drive (RD SK can only see files it creates). There is no RD SK server and no tracking. Journal passwords are typed into the journals' own pages and never stored by the app; keys and tokens stay on this phone and in your own sheet.</div>
     <div class="hint" style="margin-top:8px"><b>Free &amp; open source:</b> MIT License. Includes jsQR (Apache 2.0) and the ABDC Journal Quality List (© ABDC). Research insights use the free Crossref API; written ideas can use a free Gemini key.</div>
-    <div class="actions"><button data-act="ghrepo">Project on GitHub ↗</button></div>
+    <div class="actions"><button class="primary" data-act="updcheck" ${updBusy?"disabled":""}>${updBusy?"⏳ Checking…":"🔄 Check for updates"}</button><button data-act="ghrepo">Project on GitHub ↗</button></div>
+    ${UPD.checked?`<div class="m" style="margin-top:6px">${UPD.latest&&isNewer(UPD.latest)?`<b style="color:var(--accent)">Version ${esc(UPD.latest.version)} is available.</b> <button class="link" data-act="updshow">See what's new</button>`:"✓ You have the latest version"} · checked ${esc(new Date(UPD.checked).toLocaleString())}</div>`:""}
   </div>
   <div class="card">
     <div class="t">What's new</div>
@@ -1778,6 +1783,39 @@ function viewInsights(){
       :`<div class="empty">${insFilter==="Saved"?"No saved ideas yet. Tap ☆ on an insight to keep it.":gsOn()?"No insights yet. In your Google Sheet open the RD SK menu → “Turn on daily research insights”, then tap Sync now here.":"Connect your Google Sheet (More → Google Sheets sync) to get daily insights."}</div>`}
     <div class="hint">Recent papers (last 5 weeks) from ${"~320"} ABDC A*/A/B, FT50 and your own target journals, via Crossref, ranked against your papers. Ideas are written by the built-in method, or by Gemini (free key) / Claude (paid key) if you set one in the sheet's RD SK menu. They are prompts to think with: always read the paper and check the literature before building on them.</div>`;
 }
+
+/* ---------- updates: the website publishes version.json next to the APK ---------- */
+const UPDATE_URL="https://faltu9522.github.io/Research-Dashboard/version.json", DOWNLOAD_PAGE="https://faltu9522.github.io/Research-Dashboard/";
+const UPD_KEY="rdsk.update.v1"; let UPD={checked:0,latest:null}, updBusy=false;
+try{ Object.assign(UPD, JSON.parse(localStorage.getItem(UPD_KEY)||"{}")); }catch(e){}
+function installedBuild(){ try{ if(window.Android&&Android.appInfo) return +JSON.parse(Android.appInfo()).versionCode||0; }catch(e){} return 0; }
+/** Newer than this phone's app: by build number when the phone reports it, else by version name. */
+function isNewer(v){
+  if(!v) return false; const b=installedBuild();
+  if(b&&v.versionCode) return +v.versionCode>b;
+  const a=String(v.version).split(".").map(Number), c=String(APP_VERSION).split(".").map(Number);
+  for(let i=0;i<Math.max(a.length,c.length);i++){ if((a[i]||0)!==(c[i]||0)) return (a[i]||0)>(c[i]||0); } return false;
+}
+async function checkUpdate(manual){
+  if(updBusy) return; updBusy=!!manual; if(manual) render();
+  try{
+    const r=await httpCall("GET",UPDATE_URL+"?t="+Date.now(),"","");
+    if(r.status!==200) throw new Error(r.status===0?"No connection":"The download page answered "+r.status);
+    const v=JSON.parse(r.text); UPD={checked:Date.now(),latest:v}; try{ localStorage.setItem(UPD_KEY,JSON.stringify(UPD)); }catch(e){}
+    updBusy=false; render();
+    if(manual){ if(isNewer(v)) updateSheet(); else { toast("✓ You have the latest version ("+APP_VERSION+")"); FX.spark(lastTap.x,lastTap.y); } }
+  }catch(err){ updBusy=false; if(manual){ render(); alert("Couldn't check for updates: "+err.message); } }
+}
+function updateSheet(){
+  const v=UPD.latest; if(!v) return;
+  openSheet(`<h3>🎉 Update available <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m" style="color:var(--ink)">Version <b>${esc(v.version)}</b>${v.date?" · "+esc(v.date):""} (you have ${esc(APP_VERSION)}).</div>
+    ${(v.notes||[]).length?`<div class="t" style="margin-top:10px">What's new</div><ul class="m" style="color:var(--ink);padding-left:20px">${v.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:""}
+    <div class="actions"><button class="primary" id="upddl">⬇️ Download update</button><button class="ghost" onclick="closeSheet()">Later</button></div>
+    <div class="hint">The download page opens in your browser. Open the downloaded file and tap Install: it installs over this version and keeps all your data.</div>`);
+  $("#upddl").onclick=()=>{ openBrowser(v.page||DOWNLOAD_PAGE); closeSheet(); };
+}
+const updateBanner=()=>UPD.latest&&isNewer(UPD.latest)?`<button class="banner" data-act="updshow" style="width:100%;text-align:left;border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)">🎉 RD SK ${esc(UPD.latest.version)} is available: tap to see what's new and download</button>`:"";
 
 /* ---------- Ask AI ---------- */
 const AIU={paper:"",kind:"journals",journal:"",extra:"",busy:"",await:null,paste:"",all:false};
@@ -2467,7 +2505,8 @@ async function ghPull(){
   }catch(err){ alert("Load failed: "+err.message); }
 }
 
-load(); applyMotion(); baseline(); render(); pushWidget(); pushReminders(); setTimeout(()=>askNotifications(false),1500);
+load(); applyMotion(); baseline(); render(); pushWidget();
+if(Date.now()-(UPD.checked||0)>6*864e5) setTimeout(()=>checkUpdate(false),4000); // about once a week pushReminders(); setTimeout(()=>askNotifications(false),1500);
 if(gsOn()&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&gsOn()&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
 </script>
