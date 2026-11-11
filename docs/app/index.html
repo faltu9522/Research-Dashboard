@@ -230,7 +230,7 @@ const kindOf=p=>isBook(p)?"book":isMedia(p)?"media":"journal";
 const subKind=x=>kindOf(paperById(x.paper));
 const subIsBook=x=>isBook(paperById(x.paper));
 const isJournalSub=x=>subKind(x)==="journal";
-const KIND={journal:{icon:"",venue:"Journal",label:"Journal articles"},book:{icon:"📚",venue:"Publisher",label:"Book proposals"},media:{icon:"📰",venue:"Outlet",label:"Newspaper & web articles"}};
+const KIND={journal:{icon:"",venue:"Journal",plural:"journals",label:"Journal articles"},book:{icon:"📚",venue:"Publisher",plural:"publishers",label:"Book proposals"},media:{icon:"📰",venue:"Outlet",plural:"outlets",label:"Newspaper & web articles"}};
 const MEDIA_WORDS={"Under review":"Awaiting reply","Rejected":"Declined","Accepted":"Accepted for publication","Revision requested":"Edits requested","Revision resubmitted":"Edited & resent","Planned":"To pitch","Returned by office":"Returned","Needs resubmission":"Pitch elsewhere","Not yet submitted":"Not pitched yet","Revision due":"Edits due"};
 const OUTLETS=["The Hindu","The Indian Express","Hindustan Times","The Times of India","Deccan Herald","The Tribune","The Telegraph (India)","Mint","The Economic Times","Business Standard","The Wire","Scroll.in","ThePrint","The Quint","Firstpost","Newslaundry","Frontline","Outlook","India Today","Down To Earth","The Conversation","LSE Business Review","LSE Impact Blog","LSE South Asia Blog","Times Higher Education","University World News","Project Syndicate","Al Jazeera (Opinion)","The Guardian (Opinion)","Medium","Substack","EPW Engage"];
 const BOOK_WORDS={"Under review":"Awaiting response","Rejected":"Declined","Accepted":"Contract offered","Revision requested":"Changes requested","Revision resubmitted":"Revised & resent","Planned":"To send","Returned by office":"Returned","Needs resubmission":"Find a publisher","Not yet submitted":"Not sent yet","Revision due":"Changes due"};
@@ -263,7 +263,7 @@ function applyMotion(){ FX.mode=S.settings.motion==="calm"?"calm":"full"; docume
 /** Plays the right animation when a submission's status changes. */
 function celebrate(before,after,journal){
   if(before===after) { FX.spark(lastTap.x,lastTap.y); return; }
-  if(after==="Accepted") FX.accepted(journal);
+  if(after==="Accepted"){ FX.accepted(journal); const s=acceptedRow(journal); if(s&&othersOut(s).length) setTimeout(()=>withdrawSheet(s),2900); }
   else if(after==="Under review"&&(before==="Planned"||before==="Revision requested"||!before)) FX.submitted(journal,lastTap.x,lastTap.y);
   else if(after==="Rejected"||after==="Returned by office") FX.rejected(journal);
   else if(after==="Revision requested") FX.revision(journal);
@@ -417,6 +417,8 @@ function fmt(s){ if(!s) return "—"; const [y,m,d]=s.split("-"); return (+d)+" 
 /* ---------- calculations (mirror the workbook formulas) ---------- */
 const isSent = s => s.status && s.status!=="Planned";
 const isOpen = s => s.status==="Under review" || s.status==="Revision requested";
+/** Still being considered by that venue (a resubmitted revision included). */
+const stillOut = s => isOpen(s) || s.status==="Revision resubmitted";
 function subsOf(pid){ return S.subs.filter(s=>s.paper===pid); }
 function paperById(id){ return S.papers.find(p=>p.id===id); }
 function paperStage(p){
@@ -518,7 +520,7 @@ function paperCard(p){
   return `<div class="card tap" data-act="paper" data-id="${p.id}">
     <div class="row"><div class="grow"><div class="t">${book?`<span class="chip s-acc" style="font-size:11px">${KIND[kind].icon} ${esc(p.type)}</span> `:""}${esc(p.key)}</div>
       <div class="m">${p.authors?"👤 "+esc(p.authors):'<span style="color:var(--warn)">👤 Authors not added</span>'}</div>
-      <div class="m">${book?(()=>{ const out=i.subs.filter(isOpen); return out.length>1?"With "+out.length+(kind==="book"?" publishers: ":" outlets: ")+esc(out.map(x=>x.journal).join(", ")):i.last?KIND[kind].venue+": "+esc(i.last.journal):"Not sent yet"; })():(i.last?"Last: "+esc(i.last.journal):"Never sent out")}${i.next?" · Next: "+esc(i.next.journal):""}</div>
+      <div class="m">${(()=>{ const out=i.subs.filter(stillOut); if(out.length>1) return (book?"With ":"Under review at ")+out.length+" "+KIND[kind].plural+": "+esc(out.map(x=>x.journal).join(", ")); return book?(i.last?KIND[kind].venue+": "+esc(i.last.journal):"Not sent yet"):(i.last?"Last: "+esc(i.last.journal):"Never sent out"); })()}${i.next?" · Next: "+esc(i.next.journal):""}</div>
       <div style="margin-top:5px"><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,kind))}</span>
       <span class="m">${i.sent} sent · ${i.rejections} rejected</span></div></div>
       ${i.idle!=null?`<div class="days" style="color:${i.idle>=180?"var(--need)":i.idle>=60?"var(--warn)":"inherit"}">${i.idle}<small>idle days</small></div>`:""}
@@ -954,6 +956,7 @@ function editSub(s, presetPaper){
     <select id="fp">${isNew&&!s.paper?'<option value="">— choose paper —</option>':""}${papers.map(p=>`<option value="${p.id}" ${p.id===s.paper?"selected":""}>${esc(p.key)}</option>`).join("")}</select>
     <label for="fj" id="fjl">${KIND[subKind(s)].venue}</label><input id="fj" value="${esc(s.journal)}" autocomplete="off" autocapitalize="words">
     <div class="hint" id="fjabdc"></div>
+    ${isNew?`<div id="fjmore" style="margin-top:6px"><button class="link" id="fjadd">+ Another journal</button><div class="m" id="fjlist"></div></div>`:""}
     <div class="two"><div><label for="fr">Rating / index</label><input id="fr" value="${esc(s.rating)}"></div>
     <div><label for="fs">Status</label><select id="fs">${STATUSES.map(o=>`<option value="${o}" ${o===s.status?"selected":""}>${esc(statusText(o,subKind(s)))}</option>`).join("")}</select></div></div>
     <div class="two"><div><label for="fe">Date submitted</label><input type="date" id="fe" value="${esc(s.submitted)}"></div>
@@ -973,23 +976,37 @@ function editSub(s, presetPaper){
   const linkHint=()=>{ const j=$("#fj").value.trim(), u=$("#fu").value.trim(); if(window.__bookPicker){ $("#fjabdc").innerHTML=""; return; } const g=j&&abdcOf(j); $("#fjabdc").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list")+turnaroundLine(j,null)+` <button class="link" data-act="checklist" data-j="${esc(j)}">📋 ${(S.checklists||{})[j]?"Journal checklist":"Make a checklist"}</button>`:""; if(!j) return; const po=portalFor(j);
     $("#fuh").innerHTML = u?"Using your link.":po.src==="built-in"?"✓ Found automatically: "+esc(po.url):po.src==="yours"?"Using your saved link: "+esc(po.url):`Not known yet: <button class="link" id="ffind">Find it ↗</button>, copy the login page address, then paste it above.`;
     const f=$("#ffind"); if(f) f.onclick=()=>openBrowser(findLinkUrl(j)); };
+  const extra=[];
+  const drawExtra=()=>{ const l=$("#fjlist"); if(!l) return; const k=kindOf(paperById($("#fp").value)), pid=$("#fp").value;
+    const open=S.subs.filter(o=>o.paper===pid&&o!==s&&stillOut(o)).map(o=>o.journal);
+    const many=extra.length+open.length>0&&$("#fs").value==="Under review";
+    l.innerHTML=(extra.length?`Also sending to: ${extra.map((x,i)=>`<b>${esc(x)}</b> <button class="link" data-xrm="${i}">✕</button>`).join(", ")}`:"")
+      +(many&&k==="journal"?`<div class="hint" style="color:var(--warn)">ℹ Most journals ask that a paper is under consideration at one journal only (it's in the submission declaration)${open.length?"; this paper is already with "+esc(open.join(", ")):""}. Check each journal's policy before sending to more than one.</div>`:""); };
+  if($("#fjadd")){ $("#fjadd").onclick=()=>{ const v=$("#fj").value.trim(); if(!v) return toast("Type the first one above, then tap again for the next");
+      if(!extra.some(x=>normJ(x)===normJ(v))) extra.push(v); $("#fj").value=""; $("#fr").value=""; $("#fj").focus(); drawExtra(); linkHint(); };
+    $("#fjlist").onclick=e=>{ const r=e.target.closest("[data-xrm]"); if(r){ extra.splice(+r.dataset.xrm,1); drawExtra(); } }; }
   const bookMode=()=>{ const k=kindOf(paperById($("#fp").value)); window.__bookPicker=k==="journal"?false:k; $("#fjl").textContent=KIND[k].venue;
+    if($("#fjadd")) $("#fjadd").textContent="+ Another "+KIND[k].venue.toLowerCase(); drawExtra();
     [...$("#fs").options].forEach(o=>o.textContent=statusText(o.value,k)); };
   bookMode(); $("#fp").addEventListener("change",bookMode);
   journalPicker($("#fj")); $("#fj").addEventListener("input",linkHint); $("#fu").addEventListener("input",linkHint); linkHint();
   if($("#fopen")) $("#fopen").onclick=()=>{ const u=$("#fu").value.trim(); openUrl(u||portalFor($("#fj").value.trim()).url); };
-  $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); if(st==="Planned"){ /* keep dates as typed */ } };
+  $("#fs").onchange=()=>{ const st=$("#fs").value; if(st!=="Planned"&&!$("#fe").value) $("#fe").value=today(); drawExtra(); };
   $("#fsave").onclick=()=>{
-    const pid=$("#fp").value, j=$("#fj").value.trim(), before=isNew?"":s.status;
+    const pid=$("#fp").value, before=isNew?"":s.status;
+    if(isNew&&!$("#fj").value.trim()&&extra.length) $("#fj").value=extra.pop();
+    const j=$("#fj").value.trim();
     if(!pid) return toast("Choose a paper"); if(!j) return toast("Enter a journal");
-    Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim(), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim(), msid:$("#fm").value.trim()});
+    Object.assign(s,{paper:pid, journal:j, rating:$("#fr").value.trim()||(isNew?abdcOf(j)||"":""), status:$("#fs").value, submitted:$("#fe").value, decided:$("#ff").value, notes:$("#fn").value.trim(), titleUsed:$("#ft").value.trim(), msid:$("#fm").value.trim()});
     S.contacts=S.contacts||{}; const em=$("#fx").value.trim(); if(em) S.contacts[j]=em; else delete S.contacts[j];
     const u=$("#fu").value.trim();
     if(u) S.portals[j]=/^https?:\/\//i.test(u)?u:"https://"+u; else delete S.portals[j];
-    if(isNew&&S.subs.some(o=>o.paper===s.paper&&sameJournal(o.journal,s.journal)&&o.status===s.status&&(o.submitted||"")===(s.submitted||""))
-      &&!confirm("This paper already has an identical "+s.journal+" row ("+s.status+"). Add another one anyway?")) return;
-    if(isNew) S.subs.push(s);
-    noteActivity(); persist(); closeSheet(); render(); celebrate(before||(isNew&&s.status==="Under review"?"Planned":s.status),s.status,j);
+    const rows=[s].concat(isNew?extra.filter(x=>normJ(x)!==normJ(j)).map(x=>Object.assign({},s,{id:uid("s"),journal:x,rating:abdcOf(x)||"",msid:"",titleUsed:s.titleUsed})):[]);
+    if(isNew){ const dup=rows.filter(r=>S.subs.some(o=>o.paper===r.paper&&sameJournal(o.journal,r.journal)&&o.status===r.status&&(o.submitted||"")===(r.submitted||"")));
+      if(dup.length&&!confirm("This paper already has an identical row for "+dup.map(r=>r.journal).join(", ")+" ("+s.status+"). Add anyway?")) return; }
+    if(isNew) rows.forEach(r=>S.subs.push(r));
+    noteActivity(); persist(); closeSheet(); render(); celebrate(before||(isNew&&s.status==="Under review"?"Planned":s.status),s.status,rows.length>1?rows.map(r=>r.journal).join(" & "):j);
+    if(rows.length>1) setTimeout(()=>toast("Added "+rows.length+" submissions"),1200);
   };
   if($("#fdel")) $("#fdel").onclick=()=>{ if(confirm("Delete this submission row?")){ S.subs=S.subs.filter(x=>x!==s); persist(); closeSheet(); render(); } };
 }
@@ -1265,9 +1282,53 @@ Thank you for your time and for handling our submission.
 
 Kind regards,
 ${name||"[Your name]"}${many?"\n(on behalf of all authors)":""}`;
-  const url="mailto:"+encodeURIComponent(to).replace(/%40/g,"@")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
   if(!to) toast("Tip: add the editorial office email on the submission to fill in the To: field");
-  openUrl(url);
+  mailTo(to,subject,body);
+}
+
+/* ---------- one venue said yes: tell the others ---------- */
+function acceptedRow(journal){ return S.subs.filter(s=>s.status==="Accepted"&&s.journal===journal).sort((a,b)=>(b.decided||"").localeCompare(a.decided||""))[0]; }
+function othersOut(s){ return S.subs.filter(o=>o!==s&&o.paper===s.paper&&stillOut(o)); }
+function mailTo(to,subject,body){ openUrl("mailto:"+encodeURIComponent(to).replace(/%40/g,"@")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body)); }
+function withdrawEmail(o,acc){
+  const p=paperById(o.paper)||{}, kind=kindOf(p), title=o.titleUsed||p.title||p.key||"";
+  const to=(S.contacts||{})[o.journal]||"", name=S.settings.myName||"";
+  const many=(p.authors||"").split(/,|;| and /).filter(x=>x.trim()).length>2, we=many||/,|;| and /.test(p.authors||"");
+  const what=kind==="book"?"book proposal":kind==="media"?"article":"manuscript";
+  const why=kind==="book"?"we have accepted a publishing offer for it elsewhere":"it has been accepted for publication elsewhere";
+  const subject=`Withdrawal of ${what}${o.msid?" – "+o.msid:""}: “${title}”`;
+  const body=`Dear Editor,
+
+I am writing to withdraw ${we?"our":"my"} ${what} “${title}”${o.msid?" (Manuscript ID: "+o.msid+")":""}, submitted to ${o.journal.replace(/-A$/,"")}${o.submitted?" on "+fmt(o.submitted):""}, as ${why}.
+
+Thank you very much for your time and consideration, and my apologies for any inconvenience this may cause.
+
+Kind regards,
+${name||"[Your name]"}${many?"\n(on behalf of all authors)":""}`;
+  if(!to) toast("Tip: add the "+KIND[kind].venue.toLowerCase()+"'s email on the submission to fill in the To: field");
+  mailTo(to,subject,body);
+}
+function withdrawSheet(s){
+  const p=paperById(s.paper)||{}, kind=kindOf(p), others=othersOut(s); if(!others.length) return;
+  const n=others.length, v=n>1?KIND[kind].plural:KIND[kind].venue.toLowerCase();
+  openSheet(`<h3><span>🎉 ${esc(statusText("Accepted",kind))}: ${esc(s.journal)}</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <p class="m">“${esc(p.key)}” is still with ${n} other ${v}. It's courteous (and usually required) to tell ${n>1?"them":"it"} and withdraw.</p>
+    ${others.map((o,i)=>`<div class="card"><label class="row" style="gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:15px;color:var(--ink);margin:0"><input type="checkbox" data-wi="${i}" checked style="width:auto">
+      <span class="grow"><b>${esc(o.journal)}</b><br><span class="m">${esc(statusText(o.status,kind))}${o.submitted?" since "+fmt(o.submitted):""}</span></span></label>
+      <div class="actions"><button data-wm="${i}">✉ Draft withdrawal email</button>${kind==="journal"?`<button data-wo="${i}">Open journal site ↗</button>`:""}</div></div>`).join("")}
+    ${kind==="journal"?`<div class="hint">Many journals also want the withdrawal made in their submission system.</div>`:""}
+    <div class="actions"><button class="primary" id="wdo">Mark ticked as Withdrawn</button><button onclick="closeSheet()">Not now</button></div>`);
+  $("#sheet").onclick=e=>{
+    const m=e.target.closest("[data-wm]"), op=e.target.closest("[data-wo]");
+    if(m) return withdrawEmail(others[+m.dataset.wm],s);
+    if(op){ const o=others[+op.dataset.wo]; return openUrl(portalFor(o.journal).url); }
+    if(e.target.id==="wdo"){
+      const pick=others.filter((o,i)=>$(`[data-wi="${i}"]`).checked); if(!pick.length) return toast("Nothing ticked");
+      const note="Withdrawn: "+statusText("Accepted",kind).toLowerCase()+" at "+s.journal;
+      pick.forEach(o=>{ o.status="Withdrawn"; o.decided=today(); o.notes=o.notes?o.notes+" | "+note:note; });
+      noteActivity(); persist(); closeSheet(); render(); toast("Marked "+pick.length+" as Withdrawn");
+    }
+  };
 }
 
 /* ---------- stats ---------- */
@@ -1366,8 +1427,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.7", APP_BUILD="11 Nov 2026";
+const APP_VERSION="4.8", APP_BUILD="11 Nov 2026";
 const CHANGELOG=[
+  ["4.8","11 Nov 2026",["Simultaneous submissions: “+ Another journal” in the submission form (with a reminder about exclusive-consideration rules), and cards show “Under review at 2 journals: A, B”","When a journal accepts or a publisher offers a contract, RD SK lists the others still considering the work: mark them Withdrawn and draft a polite withdrawal email for each"]],
   ["4.7","11 Nov 2026",["Privacy: the app no longer ships with any built-in paper data (sign in to load your sheet); the old GitHub sync option is hidden"]],
   ["4.6","11 Nov 2026",["💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"]],
   ["4.5","10 Nov 2026",["🔄 Check for updates (More → About): shows what's new and opens the download page; the app also checks about once a week and shows a note on Home when an update is out"]],

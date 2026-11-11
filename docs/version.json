@@ -1,9 +1,10 @@
 {
- "version": "4.7",
- "versionCode": 38,
+ "version": "4.8",
+ "versionCode": 39,
  "date": "11 Nov 2026",
  "notes": [
-  "Privacy: the app no longer ships with any built-in paper data (sign in to load your sheet); the old GitHub sync option is hidden"
+  "Simultaneous submissions: “+ Another journal” in the submission form (with a reminder about exclusive-consideration rules), and cards show “Under review at 2 journals: A, B”",
+  "When a journal accepts or a publisher offers a contract, RD SK lists the others still considering the work: mark them Withdrawn and draft a polite withdrawal email for each"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"
