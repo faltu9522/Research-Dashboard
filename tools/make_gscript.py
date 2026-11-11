@@ -20,7 +20,8 @@ for name in ("suggest.js", "emailparse.js", "watchlist.js", "insights.js"):
     assert start in src, name
     src = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: start + "\n" + code.strip() + "\n" + end, src, flags=re.S)
 start, end = "// ==== current-data.json (copied from data/ by tools/make_gscript.py; made by tools/sheet2_import.py) ====", "// ==== end current-data.json ===="
-data = json.dumps(json.load(open("data/current-data.json", encoding="utf-8")), ensure_ascii=False, separators=(",", ":"))
+# a one-off replacement record (tools/sheet2_import.py style) is only bundled when present locally; never committed
+data = json.dumps(json.load(open("data/current-data.json", encoding="utf-8")), ensure_ascii=False, separators=(",", ":")) if os.path.exists("data/current-data.json") else "{}"
 assert start in src
 src = re.sub(re.escape(start) + r".*?" + re.escape(end), lambda m: start + "\nvar RD_CURRENT = " + data + ";\n" + end, src, flags=re.S)
 open(GS, "w", encoding="utf-8").write(src)

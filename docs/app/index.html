@@ -746,7 +746,7 @@ function viewMore(){
     <input id="chase" type="number" min="1" value="${esc(S.settings.chaseDays)}">
     <div class="hint">Under-review submissions older than this are flagged “Check status”; at twice this they're “Overdue”.</div>
     <label for="myname">Your name (signs chase emails)</label>
-    <input id="myname" value="${esc(S.settings.myName||"")}" placeholder="e.g. Dr S. Kaushal">
+    <input id="myname" value="${esc(S.settings.myName||"")}" placeholder="e.g. Dr A. Author">
     <label>Animations</label>
     <div class="filters" style="flex-wrap:wrap">${[["full","🎆 Full"],["calm","🌙 Calm"]].map(([k,l])=>`<button data-act="motion" data-v="${k}" class="${(S.settings.motion||"full")===k?"on":""}">${l}</button>`).join("")}</div>
   </div>
@@ -769,15 +769,13 @@ function viewMore(){
   <h2>Ask AI <small>free Gemini key</small></h2>
   <div class="card">${geminiCard()}</div>
   ${GS.url||!gDirect()?`<details class="card"><summary class="t">Older way: web-app link${GS.url?" (in use)":""}</summary><div style="margin-top:8px">${gsCard()}</div></details>`:""}
-  <h2>Sync to GitHub</h2>
-  <div class="card">${ghCard()}</div>
   <h2>Journal login links</h2>
   <div class="card">
     <div class="hint" style="margin-top:0">${Object.keys(S.portals).length} custom link(s) set. Each under-review card opens the journal's submission system; journals without a known link fall back to a web search. Set your own link from any submission's edit screen.</div>
     ${Object.keys(S.portals).length?`<div class="actions"><button data-act="clearportals" class="danger">Clear my custom links</button></div>`:""}
   </div>
   <h2>Reset</h2>
-  <div class="card"><div class="actions" style="margin-top:0"><button class="danger" data-act="reset">Reset to the master sheet data (22 Oct 2026)</button></div>
+  <div class="card"><div class="actions" style="margin-top:0"><button class="danger" data-act="reset">Clear this phone's data</button></div>
   <div class="hint">Discards all changes made in the app.</div></div>
   <h2>About</h2>
   ${aboutCard()}`;
@@ -883,7 +881,7 @@ document.addEventListener("click",e=>{
     case "ghpull": ghPull(); break;
     case "ghforget": if(confirm("Remove the GitHub token from this phone?")){ GH.token=""; ghStore(); render(); } break;
     case "clearportals": if(confirm("Remove all custom journal links?")){ S.portals={}; persist(); render(); } break;
-    case "reset": if(confirm("Reset everything to the Excel data? All changes made in the app will be lost.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); trackPaused=true; persist(false); trackPaused=false; baseline(); render(); toast("Reset done"); } break;
+    case "reset": if(confirm("Clear everything stored on this device? Your Google Sheet is not touched: sign in again to load it back.")){ S=JSON.parse(JSON.stringify(window.RD_SEED)); S.settings.fresh=true; trackPaused=true; persist(false); trackPaused=false; baseline(); render(); toast("Cleared"); } break;
   }
 });
 
@@ -1056,7 +1054,7 @@ function newBookSheet(kind){
     <label for="bt">${T.title}</label><textarea id="bt" style="min-height:52px" placeholder="${T.ph}"></textarea>
     <div class="two"><div><label for="bk">Short name</label><input id="bk" placeholder="(from the title)"></div>
     <div><label for="by">Type</label><select id="by">${T.types.map(t=>`<option>${t}</option>`).join("")}</select></div></div>
-    <label for="ba">${T.authors}</label><input id="ba" placeholder="e.g. Kaushal, S., Guha, A.">
+    <label for="ba">${T.authors}</label><input id="ba" placeholder="e.g. Surname, A., Surname, B.">
     <label for="bp">${T.venue}</label><input id="bp" autocomplete="off" autocapitalize="words" placeholder="${T.vph}">
     <div id="bplist" class="m" style="margin-top:6px"></div>
     <div class="actions" style="margin-top:4px"><button id="bpadd">${T.more}</button></div>
@@ -1368,8 +1366,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.6", APP_BUILD="11 Nov 2026";
+const APP_VERSION="4.7", APP_BUILD="11 Nov 2026";
 const CHANGELOG=[
+  ["4.7","11 Nov 2026",["Privacy: the app no longer ships with any built-in paper data (sign in to load your sheet); the old GitHub sync option is hidden"]],
   ["4.6","11 Nov 2026",["💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"]],
   ["4.5","10 Nov 2026",["🔄 Check for updates (More → About): shows what's new and opens the download page; the app also checks about once a week and shows a note on Home when an update is out"]],
   ["4.4","3 Nov 2026",["📰 Newspaper & web articles: op-eds, magazine pieces and blog posts with their outlets (Awaiting reply, Edits requested, Accepted for publication, Declined), their own Home card, filter and add form","Timeline: journal articles, book proposals and newspaper & web articles in separate sections"]],
@@ -1423,7 +1422,6 @@ function aboutCard(){
       ${info.webview?`<dt>WebView</dt><dd>${esc(info.webview)}</dd>`:""}
       <dt>Your data</dt><dd>${S.papers.length} papers · ${S.subs.length} submission rows · last change ${fmt(S.settings.lastUpdated)}</dd>
       <dt>Google Sheets</dt><dd>${gsOn()?(GS.lastText?"synced "+esc(GS.lastText):"connected"):"not set up"}</dd>
-      <dt>GitHub sync</dt><dd>${GH.token?(GH.lastSync?"last synced "+esc(GH.lastSync):"connected, not synced yet"):"not set up"}</dd>
     </dl>
     <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone and, once you sign in with Google, in a sheet in your own Google Drive (RD SK can only see files it creates). There is no RD SK server and no tracking. Journal passwords are typed into the journals' own pages and never stored by the app; keys and tokens stay on this phone and in your own sheet.</div>
     <div class="hint" style="margin-top:8px"><b>Free &amp; open source:</b> MIT License. Includes jsQR (Apache 2.0) and the ABDC Journal Quality List (© ABDC). Research insights use the free Crossref API; written ideas can use a free Gemini key.</div>
@@ -1869,7 +1867,7 @@ function viewAI(){
     <div class="filters" style="flex-wrap:wrap">${kinds.map(k=>`<button data-act="aikind" data-k="${k}" class="${k===kind?"on":""}">${RD_AI_KINDS[k]}</button>`).join("")}</div>
     ${needJ?`<label for="aij">Journal</label><input id="aij" value="${esc(AIU.journal)}" placeholder="Type a journal name" autocomplete="off" autocapitalize="words">`:""}
     <label for="aix">${kind==="ask"?"Your question":"Anything to add (optional)"}</label>
-    <textarea id="aix" placeholder="${kind==="ask"?"e.g. Which ABDC A journals publish Blanchot-inspired organization theory?":"e.g. prefer journals with fast first decisions; it is 11,000 words"}">${esc(AIU.extra)}</textarea>
+    <textarea id="aix" placeholder="${kind==="ask"?"e.g. Which ABDC A journals publish conceptual papers on organizational silence?":"e.g. prefer journals with fast first decisions; it is 11,000 words"}">${esc(AIU.extra)}</textarea>
     <div class="actions"><button class="primary" data-act="aiask" ${AIU.busy?"disabled":""}>✦ Ask here</button><button data-act="aigemini" ${AIU.busy?"disabled":""}>Ask in Gemini app</button></div>
     <div class="m" style="margin-top:8px">${AIU.busy?"⏳ "+esc(AIU.busy):(GS.gemini||GS.url)?"<b>Ask here</b>: free, uses your Gemini key; the answer is saved. <b>Gemini app</b>: hands the question to the Gemini app (your Pro subscription).":"<b>Ask here</b> needs your free Gemini key (More → Ask AI). <b>Gemini app</b> works now."}</div>
   </div>
@@ -2155,7 +2153,7 @@ const GEMINI_PHONE=["gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite
 
 /* ---------- co-authors: each gets a sheet with only the papers they co-author, kept in step both ways ---------- */
 const PICKER_URL="https://faltu9522.github.io/Research-Dashboard/pick.html";
-/** "Kaushal, S., Guha. A., Nyoni, A.M." -> [{key:"kaushal s", label:"Kaushal, S."}, …] */
+/** "Smith, J., Rao. A., Ng, A.M." -> [{key:"smith j", label:"Smith, J."}, …] */
 function authorList(str){
   const out=[], re=/([A-Z][A-Za-z'’\-]+)\s*[,.]\s*((?:[A-Z]\.?\s*){1,3})/g; let m;
   while((m=re.exec(str||""))){ const ini=m[2].replace(/[^A-Z]/g,""); const key=(m[1]+" "+ini.charAt(0)).toLowerCase(); if(!out.some(a=>a.key===key)) out.push({key,label:m[1]+", "+ini.split("").join(".")+"."}); }

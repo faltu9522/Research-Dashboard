@@ -1,9 +1,9 @@
 {
- "version": "4.6",
- "versionCode": 37,
+ "version": "4.7",
+ "versionCode": 38,
  "date": "11 Nov 2026",
  "notes": [
-  "💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"
+  "Privacy: the app no longer ships with any built-in paper data (sign in to load your sheet); the old GitHub sync option is hidden"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"

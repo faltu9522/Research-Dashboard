@@ -51,7 +51,7 @@ def issns(*xs):
 
 
 def crossref_issn(name):
-    url = "https://api.crossref.org/journals?rows=5&query=" + urllib.parse.quote(name) + "&mailto=snjy9522@gmail.com"
+    url = "https://api.crossref.org/journals?rows=5&query=" + urllib.parse.quote(name)
     try:
         items = json.load(urllib.request.urlopen(url, timeout=30))["message"]["items"]
     except Exception:

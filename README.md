@@ -28,7 +28,7 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   changes. Passwords are never stored by the app.
 - **Update from an email** – share a journal email (or selected text) to RD SK, or tap *Paste an editor's
   email*: the app matches the submission (manuscript ID, journal, title) and guesses the outcome for you to confirm.
-- **📷 Scan QR / add from links** – `excel/RD-SK-New-Submissions.xlsx` (laptop) builds an `rdsk://add?…` link and a
+- **📷 Scan QR / add from links** – a QR workbook made locally with `tools/make_qr_template.py` (laptop) builds an `rdsk://add?…` link and a
   QR code for each new submission; scan it in the app, or send the *Send to phone* sheet's links to yourself and
   Share → RD SK to add many at once. Same paper + journal updates the existing row.
 - **🔗 Set login link** – for journals without a built-in login page, with a *Find it* search helper.
@@ -38,7 +38,7 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   ID/Updated columns at the right); formulas and the Dashboard tab are untouched. Newest edit wins per row.
   `android/app/src/main/assets/gscript.js` embeds the same script for the in-app *Copy the script* button
   (regenerate it if you change the .gs file).
-- **Master sheet** – `excel/RD-SK-Master.xlsx` (built by `tools/build_master.py` from the app data, the user's
+- **Master sheet** – made in your Drive by the app from `master-template.xlsx` (built by `tools/build_master.py --template`; the user's
   SK_Research_Updates_2026.xlsx and the official ABDC list): Dashboard, Submissions grouped by paper with spare rows,
   Papers (stage, current journal, queue, suggested next journals), Journals (ABDC 2025 by formula, login links,
   editor emails) and the full ABDC list tab. Upload it to Google Drive as the Google Sheet the app syncs with.
@@ -76,7 +76,7 @@ A phone app for tracking paper submissions, built from the *Research Dashboard* 
   *Ask in Gemini app* copies the question for the Gemini app (e.g. a Gemini Pro subscription) and lets you paste the
   answer back. Answers come back after a reinstall with the restore link.
 - **Replace all data** (sheet menu *RD SK → Replace all papers and submissions with the Sheet 2 record*) – wipes
-  Papers and Submissions and writes the clean record in `data/current-data.json` (made from Sheet 2 of
+  Papers and Submissions and writes a clean record (a local `data/current-data.json`, made from Sheet 2 of
   SK_Research_Updates_2026.xlsx). Journals, ABDC list, email log, insights, settings, triggers and the web-app link
   stay. Phones on v2.8+ drop their old copy on the next sync; emails received before the replace change nothing.
 
@@ -140,11 +140,9 @@ One-time setup for the picker (free), in the same Google Cloud project:
 5. While the app is in Testing, add each co-author's Gmail under **Audience → Test users**.
 
 ## Rebuilding
-- Clean record from a new tracker: `python3 tools/sheet2_import.py SK_Research_Updates_2026.xlsx data/current-data.json`
-  (yellow + date = under review, yellow without date = planned, red = earlier attempt, other journals = shortlist in
-  the paper's notes), then `python3 tools/build_master.py android/app/src/main/assets/seed.js data/current-data.json
-  ABDC-JQL-2025.xlsx android/app/src/main/assets/portals.js excel/RD-SK-Master.xlsx android/app/src/main/assets/seed.js`
-  and `python3 tools/make_gscript.py`.
+- Master template: `python3 tools/build_master.py <seed.js> --template ABDC-JQL-2025.xlsx android/app/src/main/assets/portals.js android/app/src/main/assets/master-template.xlsx x`.
+- Privacy: no personal data is committed (the repository and website are public). The app starts empty and loads your
+  data from your own Google Sheet after sign-in; local working files (exports, `data/`, `excel/`) are git-ignored.
 - Seed data from a newer workbook: `python3 tools/excel_to_seed.py Research_Dashboard.xlsx android/app/src/main/assets/seed.js`
   (seed data is only used on first launch or after *Reset*; to load a new workbook on the phone use *Import*).
 - After each build run `python3 tools/release.py`: it copies the APK to `apk/` and `docs/` (the download page), writes

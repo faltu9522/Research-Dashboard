@@ -1,0 +1,9 @@
+# local working files with personal data: never commit
+data/
+excel/
+*.xlsx
+!android/app/src/main/assets/master-template.xlsx
+!docs/app/master-template.xlsx
+/*.png
+android/**/*.png
+!android/app/src/main/res/**

@@ -1,4 +1,5 @@
-"""Build the RD SK master workbook (for Google Sheets) and the app's seed data.
+"""Build the RD SK master workbook (for Google Sheets): the empty template the app uploads to your Drive, or a filled
+workbook and seed from a JSON file of papers and submissions (kept locally, never committed).
 
 With data/current-data.json (made from Sheet 2 by tools/sheet2_import.py) as the second argument, that file is the
 whole record: papers and submissions come only from it.
@@ -29,50 +30,7 @@ STATUSES = ["Planned", "Under review", "Revision requested", "Revision resubmitt
             "Returned by office", "Accepted", "Withdrawn"]
 TODAY = "2026-10-22"
 
-# ---------- changes from SK_Research_Updates_2026.xlsx (read by hand: its layout is free-form) ----------
-RENAME_JOURNAL = {"IJEM": "International Journal of Educational Management", "Security Dialogue-A": "Security Dialogue",
-                  "Communication Research-A": "Communication Research",
-                  "International Journal of Information Management-A": "International Journal of Information Management"}
-PAPER_UPDATES = {  # key in app data -> fields from the new sheet
-    "‘One dies’: Blanchot & organizational speech": {"authors": "Kaushal, S., Guha, A."},
-    "Distributed securitization (India SIR)": {"authors": "Kaushal, S., Guha, A., Dhammi, S."},
-    "Bullshit without a bullshitter (GenAI)": {"authors": "Kaushal, S., Guha, A."},
-    "The Right to the Secret:": {"key": "The Right to the Secret (Foucault–Derrida)", "title": "Right to the Secret (Foucault Derrida)",
-                                 "authors": "Kaushal, S., Guha, A."},
-    "Who gets named? Name Retention and Attribution Style in Indian Fact-Checking": {"key": "Who gets named?",
-        "title": "Who gets named? Name Retention and Attribution Style in Indian Fact-Checking"},
-    "Organizational Silence (lit review)": {"title": "The Deficit Model of Organization Silence – A bibliometric review and a Case for Blanchot and Levinas",
-                                            "authors": "Kaushal, S."},
-    "Whose grief is political? Grieving rules and the securitization of mourning in Indian news media": {
-        "key": "Whose grief is political?", "title": "Whose grief is political? Grieving rules and the securitization of mourning in Indian news media",
-        "authors": "Kaushal, S., Guha, A."},
-    "Assessing in Whose Language?": {"authors": "Guha, A., Kaushal, S."},
-    "Hedging machines: a systematic review": {"title": "Hedging machines: a systematic review"},
-    "Who Spoke? Attribution Distortion and the Split Production Format of AI-Assisted Communication": {"key": "Who Spoke? (AI attribution)"},
-    "The Deficit Model of Organization Silence- A bibliometric review and a Case for Blanchot and Levinas": {"merge_into": "Organizational Silence (lit review)"},
-}
-NEW_PAPERS = [  # papers only in the new sheet
-    {"key": "Is the Apology the Same Size?", "title": "Is the Apology the Same Size?", "authors": "Guha, A., Kaushal, S."},
-    {"key": "Can Virtue Be Advertised?", "title": "Can Virtue Be Advertised?", "authors": "Guha, A., Kaushal, S."},
-    {"key": "We Are Family? (corporate kinship talk)", "title": "We Are Family? Corporate Kinship Talk", "authors": "Guha, A., Kaushal, S."},
-]
-NEW_PLANNED = [  # (paper key after renames, journal, first in queue?)
-    ("Who gets named?", "Political Communication", True),
-    ("Can Virtue Be Advertised?", "Journal of Markets & Morality", True),
-    ("Cosmoceuticals", "Technology Analysis and Strategic Management", True),
-]
-SUB_FIXES = [  # (paper key, journal, field, value)
-    ("Distributed securitization (India SIR)", "Security Dialogue", "submitted", "2026-10-11"),
-]
-LIVE = {("Farmers’ protest & radical passivity", "Applied Linguistics", "Under review"): "Awaiting reviewer scores"}
-ORDER = [  # paper order of the new sheet; the rest follow
-    "‘One dies’: Blanchot & organizational speech", "Death & language: Heidegger–Blanchot", "Derrida hauntology & memory ethics",
-    "Cockroaches, Not Citizens (CDA)", "Distributed securitization (India SIR)", "Bullshit without a bullshitter (GenAI)",
-    "Algorithmic silence & org. power", "Intentional tacit knowledge hiding (Malawi)", "Who Spoke? (AI attribution)",
-    "The Right to the Secret (Foucault–Derrida)", "Who gets named?", "Organizational Silence (lit review)", "Whose grief is political?",
-    "Assessing in Whose Language?", "Hedging machines: a systematic review", "Farmers’ protest & radical passivity",
-    "Is the Apology the Same Size?", "Can Virtue Be Advertised?", "We Are Family? (corporate kinship talk)",
-    "Is Leadership Inherently Violent?", "Cosmoceuticals"]
+TODAY = datetime.date.today().isoformat()
 ABDC_ALIAS = {"Journal of Organizational Effectiveness: People and Performance (JOEPP)": "Journal of Organizational Effectiveness",
               "Corporate Communications: An International Journal": "Corporate Communications",
               "Organization: the critical journal of organization, theory and society": "Organization",
@@ -115,61 +73,7 @@ def main(seed_path, _new_sheet, abdc_path, portals_path, out_xlsx, out_seed):
         seed["settings"]["lastUpdated"] = cur["asOf"]
         build(seed, papers, subs, [p["id"] for p in cur["papers"]], abdc_path, portals_path, out_xlsx, out_seed)
         return
-    papers = {p["id"]: dict(p) for p in seed["papers"]}
-    subs = [dict(s) for s in seed["subs"]]
-    key_to_id = {p["key"]: p["id"] for p in papers.values()}
-
-    # paper updates, renames and merges
-    for old_key, upd in PAPER_UPDATES.items():
-        pid = key_to_id.get(old_key)
-        if not pid:
-            raise SystemExit("paper not found: " + old_key)
-        if "merge_into" in upd:
-            target = key_to_id[upd["merge_into"]]
-            for s in subs:
-                if s["paper"] == pid:
-                    s["paper"] = target
-            del papers[pid]
-            continue
-        papers[pid].update({k: v for k, v in upd.items()})
-    for np in NEW_PAPERS:
-        pid = "p%d" % (len(key_to_id) + len(NEW_PAPERS) + 100 + NEW_PAPERS.index(np))
-        papers[pid] = {"id": pid, "type": "Journal article", "override": "", "notes": "", **np}
-    key_to_id = {p["key"]: p["id"] for p in papers.values()}
-
-    for s in subs:
-        s["journal"] = RENAME_JOURNAL.get(s["journal"], s["journal"])
-    for key, journal, first in NEW_PLANNED:
-        row = {"id": "s%d" % (len(subs) + 1), "paper": key_to_id[key], "journal": journal, "rating": "", "status": "Planned",
-               "submitted": "", "decided": "", "notes": "From SK_Research_Updates_2026", "titleUsed": ""}
-        if first:
-            idx = next((i for i, s in enumerate(subs) if s["paper"] == row["paper"] and s["status"] == "Planned"), len(subs))
-            subs.insert(idx, row)
-        else:
-            subs.append(row)
-    for key, journal, field, value in SUB_FIXES:
-        for s in subs:
-            if s["paper"] == key_to_id[key] and s["journal"] == journal and s["status"] != "Planned":
-                s[field] = value
-    for s in subs:
-        k = (papers[s["paper"]]["key"], s["journal"], s["status"])
-        if k in LIVE:
-            s["live"] = {"text": LIVE[k], "at": TODAY}
-        # a plain ABDC letter in the old rating column is replaced by the official ABDC column
-        if re.fullmatch(r"(ABDC\s*)?(A\*|A|B|C)", (s.get("rating") or "").strip()):
-            s["rating"] = ""
-        s["id"] = s["id"] if len(s["id"]) > 8 else str(uuid.uuid4())
-    for p in papers.values():
-        if len(p["id"]) <= 8:
-            new = str(uuid.uuid4())
-            for s in subs:
-                if s["paper"] == p["id"]:
-                    s["paper"] = new
-            p["id"] = new
-    papers = {p["id"]: p for p in papers.values()}
-    key_to_id = {p["key"]: p["id"] for p in papers.values()}
-    order = [key_to_id[k] for k in ORDER] + [pid for pid in papers if papers[pid]["key"] not in ORDER]
-    build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed)
+    raise SystemExit("Pass --template, or a JSON file of papers and submissions (as data/current-data.json)")
 
 
 def build(seed, papers, subs, order, abdc_path, portals_path, out_xlsx, out_seed):
