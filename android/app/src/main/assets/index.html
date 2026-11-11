@@ -2024,13 +2024,15 @@ function gCall(fn){ return new Promise(res=>{ const id="g"+(++gSeq); gWait[id]=r
 function gDirect(){ return !!(GS.drive&&GS.drive.id); }
 function gsOn(){ return !!(GS.url||gDirect()); }
 async function googleToken(interactive){
-  if(gTok.token&&Date.now()-gTok.at<45*60e3) return gTok.token;
+  if(gTok.token&&Date.now()-gTok.at<45*60e3&&!window.RDSK_WEB) return gTok.token;   // web: web.js knows when its pass expires
   if(window.RDSK_TEST_GOOGLE){ gTok={token:"test-token",at:Date.now()}; return gTok.token; }
   if(!(window.Android&&Android.googleToken)) throw new Error("Google sign-in works in the phone app");
   const r=await gCall(id=>Android.googleToken(id,!!interactive));
-  if(!r.ok){ if(r.val==="consent-needed"||r.val==="not-signed-in") throw new Error("Please sign in with Google again (More → Google account)"); throw new Error(r.val==="cancelled"||r.val==="closed"?"Sign-in cancelled":String(r.val).replace(/^setup\|/,"")); }
+  if(!r.ok){ if(r.val==="consent-needed"&&window.RDSK_WEB) throw new Error("Google sign-in expired: tap anywhere to reconnect and sync"); if(r.val==="consent-needed"||r.val==="not-signed-in") throw new Error("Please sign in with Google again (More → Google account)"); throw new Error(r.val==="cancelled"||r.val==="closed"?"Sign-in cancelled":String(r.val).replace(/^setup\|/,"")); }
   gTok={token:r.val,at:Date.now()}; return r.val;
 }
+/** Web: the browser renewed Google access after a tap; send whatever was waiting. */
+window.rdWebReconnected=()=>{ gTok={token:"",at:0}; if(gsOn()) gsSync("normal",false); };
 function googleErr(st,j){
   const m=(j&&j.error&&j.error.message)||("Google error "+st);
   if(/has not been used|is disabled|SERVICE_DISABLED|not been enabled/i.test(m)) return "Turn on the Google Sheets API and the Google Drive API in your Google Cloud project, then try again.";

@@ -44,6 +44,37 @@
     return fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: "Bearer " + token } })
       .then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { return j.email || ""; }).catch(function () { return ""; });
   }
+  // A browser's Google pass lasts about an hour and can only be renewed after a tap. When it runs out RD SK shows a
+  // "Tap to sync" bar and renews on your next tap anywhere, then sends the changes that were waiting.
+  var needTap = false, asking = false, refusedAt = 0;
+  function bar(show) {
+    var b = document.getElementById("rdsk-reconnect");
+    if (!show) { if (b) b.remove(); return; }
+    if (b) return;
+    b = document.createElement("button"); b.id = "rdsk-reconnect"; b.type = "button";
+    b.textContent = "☁ Google sign-in expired · Tap to sync";
+    b.style.cssText = "position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9999;" +
+      "border:0;border-radius:999px;padding:9px 16px;font:600 14px system-ui,sans-serif;background:var(--accent,#2f5d8a);color:#fff;" +
+      "box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100% - 32px);cursor:pointer";
+    document.body.appendChild(b);
+  }
+  function soon() { try { var t = JSON.parse(localStorage.getItem(TOK_KEY) || "null"); return !t || t.exp < Date.now() + 10 * 60e3; } catch (e) { return true; } }
+  function renew(force) {
+    if (asking || !localStorage.getItem(ACC_KEY)) return;
+    if (!force && Date.now() - refusedAt < 5 * 60e3) return;
+    asking = true;
+    ask("").then(function (r) {
+      keep(r); asking = false; needTap = false; bar(false);
+      if (window.rdWebReconnected) window.rdWebReconnected();
+    }).catch(function () { asking = false; refusedAt = Date.now(); });
+  }
+  // the tap itself is what lets the browser open Google's window
+  document.addEventListener("click", function (e) {
+    var onBar = e.target && e.target.closest && e.target.closest("#rdsk-reconnect");
+    if (onBar) { e.preventDefault(); e.stopPropagation(); return renew(true); }
+    if (needTap || (localStorage.getItem(ACC_KEY) && soon())) renew(false);
+  }, true);
+
   function done(id, ok, val, acc) { if (window.rdGoogleDone) window.rdGoogleDone(id, ok, val, acc || localStorage.getItem(ACC_KEY) || ""); }
 
   window.Android = {
@@ -58,11 +89,12 @@
     googleToken: function (id, interactive) {
       var t = saved(); if (t) return done(id, true, t.token);
       if (!localStorage.getItem(ACC_KEY)) return done(id, false, "not-signed-in");
-      if (!interactive) return done(id, false, "consent-needed");
+      if (!interactive) { needTap = true; bar(true); return done(id, false, "consent-needed"); }
       ask("").then(function (r) { done(id, true, keep(r)); }).catch(function (e) { done(id, false, e.message === "cancelled" ? "cancelled" : e.message); });
     },
     googleAccount: function () { return localStorage.getItem(ACC_KEY) || ""; },
     googleSignOut: function () {
+      needTap = false; bar(false);
       var t = saved(); try { if (t && window.google && google.accounts) google.accounts.oauth2.revoke(t.token, function () {}); } catch (e) {}
       localStorage.removeItem(ACC_KEY); localStorage.removeItem(TOK_KEY);
     },
