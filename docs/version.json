@@ -1,9 +1,9 @@
 {
- "version": "4.5",
- "versionCode": 36,
- "date": "10 Nov 2026",
+ "version": "4.6",
+ "versionCode": 37,
+ "date": "11 Nov 2026",
  "notes": [
-  "🔄 Check for updates (More → About): shows what's new and opens the download page; the app also checks about once a week and shows a note on Home when an update is out"
+  "💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"

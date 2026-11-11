@@ -107,6 +107,13 @@ the files RD SK creates), so the rest of your Drive stays private. Google needs 
    (Extensions → Apps Script → paste → Save → RD SK menu → turn on email import / daily insights). No deployment.
 9. **More → Ask AI**: paste a free Gemini key (aistudio.google.com/apikey) for *Ask here*.
 
+## Web and computer version
+`docs/app/` (built by `tools/build_web.py`, published with every release) is the same app for browsers:
+<https://faltu9522.github.io/Research-Dashboard/app/>. Sign in with the same Google account as on the phone; both sync with
+the same sheet. Chrome/Edge offer **Install RD SK** (own window, Start-menu icon, offline). Web sign-in uses the
+"RD SK Web" OAuth client (authorized origin `https://faltu9522.github.io`); `web/web.js` stands in for the phone's native
+bridge. Phone-only: reminder notifications, the home-screen widget and reading journal sites in the in-app browser.
+
 ## Extras
 - **Animations** (More → Settings → Animations: Full / Calm): confetti cannons, fireworks and an ACCEPTED banner on
   acceptance; a paper plane when you submit; rising embers and "Rise again" after a rejection; streak flames for weeks

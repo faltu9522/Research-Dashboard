@@ -589,6 +589,8 @@ function viewHome(){
   return `
   ${welcomeCard()}
   ${searchBox}
+  ${window.RDSK_WEB&&gDirect()&&/sign in with google again|consent/i.test(GS.lastError||"")?`<button class="banner" data-act="reconnect" style="width:100%;text-align:left;border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)">🔑 Tap to reconnect Google and sync your sheet</button>`:""}
+  ${window.RDSK_INSTALL&&!S.settings.installHidden?`<div class="banner" style="display:flex;gap:8px;align-items:center;background:var(--accent-soft);color:var(--ink)"><span class="grow">💻 Install RD SK on this computer: its own window and icon, works offline.</span><button class="primary" data-act="install">Install</button></div>`:""}
   ${updateBanner()}
   ${mailNowBtn()}
   ${(()=>{ const k=streak(); return k.weeks>=1?`<div class="streak"><span class="fl">🔥</span>${k.weeks}-week streak${k.thisWeek?"":" · record something this week to keep it"}</div>`:""; })()}
@@ -731,6 +733,7 @@ function viewSubs(){
 }
 function viewMore(){
   return `
+  ${window.RDSK_INSTALL?`<div class="card" style="border:2px solid var(--accent)"><div class="t">💻 Install RD SK on this computer</div><div class="m">Opens in its own window with a Start-menu / Dock icon, and works offline. Same data as your phone, through your Google Sheet.</div><div class="actions"><button class="primary" data-act="install">Install RD SK</button></div></div>`:""}
   <h2>Settings</h2>
   <div class="card">
     <label for="chase">Chase editor after (days)</label>
@@ -809,6 +812,9 @@ document.addEventListener("click",e=>{
     case "pending": pendingSheet(); break;
     case "updcheck": checkUpdate(true); break;
     case "updshow": updateSheet(); break;
+    case "apkget": openBrowser(DOWNLOAD_PAGE); break;
+    case "install": if(window.RDSK_INSTALL){ window.RDSK_INSTALL.prompt(); window.RDSK_INSTALL.userChoice.then(()=>{ window.RDSK_INSTALL=null; render(); }); } break;
+    case "reconnect": googleToken(true).then(()=>{ GS.lastError=""; gsStore(); gsSync("normal",true); }).catch(err=>alert("Google sign-in: "+err.message)); break;
     case "mailnow": checkEmailsNow(); break;
     case "doi": e.stopPropagation(); openBrowser("https://doi.org/"+a.dataset.doi); break;
     case "star": { e.stopPropagation(); const it=(S.insights||[]).find(x=>x.doi===a.dataset.doi); if(it){ it.saved=!it.saved; if(it.saved){ GS.savedInsights=(GS.savedInsights||[]).concat([it.doi]); gsStore(); gsSchedule(); } persist(false); render(); toast(it.saved?"Saved to your ideas":"Removed"); } break; }
@@ -1231,6 +1237,7 @@ function askNotifications(force){
 }
 window.rdPermissionsChanged = () => { if(tab==="more") render(); };
 function remindCard(){
+  if(window.RDSK_WEB) return `<div class="m" style="color:var(--ink)">Reminder notifications come from the phone app. Here, submissions to chase show as <b>Check status</b> and <b>Overdue: chase editor</b> on Home and In review, and the reminder setting is shared with your phone through your sheet.</div>`;
   const on=S.settings.reminders!==false, app=!!(window.Android&&Android.notificationsAllowed), allowed=app?Android.notificationsAllowed():true;
   return `<label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);margin-top:0"><input type="checkbox" id="remind" style="width:auto" ${on?"checked":""}> Remind me about submissions</label>
     <div class="hint">Around 9 am: a notification when a submission reaches ${+S.settings.chaseDays||90} days under review (and again at ${2*(+S.settings.chaseDays||90)}), plus a weekly nudge if nothing has been recorded for 7 days. Tap a notification to open the list and email the editor.</div>
@@ -1355,8 +1362,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.5", APP_BUILD="10 Nov 2026";
+const APP_VERSION="4.6", APP_BUILD="11 Nov 2026";
 const CHANGELOG=[
+  ["4.6","11 Nov 2026",["💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"]],
   ["4.5","10 Nov 2026",["🔄 Check for updates (More → About): shows what's new and opens the download page; the app also checks about once a week and shows a note on Home when an update is out"]],
   ["4.4","3 Nov 2026",["📰 Newspaper & web articles: op-eds, magazine pieces and blog posts with their outlets (Awaiting reply, Edits requested, Accepted for publication, Declined), their own Home card, filter and add form","Timeline: journal articles, book proposals and newspaper & web articles in separate sections"]],
   ["4.3","3 Nov 2026",["Home: a separate 📚 Book proposals card (books, awaiting response, contracts, declined, longest wait); the dashboard tiles now count journal articles only"]],
@@ -1413,8 +1421,10 @@ function aboutCard(){
     </dl>
     <div class="hint" style="margin-top:12px"><b>Privacy:</b> your data lives on this phone and, once you sign in with Google, in a sheet in your own Google Drive (RD SK can only see files it creates). There is no RD SK server and no tracking. Journal passwords are typed into the journals' own pages and never stored by the app; keys and tokens stay on this phone and in your own sheet.</div>
     <div class="hint" style="margin-top:8px"><b>Free &amp; open source:</b> MIT License. Includes jsQR (Apache 2.0) and the ABDC Journal Quality List (© ABDC). Research insights use the free Crossref API; written ideas can use a free Gemini key.</div>
+    ${window.RDSK_WEB?`<div class="m" style="margin-top:10px">🌐 Web version: always up to date (it reloads the latest version when you open it).</div>
+      <div class="actions"><button data-act="ghrepo">Project on GitHub ↗</button><button data-act="apkget">📱 Get the Android app ↗</button></div>`:`
     <div class="actions"><button class="primary" data-act="updcheck" ${updBusy?"disabled":""}>${updBusy?"⏳ Checking…":"🔄 Check for updates"}</button><button data-act="ghrepo">Project on GitHub ↗</button></div>
-    ${UPD.checked?`<div class="m" style="margin-top:6px">${UPD.latest&&isNewer(UPD.latest)?`<b style="color:var(--accent)">Version ${esc(UPD.latest.version)} is available.</b> <button class="link" data-act="updshow">See what's new</button>`:"✓ You have the latest version"} · checked ${esc(new Date(UPD.checked).toLocaleString())}</div>`:""}
+    ${UPD.checked?`<div class="m" style="margin-top:6px">${UPD.latest&&isNewer(UPD.latest)?`<b style="color:var(--accent)">Version ${esc(UPD.latest.version)} is available.</b> <button class="link" data-act="updshow">See what's new</button>`:"✓ You have the latest version"} · checked ${esc(new Date(UPD.checked).toLocaleString())}</div>`:""}`}
   </div>
   <div class="card">
     <div class="t">What's new</div>
@@ -1574,7 +1584,10 @@ function checkAllStatuses(){
   const targets=Object.values(groups).map(g=>({...g,count:g.papers.length,papers:g.papers.join("; ")}));
   if(!targets.length) return toast("No under-review journals with a known login link");
   if(window.Android && Android.checkStatuses) Android.checkStatuses(JSON.stringify(targets));
-  else toast("This works in the phone app");
+  else openSheet(`<h3>Journal logins <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m">On a computer RD SK can't read journal sites for you, so open each one, check the status, and record any change.</div>
+    ${targets.map(t=>`<div class="card"><div class="t">${esc(t.journal)}</div><div class="m">${esc(t.papers)}</div>
+      <div class="actions"><button class="primary" onclick="window.open('${esc(t.url)}','_blank')">Open login ↗</button></div></div>`).join("")}`);
 }
 window.rdStatusResults=json=>{
   let res={}; try{ res=JSON.parse(json); }catch(e){}
@@ -1791,7 +1804,7 @@ try{ Object.assign(UPD, JSON.parse(localStorage.getItem(UPD_KEY)||"{}")); }catch
 function installedBuild(){ try{ if(window.Android&&Android.appInfo) return +JSON.parse(Android.appInfo()).versionCode||0; }catch(e){} return 0; }
 /** Newer than this phone's app: by build number when the phone reports it, else by version name. */
 function isNewer(v){
-  if(!v) return false; const b=installedBuild();
+  if(!v||window.RDSK_WEB) return false; const b=installedBuild();
   if(b&&v.versionCode) return +v.versionCode>b;
   const a=String(v.version).split(".").map(Number), c=String(APP_VERSION).split(".").map(Number);
   for(let i=0;i<Math.max(a.length,c.length);i++){ if((a[i]||0)!==(c[i]||0)) return (a[i]||0)>(c[i]||0); } return false;
@@ -2269,12 +2282,14 @@ function welcomeCard(){
   if(!S.settings.fresh||gsOn()) return "";
   return `<div class="card wide" style="border:2px solid var(--accent)"><div class="t">👋 New install? Restore your data</div>
     <div class="actions"><button class="primary" data-act="gsignin">Sign in with Google</button></div>
-    <div class="m" style="margin:8px 0 2px">Signed in before? Your papers load from your Google Drive. Or use the older restore link:</div>
+    <div class="m" style="margin:8px 0 2px">${window.RDSK_WEB?"Use the Google account that holds your RD SK Master sheet: your papers load from your Google Drive.":"Signed in before? Your papers load from your Google Drive. Or use the older restore link:"}</div>
+    ${window.RDSK_WEB?`<div class="actions"><button class="ghost" id="wskip">Start empty</button></div></div>`:`
     <div class="m" style="color:var(--ink);margin-top:4px">Tap your <b>RD SK restore link</b> (the rdsk://connect… link you saved in your email or notes), or paste your Google Sheet's web-app URL here.</div>
     <div class="row" style="margin-top:8px"><input id="wurl" class="grow" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off"><button id="wpaste">Paste</button></div>
-    <div class="actions"><button class="primary" id="wgo">Restore from Google Sheet</button><button class="ghost" id="wskip">Start with the built-in data</button></div></div>`;
+    <div class="actions"><button class="primary" id="wgo">Restore from Google Sheet</button><button class="ghost" id="wskip">Start with the built-in data</button></div></div>`}`;
 }
 function bindWelcome(){
+  if($("#wskip")&&!$("#wgo")){ $("#wskip").onclick=()=>{ delete S.settings.fresh; persist(false); render(); }; return; }
   if(!$("#wgo")) return;
   $("#wpaste").onclick=()=>{ const c=(window.Android&&Android.getClipboard)?Android.getClipboard():""; if(c) $("#wurl").value=c.trim(); else toast("Long-press the box and choose Paste"); };
   $("#wgo").onclick=()=>{ let v=$("#wurl").value.trim(); const m=v.match(/rdsk:\/\/connect\?url=(\S+)/); if(m) try{ v=decodeURIComponent(m[1]); }catch(e){}
@@ -2506,7 +2521,7 @@ async function ghPull(){
 }
 
 load(); applyMotion(); baseline(); render(); pushWidget();
-if(Date.now()-(UPD.checked||0)>6*864e5) setTimeout(()=>checkUpdate(false),4000); // about once a week pushReminders(); setTimeout(()=>askNotifications(false),1500);
+if(!window.RDSK_WEB&&Date.now()-(UPD.checked||0)>6*864e5) setTimeout(()=>checkUpdate(false),4000); // about once a week pushReminders(); setTimeout(()=>askNotifications(false),1500);
 if(gsOn()&&GS.auto) setTimeout(()=>gsSync("normal",false),1200);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&gsOn()&&GS.auto&&Date.now()-GS.lastSync>60000) gsSync("normal",false); });
 </script>

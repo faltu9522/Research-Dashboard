@@ -26,4 +26,6 @@ json.dump({"version": name, "versionCode": code, "date": m.group(2), "notes": no
 page = open("docs/index.html", encoding="utf-8").read()
 page = re.sub(r"Download the app \(APK, version [^)]+\)", "Download the app (APK, version %s)" % name, page)
 open("docs/index.html", "w", encoding="utf-8").write(page)
+import subprocess, sys
+subprocess.run([sys.executable, "tools/build_web.py"], check=True)  # the web version ships with every release
 print("released", name, "build", code)
