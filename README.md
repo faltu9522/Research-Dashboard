@@ -124,6 +124,21 @@ bridge. Phone-only: reminder notifications, the home-screen widget and reading j
   filled by Ask AI (Gemini) or by hand, ticked off in the ✈️ Submit flow; synced in the sheet's hidden settings.
 - **Timeline & journeys**: every submission as a bar from submission to decision; each paper's journey across journals.
 - **Home-screen widget**: long-press the home screen → Widgets → RD SK.
+- **Research tools** (Home and More):
+  - **Revision plans**: paste the decision letter; RD SK splits it into reviewer points, you write each response, note
+    the change and who does it, and it drafts the response-to-reviewers letter (Gemini can suggest replies).
+  - **Journal profiles**: citations per article, articles a year, recent topics (Crossref) and open access / author
+    fees / review time (DOAJ); compare a paper's shortlist side by side.
+  - **Calls for papers**: deadlines with countdowns and reminders 14, 3 and 1 days before; paste a call to fill it in.
+  - **Publications & CV**: accepted work in APA 7 or Harvard with DOI details and citations from Crossref, and a yearly
+    report (.csv) for appraisals.
+  - **Reviewing**: invitations, due dates with reminders, and a yearly count.
+  - **Goals**: yearly targets as rings on Home, with a nudge when you fall behind.
+  - **This week**: what to chase, revise, review and submit, on Home and as a Monday notification.
+  - **Your Research Year**: an animated recap and a shareable image.
+- **Manuscript files**: attach the exact file you sent to each journal from Google Drive (or upload it there).
+- **More kinds of work**: book chapters, conference papers and grant / fellowship applications, each with its own wording.
+- **Share an email in**: in Gmail, select the email's text → Share → **Update RD SK**.
 
 ## Sharing with co-authors
 More → **Co-authors** lists everyone in your papers' Authors fields. Type a co-author's Gmail and tap **Share**: RD SK

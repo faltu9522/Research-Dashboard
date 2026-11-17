@@ -25,7 +25,7 @@ footer{color:var(--muted);font-size:14px;margin-top:40px;border-top:1px solid va
 <main>
 <p><a href="./">← RD SK home</a></p>
 <h1>RD SK Privacy Policy</h1>
-<p class="sub">Effective 28 October 2026 (updated for co-author sharing)</p>
+<p class="sub">Effective 17 November 2026 (updated for journal profiles and manuscript files)</p>
 
 <div class="card">
 <b>In short:</b> RD SK keeps your research submission records on your phone and, if you sign in with Google, in a
@@ -50,7 +50,8 @@ browser removes it from that computer.</p>
 <p>If you choose <b>Sign in with Google</b>, RD SK asks for one permission:</p>
 <ul>
 <li><code>https://www.googleapis.com/auth/drive.file</code>: access only to the files RD SK creates (or files you
-explicitly open with it). RD SK cannot see, read or change any other file in your Google Drive.</li>
+explicitly choose with it, such as a manuscript file you attach). RD SK cannot see, read or change any other file in
+your Google Drive.</li>
 </ul>
 <p>With this permission RD SK creates one Google Sheet (“RD SK Master”) in your Drive and keeps it in sync with the
 app, using the Google Sheets and Google Drive APIs directly from your phone. The sheet belongs to you; you can open,
@@ -78,8 +79,12 @@ Google may use this content to improve its products. Your key is stored on your 
 settings tab.</li>
 <li><b>Ask in Gemini app:</b> the question is copied to your clipboard and passed to the Gemini app on your phone.
 That app's own privacy terms apply.</li>
-<li><b>Journal checks (Crossref):</b> journal names are sent to the public Crossref API to see what the journals
-published recently. No personal data is sent.</li>
+<li><b>Journal checks and profiles (Crossref, DOAJ):</b> journal names and ISSNs are sent to the public Crossref and
+DOAJ (Directory of Open Access Journals) APIs to show what journals publish, their citation and open-access details.
+For your publication list, the DOIs or titles of your accepted papers are sent to Crossref to fetch their published
+details. No personal data is sent.</li>
+<li><b>Manuscript files:</b> if you attach a file to a submission, you choose it in Google's file picker. RD SK stores
+only the file's name and link in your sheet; it does not read or upload the file's contents.</li>
 <li><b>Journal websites:</b> the in-app browser opens journal submission sites. You sign in to them yourself, and
 Google Password Manager may fill in your details. RD SK does not store your journal passwords.</li>
 <li><b>Email import and daily insights (optional helper script):</b> if you install the RD SK helper script in your

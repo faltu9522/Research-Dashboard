@@ -31,7 +31,7 @@ public class Reminders extends BroadcastReceiver {
     static final String ACTION_CHECK = "com.sk.rd.CHECK_REMINDERS";
     private static final String PREFS = "reminders";
     private static final String CHANNEL = "chase";
-    private static final int ID_CHASE = 1, ID_NUDGE = 2, ID_TEST = 3;
+    private static final int ID_CHASE = 1, ID_NUDGE = 2, ID_TEST = 3, ID_WEEK = 4, ID_ALERT = 100;
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
@@ -99,6 +99,34 @@ public class Reminders extends BroadcastReceiver {
         } else if (lines.size() > 1) {
             post(ctx, ID_CHASE, lines.size() + " submissions need a status check",
                     "Tap to see them and email the editors.", lines, "review");
+        }
+
+        // Deadlines worked out by the app: calls for papers, reviews due, revision due dates. Each fires once, on its day.
+        Set<String> alerted = new HashSet<>(p.getStringSet("alerted", new HashSet<>()));
+        Set<String> keys = new HashSet<>();
+        JSONArray al = d.optJSONArray("alerts");
+        int shown = 0;
+        for (int i = 0; al != null && i < al.length(); i++) {
+            JSONObject a = al.optJSONObject(i);
+            if (a == null) continue;
+            String key = a.optString("key");
+            keys.add(key);
+            long day = dayNum(a.optString("day"));
+            if (day < 0 || day > today || today - day > 2 || alerted.contains(key)) continue;
+            alerted.add(key);
+            post(ctx, ID_ALERT + (shown++ % 20), a.optString("title"), a.optString("text"), null, a.optString("open", "home"));
+        }
+        alerted.retainAll(keys);
+        p.edit().putStringSet("alerted", alerted).apply();
+
+        // Monday morning: this week's plan.
+        JSONObject wk = d.optJSONObject("weekly");
+        if (wk != null && Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY && p.getLong("lastWeekly", -1) != today) {
+            List<String> wl = new ArrayList<>();
+            JSONArray ls = wk.optJSONArray("lines");
+            for (int i = 0; ls != null && i < ls.length(); i++) wl.add(ls.optString(i));
+            post(ctx, ID_WEEK, wk.optString("title", "This week"), wl.isEmpty() ? "Tap to see this week's plan." : wl.get(0), wl.isEmpty() ? null : wl, "home");
+            p.edit().putLong("lastWeekly", today).apply();
         }
 
         // Weekly nudge if nothing has been recorded for 7+ days.

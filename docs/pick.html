@@ -29,16 +29,20 @@ function start() {
   var cfg = window.RDSK_PICKER || {}, token = window.RDSKPick && window.RDSKPick.token();
   if (!token) return say("Open this page from the RD SK app: More → Google account → Open a sheet shared with me.");
   if (!cfg.apiKey || !cfg.appId) return done("error=" + encodeURIComponent("The file picker isn't set up yet (API key and project number in docs/picker-config.js)."));
+  var fileMode = /[?&]mode=file\b/.test(location.search);  // a manuscript file for a submission (any file in your Drive, or upload one)
   gapi.load("picker", function () {
-    var view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setOwnedByMe(false).setMode(google.picker.DocsViewMode.LIST);
-    var picker = new google.picker.PickerBuilder().addView(view).setOAuthToken(token).setDeveloperKey(cfg.apiKey).setAppId(cfg.appId)
-      .setTitle("Choose the RD SK sheet shared with you").setSize(window.innerWidth, window.innerHeight)
+    var b = new google.picker.PickerBuilder().setOAuthToken(token).setDeveloperKey(cfg.apiKey).setAppId(cfg.appId).setSize(window.innerWidth, window.innerHeight);
+    if (fileMode) b.addView(new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(true).setMode(google.picker.DocsViewMode.LIST))
+      .addView(new google.picker.DocsUploadView()).setTitle("Choose the manuscript file you sent");
+    else b.addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setOwnedByMe(false).setMode(google.picker.DocsViewMode.LIST))
+      .setTitle("Choose the RD SK sheet shared with you");
+    var picker = b
       .setCallback(function (d) {
         if (d.action === google.picker.Action.PICKED) done("id=" + encodeURIComponent(d.docs[0].id) + "&name=" + encodeURIComponent(d.docs[0].name));
         else if (d.action === google.picker.Action.CANCEL) done("cancel=1");
       }).build();
     picker.setVisible(true);
-    say("Choose the RD SK sheet your co-author shared with you.");
+    say(fileMode ? "Choose the manuscript file (or upload it)." : "Choose the RD SK sheet your co-author shared with you.");
   });
 }
 document.getElementById("again").onclick = start;

@@ -11,13 +11,13 @@
 //   or a full https URL. opts: {abdc: RD_ABDC list, suggest: rdSuggest, now: Date.now()}
 
 var RDG_PAPER = { key: /^paper/i, title: /^(current |full )?title$/i, authors: /^authors?$/i, type: /^type$/i,
-  override: /^override/i, notes: /^notes?$/i, suggest: /^suggested next/i, id: /^app id$/i, updated: /^updated$/i, approach: /^approach$/i };
+  override: /^override/i, notes: /^notes?$/i, suggest: /^suggested next/i, id: /^app id$/i, updated: /^updated$/i, approach: /^approach$/i, doi: /^doi$/i };
 var RDG_SUB = { paper: /^paper$/i, journal: /^journal$/i, abdc: /^abdc/i, rating: /rating|index/i, status: /^status$/i,
   submitted: /^(date submitted|date of submission)/i, decided: /^date of decision/i, notes: /^notes?$/i, titleUsed: /^title used/i,
-  msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i, dtype: /^decision type/i, prio: /^priority$/i, id: /^app id$/i, updated: /^updated$/i };
+  msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i, dtype: /^decision type/i, prio: /^priority$/i, file: /^manuscript file/i, id: /^app id$/i, updated: /^updated$/i };
 var RDG_JOURNAL = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login link/i, email: /email/i };
-var RDG_ADD_PAPER = { suggest: "Suggested next journals", id: "App ID", updated: "Updated", approach: "Approach" };
-var RDG_ADD_SUB = { msid: "Manuscript ID", live: "Status on journal site", liveAt: "Status checked", dtype: "Decision type", prio: "Priority", id: "App ID", updated: "Updated" };
+var RDG_ADD_PAPER = { suggest: "Suggested next journals", id: "App ID", updated: "Updated", approach: "Approach", doi: "DOI" };
+var RDG_ADD_SUB = { msid: "Manuscript ID", live: "Status on journal site", liveAt: "Status checked", dtype: "Decision type", prio: "Priority", file: "Manuscript file", id: "App ID", updated: "Updated" };
 var RDG_DATES = { submitted: 1, decided: 1, liveAt: 1 };
 var RDG_APP = "RD SK app", RDG_AI = "AI chat", RDG_EMAILS = "Emails", RDG_DECISIONS = "Decisions & reviews", RDG_INSIGHTS = "Research insights";
 var RDG_AI_HEAD = ["Date", "Paper", "Approach", "Question", "Journal", "Details", "Answer", "By", "ID"];
@@ -211,6 +211,7 @@ async function rdgSync(api, id, body, opts) {
     put(pb, i, P, "key", p.key); put(pb, i, P, "title", p.title || ""); put(pb, i, P, "authors", p.authors || "");
     put(pb, i, P, "type", p.type || ""); put(pb, i, P, "override", p.override || ""); put(pb, i, P, "notes", p.notes || "");
     if (p.approach !== undefined) put(pb, i, P, "approach", p.approach || "");
+    if (p.doi !== undefined) put(pb, i, P, "doi", p.doi || "");
     put(pb, i, P, "id", p.id); put(pb, i, P, "updated", rdgStamp(p.mod || now, tz));
     if (old && old !== p.key) sb.v.forEach(function (r, k) { if (rdgStr(g(r, S, "paper")) === old) put(sb, k, S, "paper", p.key); });
   });
@@ -225,13 +226,14 @@ async function rdgSync(api, id, body, opts) {
     put(sb, i, S, "notes", s.notes || ""); put(sb, i, S, "titleUsed", s.titleUsed || ""); put(sb, i, S, "msid", s.msid || "");
     put(sb, i, S, "live", s.live || ""); put(sb, i, S, "liveAt", s.liveAt || ""); put(sb, i, S, "dtype", s.dtype || "");
     if (s.prio !== undefined) put(sb, i, S, "prio", s.prio || "");
+    if (s.file !== undefined) put(sb, i, S, "file", s.file || "");
     put(sb, i, S, "id", s.id); put(sb, i, S, "updated", rdgStamp(s.mod || now, tz));
   });
   (body.deleted || []).forEach(function (did) {
     var i = find(pb, P, did, null);
-    if (i >= 0) ["key", "title", "authors", "type", "override", "notes", "suggest", "id", "updated", "approach"].forEach(function (f) { put(pb, i, P, f, ""); });
+    if (i >= 0) ["key", "title", "authors", "type", "override", "notes", "suggest", "id", "updated", "approach", "doi"].forEach(function (f) { put(pb, i, P, f, ""); });
     i = find(sb, S, did, null);
-    if (i >= 0) ["paper", "journal", "rating", "status", "submitted", "decided", "notes", "titleUsed", "msid", "live", "liveAt", "dtype", "prio", "id", "updated"]
+    if (i >= 0) ["paper", "journal", "rating", "status", "submitted", "decided", "notes", "titleUsed", "msid", "live", "liveAt", "dtype", "prio", "file", "id", "updated"]
       .forEach(function (f) { put(sb, i, S, f, ""); });
   });
 
@@ -264,6 +266,13 @@ async function rdgSync(api, id, body, opts) {
     if (inc.checklists) { var cl = Object.assign({}, app.checklists || {});
       Object.keys(inc.checklists).forEach(function (k) { var t = inc.checklists[k]; if (!cl[k] || (t.at || "") > (cl[k].at || "")) cl[k] = t; });
       if (JSON.stringify(cl) !== JSON.stringify(app.checklists || {})) { app.checklists = cl; appDirty = true; } }
+    // records (revision plans, calls for papers, reviews, goals): one row each, the newer edit wins
+    if (inc.recs) Object.keys(inc.recs).forEach(function (coll) {
+      Object.keys(inc.recs[coll] || {}).forEach(function (rid) {
+        var t = inc.recs[coll][rid], key = "rec:" + coll + ":" + rid, old = app[key];
+        if (t && (!old || (t.at || 0) > (old.at || 0))) { app[key] = t; appDirty = true; }
+      });
+    });
     ["settings", "secrets"].forEach(function (k) { if (inc[k]) { var m = Object.assign({}, app[k] || {}, inc[k]); if (JSON.stringify(m) !== JSON.stringify(app[k] || {})) { app[k] = m; appDirty = true; } } });
     if (J && J.journal) {
       var at = {}; jb.v.forEach(function (r, i) { if (rdgStr(r[J.journal - 1])) at[rdgNorm(r[J.journal - 1])] = i; });
@@ -359,7 +368,8 @@ async function rdgSync(api, id, body, opts) {
 
   var outApp = { portals: Object.assign({}, app.portals || {}), contacts: Object.assign({}, app.contacts || {}), abdc: {},
                  chaseDays: app.chaseDays, settings: app.settings, secrets: app.secrets, script: app.script, shares: app.shares, checklists: app.checklists,
-                 importRequest: app.importRequest, importResult: app.importResult };
+                 importRequest: app.importRequest, importResult: app.importResult, recs: {} };
+  Object.keys(app).forEach(function (k) { var m = /^rec:([^:]+):(.+)$/.exec(k); if (m) { (outApp.recs[m[1]] = outApp.recs[m[1]] || {})[m[2]] = app[k]; } });
   if (jb && J && J.journal) jb.v.forEach(function (r) {
     var name = rdgStr(r[J.journal - 1]); if (!name) return;
     if (J.link && rdgStr(r[J.link - 1])) outApp.portals[name] = rdgStr(r[J.link - 1]);
@@ -370,7 +380,7 @@ async function rdgSync(api, id, body, opts) {
     ok: true, now: now, sheet: (meta.properties || {}).title || "", app: outApp, pending: pending, insights: insights, ai: ai,
     papers: pb.v.filter(function (r) { return rdgStr(g(r, P, "key")); }).map(function (r) {
       return { id: rdgStr(g(r, P, "id")), key: rdgStr(g(r, P, "key")), title: rdgStr(g(r, P, "title")), authors: rdgStr(g(r, P, "authors")),
-               type: rdgStr(g(r, P, "type")), override: rdgStr(g(r, P, "override")), notes: rdgStr(g(r, P, "notes")), approach: rdgStr(g(r, P, "approach")),
+               type: rdgStr(g(r, P, "type")), override: rdgStr(g(r, P, "override")), notes: rdgStr(g(r, P, "notes")), approach: rdgStr(g(r, P, "approach")), doi: rdgStr(g(r, P, "doi")),
                mod: rdgMs(g(r, P, "updated"), tz) };
     }),
     subs: sb.v.filter(isSub).map(function (r) {
@@ -378,7 +388,7 @@ async function rdgSync(api, id, body, opts) {
                abdc: rdgStr(g(r, S, "abdc")), status: rdgStr(g(r, S, "status")), submitted: rdgDay(g(r, S, "submitted")),
                decided: rdgDay(g(r, S, "decided")), notes: rdgStr(g(r, S, "notes")), titleUsed: rdgStr(g(r, S, "titleUsed")),
                msid: rdgStr(g(r, S, "msid")), live: rdgStr(g(r, S, "live")), liveAt: rdgDay(g(r, S, "liveAt")), dtype: rdgStr(g(r, S, "dtype")),
-               prio: rdgStr(g(r, S, "prio")), mod: rdgMs(g(r, S, "updated"), tz) };
+               prio: rdgStr(g(r, S, "prio")), file: rdgStr(g(r, S, "file")), mod: rdgMs(g(r, S, "updated"), tz) };
     })
   };
 }
@@ -395,7 +405,7 @@ async function rdgReplace(api, id, papers, subs, approachOf) {
   papers.forEach(function (p, i) {
     var r = at(pb, i);
     set(r, P, "key", p.key); set(r, P, "title", p.title || ""); set(r, P, "authors", p.authors || ""); set(r, P, "type", p.type || "Journal article");
-    set(r, P, "override", p.override || ""); set(r, P, "notes", p.notes || ""); set(r, P, "approach", p.approach || ""); set(r, P, "id", p.id); set(r, P, "updated", stamp);
+    set(r, P, "override", p.override || ""); set(r, P, "notes", p.notes || ""); set(r, P, "approach", p.approach || ""); set(r, P, "doi", p.doi || ""); set(r, P, "id", p.id); set(r, P, "updated", stamp);
   });
   var n = 0, heads = [];
   papers.forEach(function (p) {
@@ -404,7 +414,7 @@ async function rdgReplace(api, id, papers, subs, approachOf) {
       var r = at(sb, n++);
       set(r, S, "paper", p.key); set(r, S, "journal", s.journal); set(r, S, "rating", s.rating || ""); set(r, S, "status", s.status || "Planned");
       set(r, S, "submitted", s.submitted || ""); set(r, S, "decided", s.decided || ""); set(r, S, "notes", s.notes || ""); set(r, S, "titleUsed", s.titleUsed || "");
-      set(r, S, "msid", s.msid || ""); set(r, S, "live", s.live ? s.live.text : ""); set(r, S, "liveAt", s.live ? s.live.at : ""); set(r, S, "dtype", s.dtype || ""); set(r, S, "prio", s.prio || "");
+      set(r, S, "msid", s.msid || ""); set(r, S, "live", s.live ? s.live.text : ""); set(r, S, "liveAt", s.live ? s.live.at : ""); set(r, S, "dtype", s.dtype || ""); set(r, S, "prio", s.prio || ""); set(r, S, "file", s.file || "");
       set(r, S, "id", s.id); set(r, S, "updated", stamp);
     });
     n += p.override ? 2 : 4;

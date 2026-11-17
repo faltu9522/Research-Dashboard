@@ -100,14 +100,18 @@
     },
     googleClearToken: function () { localStorage.removeItem(TOK_KEY); },
     // Google's file picker, straight in the page (for a sheet a co-author shared with you)
-    pickSharedSheet: function (id, token) {
+    pickSharedSheet: function (id, token, url) {
+      var fileMode = /[?&]mode=file\b/.test(url || "");
       var cfgReady = window.RDSK_PICKER ? Promise.resolve() : load("../picker-config.js");
       cfgReady.then(function () { return load("https://apis.google.com/js/api.js"); }).then(function () {
         gapi.load("picker", function () {
           var cfg = window.RDSK_PICKER || {};
-          var view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setOwnedByMe(false).setMode(google.picker.DocsViewMode.LIST);
-          new google.picker.PickerBuilder().addView(view).setOAuthToken(token).setDeveloperKey(cfg.apiKey).setAppId(cfg.appId)
-            .setTitle("Choose the RD SK sheet shared with you").setCallback(function (d) {
+          var b = new google.picker.PickerBuilder().setOAuthToken(token).setDeveloperKey(cfg.apiKey).setAppId(cfg.appId);
+          if (fileMode) b.addView(new google.picker.DocsView(google.picker.ViewId.DOCS).setIncludeFolders(true).setMode(google.picker.DocsViewMode.LIST))
+            .addView(new google.picker.DocsUploadView()).setTitle("Choose the manuscript file you sent");
+          else b.addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setOwnedByMe(false).setMode(google.picker.DocsViewMode.LIST))
+            .setTitle("Choose the RD SK sheet shared with you");
+          b.setCallback(function (d) {
               if (d.action === google.picker.Action.PICKED) window.rdPicked(id, d.docs[0].id, d.docs[0].name, "");
               else if (d.action === google.picker.Action.CANCEL) window.rdPicked(id, "", "", "");
             }).build().setVisible(true);

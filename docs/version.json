@@ -1,11 +1,17 @@
 {
- "version": "4.9",
- "versionCode": 40,
+ "version": "5.0",
+ "versionCode": 41,
  "date": "17 Nov 2026",
  "notes": [
-  "Your shortlist: add any journal (ABDC or not) to a paper with a note on why, and put them in priority order; ⭐ marks the one to submit next",
-  "Suggested journals: “⭐ Shortlist as next” or “+ Shortlist”",
-  "The order syncs through a new Priority column in your sheet, so phone, web and co-authors see the same plan"
+  "✍ Revision plans: paste the reviewers' comments, work through each point (who does what), and get the response letter drafted (Gemini can suggest replies)",
+  "ℹ Journal profiles from open data: citations per article, articles a year, open access and author fees, recent topics; ⚖ compare your shortlist",
+  "📣 Calls for papers with countdowns and reminders; paste a call and RD SK fills it in",
+  "🧾 Publications & CV in APA or Harvard with DOIs and citations, plus a 📊 yearly report for appraisals",
+  "🧑‍⚖️ Reviewing tracker, 🎯 goals with progress rings, 🗓 a This week card and a Monday plan notification",
+  "🎉 Your Research Year: an animated recap and a card to share",
+  "📎 Attach the manuscript file you sent to each journal (from Google Drive)",
+  "New kinds: 📖 book chapters, 🎤 conference papers, 💰 grants & fellowships",
+  "Share an editor's email from Gmail straight into RD SK (Share → Update RD SK)"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"
