@@ -14,10 +14,10 @@ var RDG_PAPER = { key: /^paper/i, title: /^(current |full )?title$/i, authors: /
   override: /^override/i, notes: /^notes?$/i, suggest: /^suggested next/i, id: /^app id$/i, updated: /^updated$/i, approach: /^approach$/i };
 var RDG_SUB = { paper: /^paper$/i, journal: /^journal$/i, abdc: /^abdc/i, rating: /rating|index/i, status: /^status$/i,
   submitted: /^(date submitted|date of submission)/i, decided: /^date of decision/i, notes: /^notes?$/i, titleUsed: /^title used/i,
-  msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i, dtype: /^decision type/i, id: /^app id$/i, updated: /^updated$/i };
+  msid: /^manuscript id/i, live: /^status on journal/i, liveAt: /^status checked/i, dtype: /^decision type/i, prio: /^priority$/i, id: /^app id$/i, updated: /^updated$/i };
 var RDG_JOURNAL = { journal: /^journal$/i, abdc: /^abdc 2025/i, link: /^login link/i, email: /email/i };
 var RDG_ADD_PAPER = { suggest: "Suggested next journals", id: "App ID", updated: "Updated", approach: "Approach" };
-var RDG_ADD_SUB = { msid: "Manuscript ID", live: "Status on journal site", liveAt: "Status checked", dtype: "Decision type", id: "App ID", updated: "Updated" };
+var RDG_ADD_SUB = { msid: "Manuscript ID", live: "Status on journal site", liveAt: "Status checked", dtype: "Decision type", prio: "Priority", id: "App ID", updated: "Updated" };
 var RDG_DATES = { submitted: 1, decided: 1, liveAt: 1 };
 var RDG_APP = "RD SK app", RDG_AI = "AI chat", RDG_EMAILS = "Emails", RDG_DECISIONS = "Decisions & reviews", RDG_INSIGHTS = "Research insights";
 var RDG_AI_HEAD = ["Date", "Paper", "Approach", "Question", "Journal", "Details", "Answer", "By", "ID"];
@@ -224,13 +224,14 @@ async function rdgSync(api, id, body, opts) {
     put(sb, i, S, "status", s.status || ""); put(sb, i, S, "submitted", s.submitted || ""); put(sb, i, S, "decided", s.decided || "");
     put(sb, i, S, "notes", s.notes || ""); put(sb, i, S, "titleUsed", s.titleUsed || ""); put(sb, i, S, "msid", s.msid || "");
     put(sb, i, S, "live", s.live || ""); put(sb, i, S, "liveAt", s.liveAt || ""); put(sb, i, S, "dtype", s.dtype || "");
+    if (s.prio !== undefined) put(sb, i, S, "prio", s.prio || "");
     put(sb, i, S, "id", s.id); put(sb, i, S, "updated", rdgStamp(s.mod || now, tz));
   });
   (body.deleted || []).forEach(function (did) {
     var i = find(pb, P, did, null);
     if (i >= 0) ["key", "title", "authors", "type", "override", "notes", "suggest", "id", "updated", "approach"].forEach(function (f) { put(pb, i, P, f, ""); });
     i = find(sb, S, did, null);
-    if (i >= 0) ["paper", "journal", "rating", "status", "submitted", "decided", "notes", "titleUsed", "msid", "live", "liveAt", "dtype", "id", "updated"]
+    if (i >= 0) ["paper", "journal", "rating", "status", "submitted", "decided", "notes", "titleUsed", "msid", "live", "liveAt", "dtype", "prio", "id", "updated"]
       .forEach(function (f) { put(sb, i, S, f, ""); });
   });
 
@@ -377,7 +378,7 @@ async function rdgSync(api, id, body, opts) {
                abdc: rdgStr(g(r, S, "abdc")), status: rdgStr(g(r, S, "status")), submitted: rdgDay(g(r, S, "submitted")),
                decided: rdgDay(g(r, S, "decided")), notes: rdgStr(g(r, S, "notes")), titleUsed: rdgStr(g(r, S, "titleUsed")),
                msid: rdgStr(g(r, S, "msid")), live: rdgStr(g(r, S, "live")), liveAt: rdgDay(g(r, S, "liveAt")), dtype: rdgStr(g(r, S, "dtype")),
-               mod: rdgMs(g(r, S, "updated"), tz) };
+               prio: rdgStr(g(r, S, "prio")), mod: rdgMs(g(r, S, "updated"), tz) };
     })
   };
 }
@@ -403,7 +404,7 @@ async function rdgReplace(api, id, papers, subs, approachOf) {
       var r = at(sb, n++);
       set(r, S, "paper", p.key); set(r, S, "journal", s.journal); set(r, S, "rating", s.rating || ""); set(r, S, "status", s.status || "Planned");
       set(r, S, "submitted", s.submitted || ""); set(r, S, "decided", s.decided || ""); set(r, S, "notes", s.notes || ""); set(r, S, "titleUsed", s.titleUsed || "");
-      set(r, S, "msid", s.msid || ""); set(r, S, "live", s.live ? s.live.text : ""); set(r, S, "liveAt", s.live ? s.live.at : ""); set(r, S, "dtype", s.dtype || "");
+      set(r, S, "msid", s.msid || ""); set(r, S, "live", s.live ? s.live.text : ""); set(r, S, "liveAt", s.live ? s.live.at : ""); set(r, S, "dtype", s.dtype || ""); set(r, S, "prio", s.prio || "");
       set(r, S, "id", s.id); set(r, S, "updated", stamp);
     });
     n += p.override ? 2 : 4;

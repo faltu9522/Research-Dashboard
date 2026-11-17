@@ -434,7 +434,7 @@ function paperInfo(p){
   const ss = subsOf(p.id), stage = paperStage(p);
   let last=null; ss.forEach((s,i)=>{ if(isSent(s)&&s.submitted){ if(!last||s.submitted>=last.submitted) last=s; } });
   let lastDec=""; ss.forEach(s=>{ if(s.decided && s.decided>lastDec) lastDec=s.decided; });
-  const next = ss.find(s=>s.status==="Planned");
+  const next = plannedOf(p.id)[0];
   const idle = stage==="Needs resubmission" && lastDec ? daysBetween(lastDec,today()) : null;
   return {stage,last,lastDec,next,idle,sent:ss.filter(isSent).length,rejections:ss.filter(s=>s.status==="Rejected").length,subs:ss};
 }
@@ -1015,7 +1015,7 @@ function editSub(s, presetPaper){
 function showPaper(p){
   const i=paperInfo(p);
   const ss=i.subs.slice().sort((a,b)=>{ const ka=a.status==="Planned"?"~":a.submitted||"", kb=b.status==="Planned"?"~":b.submitted||""; return kb.localeCompare(ka); });
-  const planned=i.subs.filter(s=>s.status==="Planned"), done=ss.filter(s=>s.status!=="Planned");
+  const planned=plannedOf(p.id), done=ss.filter(s=>s.status!=="Planned");
   const revRow=i.subs.find(s=>s.status==="Revision requested");
   openSheet(`<h3><span>${esc(p.key)}</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div><span class="chip ${stageClass(i.stage)}">${esc(statusText(i.stage,kindOf(p)))}</span> ${i.idle!=null?`<span class="m">${i.idle} days idle</span>`:""}</div>
@@ -1033,20 +1033,22 @@ function showPaper(p){
     ${(()=>{ const n=dupRows(p).length; return n?`<div class="banner" style="margin-top:10px">⚠ ${n} duplicate row${n>1?"s":""} (same journal, status and dates). <button class="link" id="pdup">Remove duplicates</button></div>`:""; })()}
     ${journeyMap(p)}
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
-    <h2>Queue <small>first = next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${subCard(s,{hidePaper:true})}</div>
-      <div style="display:flex;flex-direction:column;gap:4px"><button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">No journals queued.</div>'}
+    <h2>Your shortlist <small>in priority order · ⭐ = submit next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${k===0?'<div class="m" style="color:var(--acc);font-weight:600;margin:2px 0 -2px">⭐ Next</div>':`<div class="m" style="margin:2px 0 -2px">#${k+1}</div>`}${subCard(s,{hidePaper:true})}</div>
+      <div style="display:flex;flex-direction:column;gap:4px">${k>0?`<button class="ghost" data-mv="${s.id}:top" title="Make next">⭐</button>`:""}<button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">Nothing shortlisted yet. Add journals you or your co-authors recommend, or pick from the suggestions below.</div>'}
+    ${kindOf(p)==="journal"?`<div class="actions"><button id="pshort">+ Add a journal to the shortlist</button></div>`:""}
     ${p.override||kindOf(p)!=="journal"?"":`<h2>Suggested next journals <small>ABDC 2025</small></h2>${suggestList(p,8)}`}`);
   const sh=$("#sheet");
   sh.onclick=e=>{
     if(suggestClick(e,p,()=>showPaper(p))) return;
     const mv=e.target.closest("[data-mv]"); if(!mv) return; e.stopPropagation();
-    const [sid,dir]=mv.dataset.mv.split(":"); movePlanned(p.id,sid,+dir); showPaper(p);
+    const [sid,dir]=mv.dataset.mv.split(":"); movePlanned(p.id,sid,dir==="top"?"top":+dir); render(); showPaper(p);
   };
   if($("#pnext")) $("#pnext").onclick=()=>{ closeSheet(); submitFlow(i.next); };
   if($("#prev")) $("#prev").onclick=()=>{ revRow.status="Revision resubmitted"; if(!revRow.decided) revRow.decided=today();
     S.subs.push({id:uid("s"),paper:p.id,journal:revRow.journal,rating:revRow.rating,status:"Under review",submitted:today(),decided:"",notes:"Revised version resubmitted",titleUsed:""});
     noteActivity(); persist(); render(); showPaper(p); celebrate("Revision requested","Under review",revRow.journal); };
   $("#padd").onclick=()=>editSub(null,p.id);
+  if($("#pshort")) $("#pshort").onclick=()=>shortlistSheet(p);
   $("#pedit").onclick=()=>editPaper(p);
   if($("#pdup")) $("#pdup").onclick=()=>{ const d=new Set(dupRows(p).map(x=>x.id)); S.subs=S.subs.filter(x=>!d.has(x.id)); persist(); render(); showPaper(p); toast(d.size+" duplicate"+(d.size>1?"s":"")+" removed"); };
   $("#pai").onclick=()=>{ AIU.paper=p.id; closeSheet(); setTab("ai"); };
@@ -1098,10 +1100,39 @@ function newBookSheet(kind){
     if(st==="Under review") celebrate("Planned","Under review",pubs.join(" & ")); else if(st==="Accepted") celebrate("Under review","Accepted",pubs.join(" & ")); else toast("Saved");
   };
 }
+/** A paper's shortlist (its Planned rows) in your priority order: 1 = submit next. The order is the Priority column in the sheet. */
+function plannedOf(pid){
+  return S.subs.map((s,k)=>[s,k]).filter(([s])=>s.paper===pid&&s.status==="Planned")
+    .sort((a,b)=>((+a[0].prio||1e6)-(+b[0].prio||1e6))||(a[1]-b[1])).map(([s])=>s);
+}
+function setPlanOrder(list){ list.forEach((s,k)=>{ if(String(s.prio||"")!==String(k+1)) s.prio=String(k+1); }); }
 function movePlanned(pid,sid,dir){
-  const idx=S.subs.map((s,k)=>[s,k]).filter(([s])=>s.paper===pid&&s.status==="Planned").map(([,k])=>k);
-  const pos=idx.findIndex(k=>S.subs[k].id===sid), other=idx[pos+dir]; if(other==null) return;
-  const a=idx[pos]; [S.subs[a],S.subs[other]]=[S.subs[other],S.subs[a]]; persist();
+  const list=plannedOf(pid), pos=list.findIndex(s=>s.id===sid), to=dir==="top"?0:pos+dir;
+  if(pos<0||to<0||to>=list.length||to===pos) return;
+  const [s]=list.splice(pos,1); list.splice(to,0,s); setPlanOrder(list); persist();
+}
+/** Adds a journal to a paper's shortlist: first in line ("next") or at the end. */
+function shortlistAdd(pid,journal,why,first){
+  const list=plannedOf(pid), have=list.find(s=>normJ(s.journal)===normJ(journal));
+  const s=have||{id:uid("s"),paper:pid,journal,rating:abdcOf(journal)||"",status:"Planned",submitted:"",decided:"",notes:why||"",titleUsed:""};
+  if(have&&why) s.notes=s.notes?s.notes+" | "+why:why;
+  if(!have) S.subs.push(s);
+  const rest=list.filter(x=>x!==s); setPlanOrder(first?[s].concat(rest):rest.concat([s])); persist(); return s;
+}
+function shortlistSheet(p){
+  window.__bookPicker=false;
+  openSheet(`<h3>Add to shortlist <button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m">Any journal: on the ABDC list or not.</div>
+    <label for="slj">Journal</label><input id="slj" autocomplete="off" autocapitalize="words" placeholder="e.g. Organization">
+    <div class="hint" id="slh"></div>
+    <label for="slw">Why this one? (optional)</label><textarea id="slw" placeholder="e.g. special issue on algorithms, fits our framing, fast turnaround, co-author's advice"></textarea>
+    <label for="slp">Priority</label><select id="slp"><option value="1">⭐ Submit next (top of the list)</option><option value="0">Later (end of the list)</option></select>
+    <div class="actions"><button class="primary" id="slsave">Add</button><button onclick="showPaper(paperById('${p.id}'))">Back</button></div>`);
+  journalPicker($("#slj"));
+  const hint=()=>{ const j=$("#slj").value.trim(), g=j&&abdcOf(j); $("#slh").innerHTML=j?(g?"ABDC 2025: <b>"+esc(g)+"</b>":"Not on the ABDC 2025 list")+turnaroundLine(j,null):""; };
+  $("#slj").addEventListener("input",hint);
+  $("#slsave").onclick=()=>{ const j=$("#slj").value.trim(); if(!j) return toast("Enter a journal");
+    shortlistAdd(p.id,j,$("#slw").value.trim(),$("#slp").value==="1"); render(); showPaper(p); toast("Added to shortlist: "+j); };
 }
 function editPaper(p){
   const isNew=!p; p=p||{id:uid("p"),key:"",title:"",authors:"",type:"Journal article",override:"",notes:""};
@@ -1427,8 +1458,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="4.8", APP_BUILD="11 Nov 2026";
+const APP_VERSION="4.9", APP_BUILD="17 Nov 2026";
 const CHANGELOG=[
+  ["4.9","17 Nov 2026",["Your shortlist: add any journal (ABDC or not) to a paper with a note on why, and put them in priority order; ⭐ marks the one to submit next","Suggested journals: “⭐ Shortlist as next” or “+ Shortlist”","The order syncs through a new Priority column in your sheet, so phone, web and co-authors see the same plan"]],
   ["4.8","11 Nov 2026",["Simultaneous submissions: “+ Another journal” in the submission form (with a reminder about exclusive-consideration rules), and cards show “Under review at 2 journals: A, B”","When a journal accepts or a publisher offers a contract, RD SK lists the others still considering the work: mark them Withdrawn and draft a polite withdrawal email for each"]],
   ["4.7","11 Nov 2026",["Privacy: the app no longer ships with any built-in paper data (sign in to load your sheet); the old GitHub sync option is hidden"]],
   ["4.6","11 Nov 2026",["💻 RD SK on the web and on computers: faltu9522.github.io/Research-Dashboard/app/ (sign in with the same Google account; installable in Chrome or Edge as its own app)"]],
@@ -1603,16 +1635,18 @@ let suggestMore={};
 function suggestList(p,n){
   if(!window.rdSuggest) return "";
   const k=suggestMore[p.id]?16:n, list=rdSuggest({key:p.key,title:p.title},subsOf(p.id),window.RD_ABDC||[],k);
-  if(!list.length) return `<div class="empty">No strong ABDC matches: this paper's fields are thinly covered by the ABDC list. Your own queue above is the best guide.</div>`;
+  if(!list.length) return `<div class="empty">No strong ABDC matches: this paper's fields are thinly covered by the ABDC list. Add your own picks to the shortlist above.</div>`;
   return list.map(j=>`<div class="card"><div class="row"><div class="grow"><div class="t">${esc(j.title)}${abdcChip(j.grade)}</div>
       <div class="m">${esc(j.publisher)}${j.publisher?" · ":""}${esc(j.why)}</div></div></div>
-      <div class="actions"><button data-sq="${esc(j.title)}">+ Add to queue</button><button data-ss="${esc(j.title)}">Submit today</button></div></div>`).join("")
+      <div class="actions"><button data-sn="${esc(j.title)}">⭐ Shortlist as next</button><button data-sq="${esc(j.title)}">+ Shortlist</button><button data-ss="${esc(j.title)}">Submit today</button></div></div>`).join("")
     +`<div class="actions"><button class="link" data-smore="${p.id}">${suggestMore[p.id]?"Show fewer":"Show more suggestions"}</button></div>
     <div class="hint">Picked from the ABDC 2025 list: same ABDC fields as the journals you chose for this paper, matching topic words, and close to the tier of the last journal. Always check scope and fit before submitting.</div>`;
 }
 function suggestClick(e,p,refresh){
-  const q=e.target.closest("[data-sq],[data-ss],[data-smore]"); if(!q) return false; e.stopPropagation();
+  const q=e.target.closest("[data-sq],[data-ss],[data-sn],[data-smore]"); if(!q) return false; e.stopPropagation();
   if(q.dataset.smore){ suggestMore[p.id]=!suggestMore[p.id]; refresh(); return true; }
+  if(q.dataset.sq||q.dataset.sn){ const j=q.dataset.sq||q.dataset.sn; shortlistAdd(p.id,j,"Suggested (ABDC "+(abdcOf(j)||"?")+")",!!q.dataset.sn); render(); refresh();
+    toast(q.dataset.sn?"⭐ Next: "+j:"Shortlisted: "+j); return true; }
   const j=q.dataset.sq||q.dataset.ss, now=!!q.dataset.ss;
   S.subs.push({id:uid("s"),paper:p.id,journal:j,rating:"",status:now?"Under review":"Planned",submitted:now?today():"",decided:"",notes:"Suggested (ABDC "+(abdcOf(j)||"?")+")",titleUsed:""});
   persist(); render(); refresh(); toast(now?"Submitted to "+j:"Added to queue: "+j);
@@ -1620,7 +1654,7 @@ function suggestClick(e,p,refresh){
 }
 function whatNext(p,s){
   if(!p) return;
-  const next=subsOf(p.id).find(x=>x.status==="Planned");
+  const next=plannedOf(p.id)[0];
   openSheet(`<h3>What next? <button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="m" style="color:var(--ink)"><b>${esc(p.key)}</b> was ${s.status==="Rejected"?"rejected by":"returned by"} ${esc(s.journal)}${abdcChip(abdcOf(s.journal))}.</div>
     <h2>Next in your queue</h2>
@@ -2280,7 +2314,8 @@ async function shareSyncAll(manual){
   }
   gsStore();
 }
-function remoteSub(r,pid){ return {paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live:r.live?{text:r.live,at:r.liveAt||today()}:undefined}; }
+function remoteSub(r,pid){ const o=remoteSub0(r,pid); if(o.prio===undefined) delete o.prio; return o; }
+function remoteSub0(r,pid){ return {paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",prio:r.prio!==undefined?r.prio:undefined,live:r.live?{text:r.live,at:r.liveAt||today()}:undefined}; }
 function remotePaper(r,l){ return {key:l?l.key:r.key,title:r.title,authors:r.authors,type:r.type||"Journal article",override:r.override||"",notes:r.notes,approach:r.approach||""}; }
 async function shareSyncOne(sh){
   const opts={abdc:window.RD_ABDC||[],suggest:window.rdSuggest}, base=sh.base||{};
@@ -2373,7 +2408,7 @@ function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catc
 // change tracking: each paper/submission gets mod = time of its last local change
 let H=null, trackPaused=false, gsEditCount=0;
 const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes].concat(p.approach?[p.approach]:[]));
-const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:"",s.dtype||""]);
+const sigS=s=>JSON.stringify([s.paper,s.journal,s.rating,s.status,s.submitted,s.decided,s.notes,s.titleUsed,s.msid||"",s.live?s.live.text:"",s.live?s.live.at:"",s.dtype||"",s.prio||""]);
 function baseline(){ H={}; S.papers.forEach(p=>H[p.id]=sigP(p)); S.subs.forEach(x=>H[x.id]=sigS(x)); }
 function trackChanges(){
   if(trackPaused) return 0;
@@ -2388,7 +2423,7 @@ function trackChanges(){
 let gsTimer=null, gsBusy=false;
 function gsSchedule(){ if(!gsOn()||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
 function outPaper(p,mod){ return {id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,approach:p.approach||"",mod:mod||(p.mod||0)}; }
-function outSub(x,paperKey,mod){ return {id:x.id,paper:paperKey,journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",mod:mod||(x.mod||0)}; }
+function outSub(x,paperKey,mod){ return {id:x.id,paper:paperKey,journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",prio:x.prio||"",mod:mod||(x.mod||0)}; }
 function gsPayload(mode){
   const pk=id=>(paperById(id)||{}).key||"";
   const since=mode==="normal"?GS.lastSync:-1, now=Date.now();
@@ -2446,7 +2481,7 @@ function gsApply(j){
       papers.push(np); created.push(np); byKey[r.paper]=pid; }
     const o=oldS[r.id]||{};
     const live=r.live?{text:r.live,at:r.liveAt||today(),prev:o.live&&o.live.text===r.live?o.live.prev||"":(o.live&&o.live.text)||"",changedAt:o.live&&o.live.text===r.live?o.live.changedAt||"":(o.live?today():"")}:undefined;
-    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",live,liveLog:o.liveLog,smod:r.mod||0};
+    return {id:r.id,paper:pid,journal:r.journal,rating:r.rating,status:r.status||"Planned",submitted:r.submitted,decided:r.decided,notes:r.notes,titleUsed:r.titleUsed,msid:r.msid,dtype:r.dtype||"",prio:r.prio!==undefined?r.prio:(o.prio||""),live,liveLog:o.liveLog,smod:r.mod||0};
   });
   S.papers=papers; S.subs=subs;
   const done=(GS.resolved||[]).map(x=>x.id); S.pending=(j.pending||[]).filter(x=>!done.includes(x.id));
