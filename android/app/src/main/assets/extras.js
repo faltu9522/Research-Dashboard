@@ -630,7 +630,7 @@ XA.hub = function () {
     ["pubs", "🧾", "Publications & CV", plural(published().length, "work")], ["reviews", "🧑‍⚖️", "Reviewing", plural(n("review", r => r.status === "Accepted"), "in progress", "in progress")], ["goals", "🎯", "Goals", plural(n("goal", g => (g.year || thisYear()) === thisYear()), "goal")],
     ["year", "🎉", "Your Research Year", thisYear() + " recap"]];
   if (window.XB) tools.splice(1, 0, ["xb:board", "🗂", "Pipeline board", "drag to update"]), tools.push(["xb:cites", "📈", "Citations", plural(S.papers.filter(p => p.doi).length, "paper") + " tracked"],
-    ["xb:focus", "⏱", "Focus timer", Math.round(XB.focusMin() / 6) / 10 + " h so far"], ["xb:calsheet", "📅", "Deadlines → calendar", plural(XB.deadlines().length, "upcoming deadline")], ["xb:game", "🎮", "Reviewer 2 Run", "best " + (+S.settings.gameBest || 0)]);
+    ["xb:focus", "⏱", "Focus timer", Math.round(XB.focusMin() / 6) / 10 + " h so far"], ["xb:calsheet", "📅", "Deadlines → calendar", plural(XB.deadlines().length, "upcoming deadline")], ["xb:games", "🎮", "Games", "4 games for the long wait"], ["xb:demo", "🎭", "Demo mode", window.DEMO ? "on: tap to exit" : "show RD SK safely"]);
   return `<div class="tools" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">${tools.map(([x, i, t, s]) => `<button class="card tap" data-act="${x.startsWith("xb:") ? "xb" : "xa"}" data-x="${x.replace(/^xb:/, "")}" style="text-align:left;font:inherit;color:inherit;margin:0"><div style="font-size:22px">${i}</div><div class="t" style="font-size:14.5px">${t}</div><div class="m" style="font-size:12.5px">${esc(s)}</div></button>`).join("")}</div>`;
 };
 XA.revs = function () {

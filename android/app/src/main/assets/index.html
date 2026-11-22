@@ -212,6 +212,7 @@ body.motion button:active,body.motion .card.tap:active{transform:scale(.97);tran
 <script src="fx.js"></script>
 <script src="extras.js"></script>
 <script src="extras2.js"></script>
+<script src="games.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -257,6 +258,7 @@ function load(){
   S.portals = S.portals || {}; S.settings = S.settings || {chaseDays:90};
 }
 function persist(touch=true){
+  if(window.DEMO) return;   // demo mode: shown data is make-believe, never saved
   if(touch) S.settings.lastUpdated = today();
   pushWidget();
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){ toast("Could not save: "+e.message); }
@@ -282,6 +284,7 @@ function celebrate(before,after,journal){
 }
 /** Numbers for the home-screen widget. */
 function pushWidget(){
+  if(window.DEMO) return;
   if(!(window.Android&&Android.setWidget)) return;
   try{
     const st=stats(), open=st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0)), top=open[0], c=+S.settings.chaseDays||90;
@@ -792,6 +795,8 @@ function viewMore(){
     <label>Animations</label>
     <div class="filters" style="flex-wrap:wrap">${[["full","🎆 Full"],["calm","🌙 Calm"]].map(([k,l])=>`<button data-act="motion" data-v="${k}" class="${(S.settings.motion||"full")===k?"on":""}">${l}</button>`).join("")}</div>
   </div>
+  <h2>Demo mode <small>for showing RD SK to others</small></h2>
+  <div class="card">${window.XB?XB.demoCard():""}</div>
   <h2>Reminders</h2>
   <div class="card">${remindCard()}</div>
   <h2>Backup &amp; Excel</h2>
@@ -1334,6 +1339,7 @@ function fromWorkbook(wb){
 
 /* ---------- reminders (native notifications; the page sends a summary on each save) ---------- */
 function pushReminders(){
+  if(window.DEMO) return;
   if(!(window.Android && Android.setReminderData)) return;
   const subs=S.subs.filter(s=>s.status==="Under review"&&s.submitted).map(s=>{ const p=paperById(s.paper)||{}; return {id:s.id, journal:s.journal, paper:p.key||"", submitted:s.submitted}; });
   let extra={}; try{ if(window.XA) extra=XA.alerts(); if(window.XB) extra.cites=XB.citeForPhone(); }catch(e){}
@@ -1517,8 +1523,10 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="5.3", APP_BUILD="22 Nov 2026";
+const APP_VERSION="5.4", APP_BUILD="22 Nov 2026";
 const CHANGELOG=[
+  ["5.4","22 Nov 2026",["🎭 Demo mode (More → Demo mode, or the tools grid): made-up papers and small numbers for showing RD SK to others; your real data stays untouched and nothing is saved or synced until you exit",
+    "🎮 Games corner with three new games: Stack Your CV, Catch the Acceptances and Inbox Sort (plus Reviewer 2 Run)"]],
   ["5.3","22 Nov 2026",["📍 Stages at the journal: tap “Set the stage” on a submission under review (Awaiting AE Assignment, Awaiting Reviewer Scores, Awaiting Prelim Decision…) and add your own as you meet new ones; the history is kept",
     "Reviewer 2 Run: the game now plays in the upper half, so your thumb can tap below without hiding it"]],
   ["5.2","22 Nov 2026",["🗂 Pipeline board: drag cards between To submit, Under review, Revision and Accepted (or to the red bin), with undo",
@@ -2479,7 +2487,7 @@ function bindWelcome(){
 const GS_KEY="rdsk.gsheets.v1";
 let GS={url:"",auto:true,lastSync:0,lastText:"",lastError:"",deleted:[],sheet:"",drive:{},gemini:""};
 try{ Object.assign(GS, JSON.parse(localStorage.getItem(GS_KEY)||"{}")); }catch(e){}
-function gsStore(){ try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catch(e){} }
+function gsStore(){ if(window.DEMO) return; try{ localStorage.setItem(GS_KEY, JSON.stringify(GS)); }catch(e){} }
 // change tracking: each paper/submission gets mod = time of its last local change
 let H=null, trackPaused=false, gsEditCount=0;
 const sigP=p=>JSON.stringify([p.key,p.title,p.authors,p.type,p.override,p.notes].concat(p.approach?[p.approach]:[],p.doi?["doi:"+p.doi]:[]));
@@ -2496,7 +2504,7 @@ function trackChanges(){
   return n;
 }
 let gsTimer=null, gsBusy=false;
-function gsSchedule(){ if(!gsOn()||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
+function gsSchedule(){ if(window.DEMO) return; if(!gsOn()||!GS.auto) return; clearTimeout(gsTimer); gsTimer=setTimeout(()=>gsSync("normal",false),6000); }
 function outPaper(p,mod){ return {id:p.id,key:p.key,title:p.title,authors:p.authors,type:p.type,override:p.override,notes:p.notes,approach:p.approach||"",doi:p.doi||"",mod:mod||(p.mod||0)}; }
 function outSub(x,paperKey,mod){ return {id:x.id,paper:paperKey,journal:x.journal,rating:x.rating,status:x.status,submitted:x.submitted,decided:x.decided,notes:x.notes,titleUsed:x.titleUsed,msid:x.msid||"",live:x.live?x.live.text:"",liveAt:x.live?x.live.at:"",dtype:x.dtype||"",prio:x.prio||"",file:x.file||"",mod:mod||(x.mod||0)}; }
 function gsPayload(mode){
@@ -2514,6 +2522,7 @@ function gsPayload(mode){
       shares:mode!=="link"&&!(GS.drive&&GS.drive.shared)&&(GS.shares||[]).length?GS.shares.map(x=>({author:x.author,label:x.label,email:x.email,id:x.id,name:x.name})):undefined}};
 }
 async function gsSync(mode,manual){
+  if(window.DEMO){ if(manual) toast("Sync is off in demo mode"); return; }
   if(!gsOn()) return manual&&toast("Sign in with Google first (More → Google account)");
   if(gsBusy){ gsSchedule(); return; }
   gsBusy=true; if(manual) toast("Syncing with Google Sheets…");
@@ -2615,7 +2624,7 @@ function gsCard(){
 const GH_KEY="rdsk.github.v1";
 let GH={repo:"faltu9522/Research-Dashboard",branch:"main",folder:"data",token:"",auto:true,lastSync:"",lastError:""};
 try{ Object.assign(GH, JSON.parse(localStorage.getItem(GH_KEY)||"{}")); }catch(e){}
-function ghStore(){ try{ localStorage.setItem(GH_KEY, JSON.stringify(GH)); }catch(e){} }
+function ghStore(){ if(window.DEMO) return; try{ localStorage.setItem(GH_KEY, JSON.stringify(GH)); }catch(e){} }
 function ghCard(){
   const on=!!GH.token;
   return `<div class="hint" style="margin-top:0">Saves <b>${esc(GH.folder)}/Research_Dashboard.xlsx</b> (Papers + Submissions sheets) and <b>${esc(GH.folder)}/rdsk-backup.json</b> to your repo as a commit.

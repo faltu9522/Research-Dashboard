@@ -1,10 +1,10 @@
 {
- "version": "5.3",
- "versionCode": 44,
+ "version": "5.4",
+ "versionCode": 45,
  "date": "22 Nov 2026",
  "notes": [
-  "📍 Stages at the journal: tap “Set the stage” on a submission under review (Awaiting AE Assignment, Awaiting Reviewer Scores, Awaiting Prelim Decision…) and add your own as you meet new ones; the history is kept",
-  "Reviewer 2 Run: the game now plays in the upper half, so your thumb can tap below without hiding it"
+  "🎭 Demo mode (More → Demo mode, or the tools grid): made-up papers and small numbers for showing RD SK to others; your real data stays untouched and nothing is saved or synced until you exit",
+  "🎮 Games corner with three new games: Stack Your CV, Catch the Acceptances and Inbox Sort (plus Reviewer 2 Run)"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"

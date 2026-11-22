@@ -541,10 +541,76 @@ XB.stageSheet = function (s) {
     XB.setStage(s, XB.stages().find(x => x.toLowerCase() === t.toLowerCase()) || t, $("#stgd").value); toast("📍 " + t); closeSheet(); };
 };
 
+/* =====================================================================================================
+   12. Demo mode: show RD SK to someone with make-believe numbers and papers. Your real data stays in memory, untouched,
+       and nothing is saved, synced or sent while the demo runs (persist / sync / widget / reminders all stand still).
+   ===================================================================================================== */
+const DEMO_PAPERS = [
+  ["Algorithmic Trust", "Trusting the algorithm: platform workers and opaque management", "Conceptual"],
+  ["Quiet Quitting", "Quiet quitting as organizational silence: a discourse analysis", "Empirical – qualitative"],
+  ["Green Voice", "Speaking up for sustainability: employee voice in family firms", "Empirical – quantitative"],
+  ["Remote Rituals", "Rituals at a distance: belonging in hybrid teams", "Empirical – qualitative"],
+  ["AI Authorship", "Who wrote this? AI authorship and organizational accountability", "Conceptual"],
+  ["Care Work Platforms", "Care on demand: the platformization of care work", "Literature review"]];
+const DEMO_J = ["Organization Studies", "Human Relations", "Journal of Management Studies", "Organization", "Gender, Work & Organization", "New Technology, Work and Employment", "Business & Society", "Journal of Business Ethics"];
+const pickN = (a, n) => a.slice().sort(() => Math.random() - .5).slice(0, n);
+const drnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+function demoState(mode) {
+  const real = window.DEMO.S, d = { version: real.version || 1, settings: { chaseDays: 90, lastUpdated: today(), myName: "Dr A. Researcher", motion: real.settings.motion, streakSeen: 99, citeStyle: "apa", games: real.settings.games, gameBest: real.settings.gameBest },
+    papers: [], subs: [], portals: {}, abdc: real.abdc || {}, contacts: {}, checklists: {}, insights: [], pending: [], ai: [], recs: {}, jprof: real.jprof || {}, cref: {} };
+  const ago = n => addDays(today(), -n), sub = (paper, journal, status, submitted, decided, extra) => d.subs.push(Object.assign({ id: uid("s"), paper, journal, rating: "", status, submitted, decided: decided || "", notes: "", titleUsed: "" }, extra || {}));
+  if (mode === "mine") {   // one or two of your own journal papers, with only their own submissions
+    const mine = pickN(real.papers.filter(p => kindOf(p) === "journal" && !p.override && real.subs.some(s => s.paper === p.id && s.status !== "Planned")), drnd(1, 2));
+    mine.forEach(p => { d.papers.push(JSON.parse(JSON.stringify(p))); real.subs.filter(s => s.paper === p.id).forEach(s => d.subs.push(JSON.parse(JSON.stringify(s)))); });
+    if (mine.length) return d;
+  }
+  const js = pickN(DEMO_J, 8), scen = pickN(["ur", "rev", "todo", "acc"], drnd(2, 3));
+  pickN(DEMO_PAPERS, scen.length).forEach(([key, title, approach], i) => {
+    const id = uid("p"); d.papers.push({ id, key, title, authors: "Researcher, A., Colleague, B.", type: "Journal article", override: "", notes: "", approach });
+    const j1 = js[i * 2], j2 = js[i * 2 + 1];
+    if (scen[i] === "ur") { if (Math.random() < .35) sub(id, j1, "Rejected", ago(drnd(150, 240)), ago(drnd(120, 140)), { dtype: "Desk rejection" }); sub(id, j2, "Under review", ago(drnd(40, 110)), "", { live: { text: pickN(["Awaiting Reviewer Scores", "Awaiting AE Recommendation", "Awaiting Reviewer Selection"], 1)[0], at: ago(drnd(3, 20)) } }); }
+    if (scen[i] === "rev") sub(id, j1, "Revision requested", ago(drnd(150, 200)), ago(drnd(10, 30)));
+    if (scen[i] === "todo") { sub(id, j1, "Rejected", ago(drnd(100, 160)), ago(drnd(15, 40)), { dtype: "Rejected after review" }); sub(id, j2, "Planned", "", "", { prio: "1" }); }
+    if (scen[i] === "acc") sub(id, j1, "Accepted", ago(drnd(200, 300)), ago(drnd(20, 60)));
+  });
+  const call = { id: uid("c"), title: "Special issue: Work after AI", venue: js[7], kind: "Special issue", deadline: addDays(today(), drnd(12, 40)), status: "Watching", at: Date.now() };
+  const goal = { id: uid("g"), metric: "sent", target: drnd(4, 6), year: thisYear(), at: Date.now() };
+  d.recs = { call: { [call.id]: call }, goal: { [goal.id]: goal } };
+  return d;
+}
+XB.demoOn = function (mode) {
+  if (window.DEMO) return;
+  window.DEMO = { S, GS };
+  S = demoState(mode);
+  GS = Object.assign({}, GS, { url: "", auto: false, lastSync: 0, lastText: "", lastError: "", sheet: "", drive: {}, gemini: "", shares: [], importReq: null, importResult: null, script: null });
+  closeSheet(); query = ""; setTab("home"); XB.demoBar(); FX.confetti(60);
+  toast("🎭 Demo mode: made-up numbers, nothing is saved");
+};
+XB.demoOff = function () {
+  if (!window.DEMO) return; S = window.DEMO.S; GS = window.DEMO.GS; window.DEMO = null;
+  const b = ovOpen("demobar"); if (b) b.remove();
+  document.querySelectorAll(".xov").forEach(o => closeOv(o.id)); closeSheet(); query = ""; setTab("home"); toast("Demo mode off: your data is back");
+};
+XB.demoBar = function () {
+  let b = ovOpen("demobar"); if (b) b.remove(); b = document.createElement("button"); b.id = "demobar"; b.type = "button"; b.textContent = "🎭 Demo";
+  b.title = "Demo mode is on: tap to exit";
+  b.style.cssText = "position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:50;border:0;border-radius:20px;padding:6px 12px;font:600 13px system-ui,sans-serif;background:var(--accent);color:#fff;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.2)";
+  b.onclick = () => { if (confirm("Exit demo mode and show your real data?")) XB.demoOff(); };
+  document.body.appendChild(b);
+};
+XB.demoCard = function () {
+  return window.DEMO ? `<div class="m" style="color:var(--ink)">🎭 Demo mode is <b>on</b>. Nothing you do now is saved or synced.</div><div class="actions"><button class="primary" data-act="xb" data-x="demooff">Exit demo mode</button></div>`
+    : `<div class="m">Shows RD SK with a few made-up papers and small numbers (1–3), so you can demo it without showing your work. Your data stays safe: nothing is saved or synced until you exit, and closing the app also ends the demo.</div>
+      <div class="actions"><button class="primary" data-act="xb" data-x="demo" data-k="sample">🎭 Start demo (sample papers)</button><button data-act="xb" data-x="demo" data-k="mine">Start demo with 1–2 of my papers</button></div>`;
+};
+
 /* ---------- routing ---------- */
 XB.act = function (x, id, el) {
   switch (x) {
     case "board": return XB.board();
+    case "games": return XG.hub();
+    case "demo": return el && el.dataset.k ? XB.demoOn(el.dataset.k) : window.DEMO ? (confirm("Exit demo mode and show your real data?") && XB.demoOff()) : openSheet(`<h3><span>🎭 Demo mode</span><button class="ghost" onclick="closeSheet()">✕</button></h3>${XB.demoCard()}`);
+    case "demooff": return XB.demoOff();
     case "stage": return XB.stageSheet(id);
     case "focus": return XB.focus(id);
     case "cal": return openBrowser(XB.calUrl(el.dataset.t, el.dataset.d, el.dataset.n));
@@ -562,4 +628,4 @@ window.XB = XB;
 
 /* ---------- on start: resume a focus session, weekly citation check ---------- */
 setTimeout(() => { try { if (S.focusRun) XB.focusRun(); } catch (e) {} }, 600);
-setTimeout(() => { XB.citeCheck(false).catch(() => {}); }, 9000);
+setTimeout(() => { if (!window.DEMO) XB.citeCheck(false).catch(() => {}); }, 9000);
