@@ -546,6 +546,7 @@ function subCard(s, opts={}){
       ${!book&&(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
     ${window.XB&&s.status==="Under review"?XB.waitMeter(s,d):""}
+    ${window.XB&&s.status==="Under review"?`<button class="link" data-act="xb" data-x="stage" data-id="${s.id}" style="font-size:13px;margin-top:4px">📍 ${s.live?"Update the stage":"Set the stage at the journal"}</button>`:""}
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
     ${(open||s.status==="Planned")&&!book?turnaroundLine(s.journal,open?d:null):""}
     ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
@@ -1014,6 +1015,7 @@ function editSub(s, presetPaper){
     <label for="ft">Title used (if retitled)</label><input id="ft" value="${esc(s.titleUsed)}">
     <div class="two"><div><label for="fm">Manuscript ID</label><input id="fm" value="${esc(s.msid||"")}" placeholder="e.g. ORG-26-0412" autocapitalize="characters"></div>
     <div><label for="fx">Editorial office email</label><input id="fx" type="email" value="${esc((S.contacts||{})[s.journal]||"")}" placeholder="for chase emails" autocapitalize="off"></div></div>
+    ${!isNew&&window.XB&&s.status==="Under review"?`<div class="actions" style="margin-top:8px"><button data-act="xb" data-x="stage" data-id="${s.id}">📍 Update the stage at the journal</button></div>`:""}
     ${s.liveLog&&s.liveLog.length?`<label>Status on journal site</label><div class="m" style="color:var(--ink)">${s.liveLog.slice().reverse().map(x=>`${fmt(x.at)}: <b>${esc(x.text)}</b>`).join("<br>")}${s.live?`<br><span class="m">last checked ${fmt(s.live.at)}</span>`:""}</div>`:""}
     ${!isNew&&window.XA&&s.status!=="Planned"?XA.fileRow(s):""}
     <label for="fu">Login link for this journal</label><input id="fu" type="url" placeholder="https://…" value="${esc(S.portals[s.journal]||"")}">
@@ -1521,8 +1523,10 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="5.2", APP_BUILD="22 Nov 2026";
+const APP_VERSION="5.3", APP_BUILD="22 Nov 2026";
 const CHANGELOG=[
+  ["5.3","22 Nov 2026",["📍 Stages at the journal: tap “Set the stage” on a submission under review (Awaiting AE Assignment, Awaiting Reviewer Scores, Awaiting Prelim Decision…) and add your own as you meet new ones; the history is kept",
+    "Reviewer 2 Run: the game now plays in the upper half, so your thumb can tap below without hiding it"]],
   ["5.2","22 Nov 2026",["🗂 Pipeline board: drag cards between To submit, Under review, Revision and Accepted (or to the red bin), with undo",
     "📚 Add earlier publications by DOI or from your ORCID record; 📈 citation tracking with weekly checks, alerts and a chart per paper",
     "Journey flow chart in Stats; a wait meter on every card under review","⏱ Focus timer for writing sessions (counts towards your streak)",

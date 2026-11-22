@@ -449,7 +449,7 @@ XB.game = function () {
     <button id="gx" style="position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:2;background:rgba(0,0,0,.35);color:#fff;border:0;border-radius:20px;width:40px;height:40px;font-size:20px">✕</button>`, 40);
   o.style.padding = "0"; o.style.overflow = "hidden";
   const cv = o.querySelector("#gcv"), g = cv.getContext("2d"), dpr = Math.min(2, window.devicePixelRatio || 1);
-  let W, H, G; const size = () => { W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); G = H * 0.78; }; size(); addEventListener("resize", size);
+  let W, H, G; const size = () => { W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); G = Math.round(H * 0.56); /* ground above the thumb: the lower part is the tap zone */ }; size(); addEventListener("resize", size);
   const best = () => +S.settings.gameBest || 0;
   let st, raf, last;
   const reset = () => { st = { y: 0, vy: 0, jumps: 0, speed: 330, dist: 0, stars: 0, obs: [], stx: [], t: 0, next: 1.2, nextStar: 2, over: false, started: false, shake: 0, parts: [], hold: false }; };
@@ -487,6 +487,7 @@ XB.game = function () {
     const off = st.dist * .2 % 160; g.fillStyle = "rgba(255,255,255,.07)";   // far bookshelves
     for (let x = -off; x < W + 160; x += 160) { g.fillRect(x, G - 150, 120, 150); for (let k = 0; k < 5; k++) { g.fillStyle = `hsla(${(x * 7 + k * 50) % 360},50%,70%,.12)`; g.fillRect(x + 8 + k * 22, G - 140, 16, 60); g.fillRect(x + 6 + k * 22, G - 70, 18, 60); } g.fillStyle = "rgba(255,255,255,.07)"; }
     g.fillStyle = "#2a2a2a"; g.fillRect(-10, G, W + 20, H - G); g.fillStyle = "#3d3d3d"; const d2 = st.dist % 40; for (let x = -d2; x < W; x += 40) g.fillRect(x, G + 8, 22, 4);
+    g.fillStyle = "rgba(255,255,255,.35)"; g.textAlign = "center"; g.font = "600 15px system-ui"; g.fillText("👆 tap anywhere down here", W / 2, G + (H - G) * .55);
     st.stx.forEach(s => { g.save(); g.translate(s.x, G - s.y); g.rotate(Math.sin(s.a) * .3); g.font = "26px system-ui"; g.textAlign = "center"; g.fillText("⭐", 0, 9); g.restore(); });
     st.obs.forEach(b => { g.fillStyle = b.col; rr(b.x, G - b.h, b.w, b.h, 6); g.fillStyle = "#fff"; g.textAlign = "center"; g.font = "800 11px system-ui"; g.fillText(b.label, b.x + b.w / 2, G - b.h / 2 - 1); g.font = "700 8.5px system-ui"; g.fillText(b.sub, b.x + b.w / 2, G - b.h / 2 + 10); });
     const py = G - st.y - 42, tilt = st.y > 0 ? Math.max(-.35, Math.min(.35, st.vy / 1800)) : Math.sin(st.dist / 18) * .05;   // the manuscript hero
@@ -497,19 +498,54 @@ XB.game = function () {
     st.parts.forEach(q => { g.globalAlpha = Math.max(0, q.l * 2); g.fillStyle = q.c || "#fff"; g.fillRect(q.x, q.y, 4, 4); }); g.globalAlpha = 1;
     g.fillStyle = "#fff"; g.textAlign = "left"; g.font = "800 22px system-ui"; g.fillText(score(), 18, 48); g.font = "600 13px system-ui"; g.fillStyle = "rgba(255,255,255,.75)"; g.fillText("⭐ " + st.stars + "   best " + best(), 18, 68);
     g.textAlign = "center";
-    if (!st.started) { g.fillStyle = "#fff"; g.font = "800 30px system-ui"; g.fillText("Reviewer 2 Run", W / 2, H * .3); g.font = "500 16px system-ui"; g.fillText("Tap to jump · tap again in the air to double-jump", W / 2, H * .3 + 34); g.fillText("Hold for a higher jump · grab ⭐ citations", W / 2, H * .3 + 58); }
-    if (st.over) { g.fillStyle = "rgba(0,0,0,.5)"; g.fillRect(-10, 0, W + 20, H); g.fillStyle = "#fff"; g.font = "800 32px system-ui"; g.fillText(st.record ? "New record! 🏆" : ["Desk rejected!", "Reviewer 2 strikes again", "Major revisions…", "Not a good fit for this journal"][Math.floor(st.overAt / 1000) % 4], W / 2, H * .36);
-      g.font = "600 18px system-ui"; g.fillText("Score " + score() + "  ·  best " + best(), W / 2, H * .36 + 36); g.font = "500 15px system-ui"; g.fillText("Tap to resubmit", W / 2, H * .36 + 66); }
+    if (!st.started) { g.fillStyle = "#fff"; g.font = "800 30px system-ui"; g.fillText("Reviewer 2 Run", W / 2, H * .17); g.font = "500 16px system-ui"; g.fillText("Tap to jump · tap again in the air to double-jump", W / 2, H * .17 + 34); g.fillText("Hold for a higher jump · grab ⭐ citations", W / 2, H * .17 + 58); }
+    if (st.over) { g.fillStyle = "rgba(0,0,0,.5)"; g.fillRect(-10, 0, W + 20, H); g.fillStyle = "#fff"; g.font = "800 32px system-ui"; g.fillText(st.record ? "New record! 🏆" : ["Desk rejected!", "Reviewer 2 strikes again", "Major revisions…", "Not a good fit for this journal"][Math.floor(st.overAt / 1000) % 4], W / 2, H * .2);
+      g.font = "600 18px system-ui"; g.fillText("Score " + score() + "  ·  best " + best(), W / 2, H * .2 + 36); g.font = "500 15px system-ui"; g.fillText("Tap to resubmit", W / 2, H * .2 + 66); }
     g.restore();
   };
   const loop = t => { const dt = Math.min(.034, ((t - (last || t)) / 1000)); last = t; step(dt); draw(); raf = requestAnimationFrame(loop); };
   raf = requestAnimationFrame(loop);
 };
 
+/* =====================================================================================================
+   11. Stages at the journal: "Awaiting Reviewer Scores" and the like, from a list you can extend
+   ===================================================================================================== */
+XB.STAGES = ["Submitted to Journal", "Admin Checks / With Editorial Office", "Awaiting AE Assignment", "Editor Assigned", "Awaiting Reviewer Selection",
+  "Awaiting Reviewer Invitation", "Reviewers Invited", "Awaiting Reviewer Scores", "Required Reviews Completed", "Awaiting AE Recommendation",
+  "Awaiting Editor Group's Decision", "Awaiting Prelim Decision", "Awaiting EIC Decision", "Decision in Process"];
+XB.stages = () => XB.STAGES.concat(recList("stage").sort((a, b) => (a.at || 0) - (b.at || 0)).map(x => x.text).filter(t => !XB.STAGES.some(d => d.toLowerCase() === t.toLowerCase())));
+XB.setStage = function (s, text, date) {
+  date = date || today(); const prev = s.live && s.live.text, changed = !!prev && prev !== text;
+  s.live = { text, at: date, prev: changed ? prev : (s.live && s.live.prev) || "", changedAt: changed ? date : (s.live && s.live.changedAt) || "" };
+  s.liveLog = s.liveLog || []; if (!s.liveLog.length || s.liveLog[s.liveLog.length - 1].text !== text) s.liveLog.push({ at: date, text });
+  noteActivity(); persist(); render();
+};
+XB.stageSheet = function (s) {
+  if (typeof s === "string") s = S.subs.find(x => x.id === s); if (!s) return;
+  const cur = s.live && s.live.text, mine = new Set(recList("stage").map(x => x.text.toLowerCase()));
+  openSheet(`<h3><span>📍 Stage at the journal</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
+    <div class="m"><b style="color:var(--ink)">${esc(s.journal)}</b> · ${esc((paperById(s.paper) || {}).key || "")}</div>
+    <div class="two"><div><label for="stgd">Since</label><input type="date" id="stgd" value="${today()}"></div><div></div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${XB.stages().map(t => `<button data-stg="${esc(t)}" class="${t === cur ? "primary" : ""}" style="font-size:13.5px">${esc(t)}${mine.has(t.toLowerCase()) ? ' <span data-stgdel="' + esc(t) + '" title="Remove from my list" style="opacity:.6">✕</span>' : ""}</button>`).join("")}</div>
+    <label for="stgnew">A stage that isn't listed</label>
+    <div class="row" style="gap:6px"><input id="stgnew" class="grow" placeholder="e.g. Awaiting Reviewer Scores (2 of 3)"><button class="primary" id="stgadd">Add &amp; set</button></div>
+    <div class="hint">New stages are saved to your list (and your sheet) for every submission.</div>
+    ${s.liveLog && s.liveLog.length ? `<h2>History</h2><div class="m" style="color:var(--ink)">${s.liveLog.slice().reverse().map(x => `${fmt(x.at)}: <b>${esc(x.text)}</b>`).join("<br>")}</div>` : ""}`);
+  $("#sheet").onclick = e => {
+    const del = e.target.closest("[data-stgdel]"); if (del) { e.stopPropagation(); const r = recList("stage").find(x => x.text === del.dataset.stgdel); if (r && confirm("Remove “" + r.text + "” from your list?")) { recDel("stage", r.id); XB.stageSheet(s); } return; }
+    const b = e.target.closest("[data-stg]"); if (!b) return;
+    XB.setStage(s, b.dataset.stg, $("#stgd").value); FX.spark(lastTap.x, lastTap.y); toast("📍 " + b.dataset.stg); closeSheet();
+  };
+  $("#stgadd").onclick = () => { const t = $("#stgnew").value.trim().replace(/\s+/g, " "); if (!t) return toast("Type the stage as the portal shows it");
+    if (!XB.stages().some(x => x.toLowerCase() === t.toLowerCase())) recPut("stage", { text: t });
+    XB.setStage(s, XB.stages().find(x => x.toLowerCase() === t.toLowerCase()) || t, $("#stgd").value); toast("📍 " + t); closeSheet(); };
+};
+
 /* ---------- routing ---------- */
 XB.act = function (x, id, el) {
   switch (x) {
     case "board": return XB.board();
+    case "stage": return XB.stageSheet(id);
     case "focus": return XB.focus(id);
     case "cal": return openBrowser(XB.calUrl(el.dataset.t, el.dataset.d, el.dataset.n));
     case "calsheet": return XB.calSheet();

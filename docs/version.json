@@ -1,17 +1,10 @@
 {
- "version": "5.2",
- "versionCode": 43,
+ "version": "5.3",
+ "versionCode": 44,
  "date": "22 Nov 2026",
  "notes": [
-  "🗂 Pipeline board: drag cards between To submit, Under review, Revision and Accepted (or to the red bin), with undo",
-  "📚 Add earlier publications by DOI or from your ORCID record; 📈 citation tracking with weekly checks, alerts and a chart per paper",
-  "Journey flow chart in Stats; a wait meter on every card under review",
-  "⏱ Focus timer for writing sessions (counts towards your streak)",
-  "📅 Deadlines to Google Calendar in one tap, or all at once as a calendar file",
-  "🎤 Voice entry: “Submitted Who Spoke to New Media and Society today”",
-  "💬 Notes on each paper, shared with co-authors",
-  "A larger home-screen widget with this week's to-do list and your next deadline",
-  "🎮 Reviewer 2 Run: a tiny game for the long wait"
+  "📍 Stages at the journal: tap “Set the stage” on a submission under review (Awaiting AE Assignment, Awaiting Reviewer Scores, Awaiting Prelim Decision…) and add your own as you meet new ones; the history is kept",
+  "Reviewer 2 Run: the game now plays in the upper half, so your thumb can tap below without hiding it"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"
