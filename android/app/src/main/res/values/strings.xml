@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">RD SK</string>
+    <string name="widget_large_desc">This week\'s to-do list, the numbers and your next deadline</string>
     <string name="widget_desc">Papers under review, waiting on you and the longest wait</string>
 </resources>

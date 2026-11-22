@@ -98,6 +98,7 @@ XA.revSheet = function (sub) {
     <h2>Response letter</h2>
     <div class="actions" style="margin-top:0"><button class="primary" data-rvletter>📄 Draft the response letter</button>${xaGeminiKey() ? `<button data-rvai>✦ Suggest replies with Gemini</button>` : ""}</div>
     ${people.length > 1 ? `<div class="actions"><button data-rvsend>📤 Send each co-author their points</button></div>` : ""}
+    ${window.XB && r.due ? `<div class="actions">${XB.calBtn("✍ Revision due: " + sub.journal, r.due, p.key || "")}</div>` : ""}
     <div class="two" style="margin-top:8px"><div><label for="rvdue">Revision due</label><input type="date" id="rvdue" value="${esc(r.due || "")}"></div><div style="align-self:end"><button class="danger" data-rvkill style="width:100%">Delete plan</button></div></div>
     ${xaGeminiKey() ? "" : `<div class="hint">Add a free Gemini key (More → Ask AI) to get suggested replies for points you haven't answered yet.</div>`}`);
   const save = (render2) => { r.points = pts; recPut("rev", r); if (render2) XA.revSheet(sub); };
@@ -373,7 +374,7 @@ XA.callEdit = function (c, pre) {
     <div class="two"><div>${lbl("Status", "cs")}<select id="cs">${CALL_ST.map(k => `<option ${k === c.status ? "selected" : ""}>${k}</option>`).join("")}</select></div>
     <div>${lbl("For which paper?", "cp")}<select id="cp"><option value="">—</option>${papers.map(p => `<option value="${p.id}" ${p.id === c.paper ? "selected" : ""}>${esc(p.key)}</option>`).join("")}</select></div></div>
     ${lbl("Notes", "cn")}<textarea id="cn" placeholder="themes, word limit, guest editors, abstract first?">${esc(c.notes)}</textarea>
-    <div class="actions"><button class="primary" id="csave">Save</button>${c.link ? `<button id="copen">Open call ↗</button>` : ""}<button id="cmatch">📄 Shortlist for the paper</button>${isNew ? "" : `<button class="danger" id="cdel">Delete</button>`}<button data-xback="calls">← All calls</button></div>`);
+    <div class="actions"><button class="primary" id="csave">Save</button>${c.link ? `<button id="copen">Open call ↗</button>` : ""}<button id="cmatch">📄 Shortlist for the paper</button>${window.XB && c.deadline ? XB.calBtn("📣 Deadline: " + (c.title || c.venue), c.deadline, [c.venue, c.link].filter(Boolean).join("\n")) : ""}${isNew ? "" : `<button class="danger" id="cdel">Delete</button>`}<button data-xback="calls">← All calls</button></div>`);
   journalPicker($("#cv"));
   const read = () => Object.assign(c, { title: $("#ct").value.trim(), kind: $("#ck").value, deadline: $("#cd").value, venue: $("#cv").value.trim(), link: $("#cl").value.trim(), status: $("#cs").value, paper: $("#cp").value, notes: $("#cn").value.trim() });
   $("#csave").onclick = () => { read(); if (!c.title && !c.venue) return toast("Add a title or the journal"); recPut("call", c); render(); XA.calls(); toast("Saved"); };
@@ -442,7 +443,8 @@ function cite(style, e) {
 }
 XA.pubs = function (style) {
   style = style || S.settings.citeStyle || "apa"; S.settings.citeStyle = style;
-  const list = published().sort((a, b) => ((b.acc && b.acc.decided) || "").localeCompare((a.acc && a.acc.decided) || ""));
+  const when = e => (e.acc && e.acc.decided) || String(((e.p.doi && (S.cref || {})[e.p.doi]) || {}).year || "");
+  const list = published().sort((a, b) => when(b).localeCompare(when(a)));
   const total = list.reduce((n, e) => n + ((e.p.doi && (S.cref || {})[e.p.doi] || {}).cites || 0), 0);
   openSheet(`<h3><span>🧾 Publications &amp; CV</span><button class="ghost" onclick="closeSheet()">✕</button></h3>
     <div class="filters"><button data-cst="apa" class="${style === "apa" ? "on" : ""}">APA 7</button><button data-cst="harvard" class="${style === "harvard" ? "on" : ""}">Harvard</button></div>
@@ -450,6 +452,7 @@ XA.pubs = function (style) {
     ${list.length ? list.map(e => { const w = e.p.doi && (S.cref || {})[e.p.doi]; return `<div class="card"><div style="font-size:14.5px;line-height:1.5">${esc(cite(style, e)).replace(/\*([^*]+)\*/g, "<i>$1</i>")}</div>
       <div class="actions" style="margin-top:6px">${e.p.doi ? `<span class="m">${w ? "📈 " + plural(w.cites, "citation") : ""}</span><button class="link" data-act="doi" data-doi="${esc(e.p.doi)}">DOI ↗</button>` : `<button data-doif="${e.p.id}">🔎 Find DOI</button>`}<button class="link" data-doiset="${e.p.id}">${e.p.doi ? "Edit DOI" : "Type DOI"}</button></div></div>`; }).join("")
       : `<div class="empty">Accepted papers, chapters, books and talks appear here, ready to copy into your CV.</div>`}
+    ${window.XB ? `<div class="actions" style="margin-top:0"><button data-act="xb" data-x="addpubs">📚 Add earlier publications (DOI / ORCID)</button><button data-act="xb" data-x="cites">📈 Citations</button>${S.settings.scholar ? `<button data-gs>Google Scholar ↗</button>` : ""}</div>` : ""}
     <div class="actions"><button class="primary" data-pcopy>Copy list</button><button data-pshare>Share…</button><button data-prefresh>↻ Update citations</button><button data-preport>📊 Yearly report</button></div>
     <div class="hint">Details (volume, pages, citations) come from Crossref once a paper has a DOI; until then it is listed as in press.</div>`);
   const text = () => list.map(e => cite(style, e).replace(/\*/g, "")).join("\n\n");
@@ -457,6 +460,7 @@ XA.pubs = function (style) {
     const t = e.target.closest("button"); if (!t) return; const d = t.dataset;
     if (d.cst) { S.settings.citeStyle = d.cst; persist(false); return XA.pubs(d.cst); }
     if (d.pcopy != null) return copyOut(text());
+    if (d.gs != null) return openBrowser(S.settings.scholar);
     if (d.pshare != null) return shareOut("Publications", text());
     if (d.preport != null) return XA.report();
     if (d.prefresh != null) { toast("Updating from Crossref…"); for (const x of list) if (x.p.doi) { delete (S.cref || {})[x.p.doi]; try { await crossrefWork(x.p.doi); } catch (err) {} } return XA.pubs(style); }
@@ -513,7 +517,7 @@ XA.reviewEdit = function (r) {
     <div class="two"><div>${lbl("Due", "rd")}<input type="date" id="rd" value="${esc(r.due)}"></div><div>${lbl("Review sent on", "rx")}<input type="date" id="rx" value="${esc(r.done)}"></div></div>
     ${lbl("Reviewer site link", "rl")}<input id="rl" type="url" value="${esc(r.link || "")}" placeholder="the journal's reviewer centre">
     ${lbl("Notes", "rn")}<textarea id="rn">${esc(r.notes)}</textarea>
-    <div class="actions"><button class="primary" id="rsave">Save</button>${r.link ? `<button id="ropen">Open site ↗</button>` : ""}${isNew ? "" : `<button class="danger" id="rdel">Delete</button>`}<button data-xback="reviews">← All reviews</button></div>`);
+    <div class="actions"><button class="primary" id="rsave">Save</button>${r.link ? `<button id="ropen">Open site ↗</button>` : ""}${window.XB && r.due && !isNew ? XB.calBtn("🧑‍⚖️ Review due: " + r.journal, r.due, r.msid || "") : ""}${isNew ? "" : `<button class="danger" id="rdel">Delete</button>`}<button data-xback="reviews">← All reviews</button></div>`);
   journalPicker($("#rj"));
   $("#rs").onchange = () => { if ($("#rs").value === "Submitted" && !$("#rx").value) $("#rx").value = today(); };
   $("#rsave").onclick = () => { Object.assign(r, { journal: $("#rj").value.trim(), msid: $("#rm").value.trim(), round: +$("#rr").value || 1, title: $("#rt").value.trim(), status: $("#rs").value, invited: $("#ri").value, due: $("#rd").value, done: $("#rx").value, link: $("#rl").value.trim(), notes: $("#rn").value.trim() });
@@ -625,7 +629,9 @@ XA.hub = function () {
   const tools = [["revs", "✍", "Revision plans", plural(revOpen().length, "open plan")], ["profilepick", "ℹ", "Journal profiles", "citations, fees, volume"], ["calls", "📣", "Calls for papers", plural(callsLive().length, "open call")],
     ["pubs", "🧾", "Publications & CV", plural(published().length, "work")], ["reviews", "🧑‍⚖️", "Reviewing", plural(n("review", r => r.status === "Accepted"), "in progress", "in progress")], ["goals", "🎯", "Goals", plural(n("goal", g => (g.year || thisYear()) === thisYear()), "goal")],
     ["year", "🎉", "Your Research Year", thisYear() + " recap"]];
-  return `<div class="tools" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">${tools.map(([x, i, t, s]) => `<button class="card tap" data-act="xa" data-x="${x}" style="text-align:left;font:inherit;color:inherit;margin:0"><div style="font-size:22px">${i}</div><div class="t" style="font-size:14.5px">${t}</div><div class="m" style="font-size:12.5px">${esc(s)}</div></button>`).join("")}</div>`;
+  if (window.XB) tools.splice(1, 0, ["xb:board", "🗂", "Pipeline board", "drag to update"]), tools.push(["xb:cites", "📈", "Citations", plural(S.papers.filter(p => p.doi).length, "paper") + " tracked"],
+    ["xb:focus", "⏱", "Focus timer", Math.round(XB.focusMin() / 6) / 10 + " h so far"], ["xb:calsheet", "📅", "Deadlines → calendar", plural(XB.deadlines().length, "upcoming deadline")], ["xb:game", "🎮", "Reviewer 2 Run", "best " + (+S.settings.gameBest || 0)]);
+  return `<div class="tools" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px">${tools.map(([x, i, t, s]) => `<button class="card tap" data-act="${x.startsWith("xb:") ? "xb" : "xa"}" data-x="${x.replace(/^xb:/, "")}" style="text-align:left;font:inherit;color:inherit;margin:0"><div style="font-size:22px">${i}</div><div class="t" style="font-size:14.5px">${t}</div><div class="m" style="font-size:12.5px">${esc(s)}</div></button>`).join("")}</div>`;
 };
 XA.revs = function () {
   const open = S.subs.filter(s => s.status === "Revision requested");

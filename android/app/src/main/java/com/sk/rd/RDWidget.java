@@ -26,6 +26,7 @@ public class RDWidget extends AppWidgetProvider {
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, RDWidget.class));
         if (ids.length > 0) mgr.updateAppWidget(ids, views(ctx));
+        RDWidgetLarge.refresh(ctx);
     }
 
     private static RemoteViews views(Context ctx) {

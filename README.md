@@ -139,6 +139,12 @@ bridge. Phone-only: reminder notifications, the home-screen widget and reading j
 - **Manuscript files**: attach the exact file you sent to each journal from Google Drive (or upload it there).
 - **More kinds of work**: book chapters, conference papers and grant / fellowship applications, each with its own wording.
 - **Share an email in**: in Gmail, select the email's text → Share → **Update RD SK**.
+- **Pipeline board**: hold a card and drag it to the next column (or the red bin) to record a decision, with undo.
+- **Earlier publications and citations**: add published papers by DOI or import them from ORCID; RD SK checks Crossref
+  weekly (the phone also in the background) and notifies you of new citations, with a per-year chart from OpenAlex.
+- **Journey flow** (Stats), **wait meter** on cards, **focus timer**, **calendar** (Google Calendar links and an .ics
+  file), **voice entry** (Google's speech input), **paper notes** shared with co-authors, a larger **widget**, and
+  **Reviewer 2 Run**, a small game.
 
 ## Sharing with co-authors
 More → **Co-authors** lists everyone in your papers' Authors fields. Type a co-author's Gmail and tap **Share**: RD SK

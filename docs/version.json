@@ -1,9 +1,17 @@
 {
- "version": "5.1",
- "versionCode": 42,
+ "version": "5.2",
+ "versionCode": 43,
  "date": "22 Nov 2026",
  "notes": [
-  "Back button: clears a search first (and closes the Research Year recap) instead of closing the app"
+  "🗂 Pipeline board: drag cards between To submit, Under review, Revision and Accepted (or to the red bin), with undo",
+  "📚 Add earlier publications by DOI or from your ORCID record; 📈 citation tracking with weekly checks, alerts and a chart per paper",
+  "Journey flow chart in Stats; a wait meter on every card under review",
+  "⏱ Focus timer for writing sessions (counts towards your streak)",
+  "📅 Deadlines to Google Calendar in one tap, or all at once as a calendar file",
+  "🎤 Voice entry: “Submitted Who Spoke to New Media and Society today”",
+  "💬 Notes on each paper, shared with co-authors",
+  "A larger home-screen widget with this week's to-do list and your next deadline",
+  "🎮 Reviewer 2 Run: a tiny game for the long wait"
  ],
  "page": "https://faltu9522.github.io/Research-Dashboard/",
  "apk": "https://faltu9522.github.io/Research-Dashboard/RD-SK.apk"

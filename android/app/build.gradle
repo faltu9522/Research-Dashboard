@@ -14,8 +14,8 @@ android {
         applicationId 'com.sk.rd'
         minSdk 24
         targetSdk 34
-        versionCode 42
-        versionName '5.1'
+        versionCode 43
+        versionName '5.2'
     }
 
     // A fixed signing key kept in the repo so every build can be installed over the previous one

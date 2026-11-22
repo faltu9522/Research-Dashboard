@@ -31,12 +31,12 @@ public class Reminders extends BroadcastReceiver {
     static final String ACTION_CHECK = "com.sk.rd.CHECK_REMINDERS";
     private static final String PREFS = "reminders";
     private static final String CHANNEL = "chase";
-    private static final int ID_CHASE = 1, ID_NUDGE = 2, ID_TEST = 3, ID_WEEK = 4, ID_ALERT = 100;
+    private static final int ID_CHASE = 1, ID_NUDGE = 2, ID_TEST = 3, ID_WEEK = 4, ID_CITE = 5, ID_ALERT = 100;
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
         String a = intent.getAction();
-        if (ACTION_CHECK.equals(a)) check(ctx);
+        if (ACTION_CHECK.equals(a)) { check(ctx); citations(ctx, goAsync()); }
         else schedule(ctx); // boot completed / app updated
     }
 
@@ -136,6 +136,65 @@ public class Reminders extends BroadcastReceiver {
             post(ctx, ID_NUDGE, "Any news on your submissions?",
                     "Nothing recorded for " + (today - last) + " days. Tap to log new submissions or decisions.", null, "home");
             p.edit().putLong("lastNudge", today).apply();
+        }
+    }
+
+    /**
+     * Once a week: asks Crossref for the citation count of each published paper the app listed (DOIs only, no
+     * personal data) and posts one notification when any went up. Runs off the main thread.
+     */
+    static void citations(Context ctx, PendingResult done) {
+        JSONObject d = data(ctx);
+        JSONArray list = d.optJSONArray("cites");
+        SharedPreferences p = prefs(ctx);
+        long today = todayNum();
+        if (list == null || list.length() == 0 || !d.optBoolean("enabled", true) || today - p.getLong("lastCite", -99) < 7) { done.finish(); return; }
+        new Thread(() -> {
+            try {
+                JSONObject known = new JSONObject(p.getString("citeCounts", "{}"));
+                List<String> lines = new ArrayList<>();
+                int ok = 0;
+                for (int i = 0; i < list.length() && i < 80; i++) {
+                    JSONObject c = list.optJSONObject(i);
+                    if (c == null) continue;
+                    String doi = c.optString("doi");
+                    int before = known.has(doi) ? known.optInt(doi) : c.optInt("count", -1);
+                    int now = crossrefCount(doi);
+                    if (now < 0) continue;
+                    ok++;
+                    if (before >= 0 && now > before) {
+                        String t = c.optString("title");
+                        lines.add("“" + (t.length() > 48 ? t.substring(0, 46) + "…" : t) + "” +" + (now - before) + " (now " + now + ")");
+                    }
+                    known.put(doi, now);
+                }
+                p.edit().putString("citeCounts", known.toString()).putLong("lastCite", ok > 0 ? today : p.getLong("lastCite", -99)).apply();
+                if (lines.size() == 1) post(ctx, ID_CITE, "📈 New citation" + (lines.get(0).contains("+1 ") ? "" : "s"), lines.get(0), null, "home");
+                else if (lines.size() > 1) post(ctx, ID_CITE, "📈 New citations for " + lines.size() + " papers", "Tap to see them in RD SK.", lines, "home");
+            } catch (Exception ignored) {
+            } finally {
+                done.finish();
+            }
+        }).start();
+    }
+
+    private static int crossrefCount(String doi) {
+        java.net.HttpURLConnection c = null;
+        try {
+            c = (java.net.HttpURLConnection) new java.net.URL("https://api.crossref.org/works/" + java.net.URLEncoder.encode(doi, "UTF-8").replace("%2F", "/")).openConnection();
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(15000);
+            c.setRequestProperty("User-Agent", "RD-SK/5.2 (https://github.com/faltu9522/Research-Dashboard)");
+            if (c.getResponseCode() != 200) return -1;
+            java.io.InputStream in = c.getInputStream();
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            return new JSONObject(out.toString("UTF-8")).getJSONObject("message").optInt("is-referenced-by-count", -1);
+        } catch (Exception e) {
+            return -1;
+        } finally {
+            if (c != null) c.disconnect();
         }
     }
 

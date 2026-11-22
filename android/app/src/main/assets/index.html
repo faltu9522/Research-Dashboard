@@ -211,6 +211,7 @@ body.motion button:active,body.motion .card.tap:active{transform:scale(.97);tran
 <script src="gsheets.js"></script>
 <script src="fx.js"></script>
 <script src="extras.js"></script>
+<script src="extras2.js"></script>
 <script>
 "use strict";
 const STORE_KEY = "rdsk.state.v1";
@@ -287,7 +288,9 @@ function pushWidget(){
     const over=open.filter(x=>(subDays(x)||0)>=2*c).length, chk=open.filter(x=>(subDays(x)||0)>=c).length, sk=streak();
     Android.setWidget(JSON.stringify({under:st.under,waiting:st.waiting,
       longest:top?"⏳ "+top.journal+" · "+subDays(top)+" days ("+((paperById(top.paper)||{}).key||"")+")":"Nothing under review",
-      flag:over?"⚠ "+over+" overdue: chase the editor":chk?"🔎 "+chk+" to check":"", streak:sk.weeks>=2?"🔥 "+sk.weeks+" wk":""}));
+      flag:over?"⚠ "+over+" overdue: chase the editor":chk?"🔎 "+chk+" to check":"", streak:sk.weeks>=2?"🔥 "+sk.weeks+" wk":"",
+      week:window.XA?XA.weekItems().slice(0,4).map(x=>x.icon+" "+x.text):[],
+      ...(()=>{ const dl=window.XB?XB.deadlines()[0]:null; return dl?{deadline:dl.t+" · "+fmt(dl.d),deadlineDays:String(daysBetween(today(),dl.d))}:{deadline:"",deadlineDays:"–"}; })()}));
   }catch(e){}
 }
 /** Weeks in a row (up to this week or last) with something sent or decided. */
@@ -295,6 +298,7 @@ function streak(){
   const wk=d=>Math.floor((dnum(d)+3)/7), now=wk(today()), set=new Set();
   S.subs.forEach(x=>{ if(x.submitted&&isSent(x)) set.add(wk(x.submitted)); if(x.decided) set.add(wk(x.decided)); });
   (S.settings.activity||[]).forEach(d=>set.add(wk(d)));
+  if(window.XA) recList("focus").forEach(f=>{ if(f.date) set.add(wk(f.date)); });
   let w=set.has(now)?now:now-1, n=0; while(set.has(w)){ n++; w--; }
   return {weeks:n,thisWeek:set.has(now)};
 }
@@ -306,7 +310,7 @@ function recColl(c){ S.recs=S.recs||{}; return S.recs[c]=S.recs[c]||{}; }
 function recList(c){ return Object.values(recColl(c)).filter(r=>!r.del); }
 function recGet(c,id){ const r=recColl(c)[id]; return r&&!r.del?r:null; }
 function recPut(c,r){ r.id=r.id||uid(c[0]); r.at=Date.now(); recColl(c)[r.id]=r; persist(false); gsSchedule(); return r; }
-function recDel(c,id){ const r=recColl(c)[id]; if(!r) return; recColl(c)[id]={id,del:true,at:Date.now()}; persist(false); gsSchedule(); }
+function recDel(c,id){ const r=recColl(c)[id]; if(!r) return; recColl(c)[id]=Object.assign({id,del:true,at:Date.now()},r.paper?{paper:r.paper}:{}); persist(false); gsSchedule(); }
 function recsOut(){ return S.recs&&Object.keys(S.recs).length?S.recs:undefined; }
 function recsIn(inc){ Object.keys(inc||{}).forEach(c=>{ const mine=recColl(c); Object.keys(inc[c]||{}).forEach(id=>{ const t=inc[c][id]; if(t&&(!mine[id]||(t.at||0)>(mine[id].at||0))) mine[id]=t; }); }); }
 
@@ -503,6 +507,8 @@ window.addEventListener("popstate",()=>{ if($("#sheet").classList.contains("open
 window.rdOpen = t => { closeSheet(); setTab(t==="review"?"review":"home"); };
 window.rdBack = function(){
   const yr=document.getElementById("yr"); if(yr){ yr.remove(); return true; }   // Research Year recap
+  if($("#sheet").classList.contains("open")){ closeSheet(); return true; }   // a panel above the board
+  const ov=[...document.querySelectorAll(".xov")].pop(); if(ov){ if(window.XB) closeOv(ov.id); else ov.remove(); return true; }   // board, focus, game
   if($("#sheet").classList.contains("open")){ closeSheet(); return true; }
   if(query){ query=""; const q=$("#q"); if(q) q.blur(); render(); window.scrollTo(0,0); return true; }   // a search: back clears it
   if(tab!=="home"){ setTab("home"); return true; }
@@ -533,6 +539,7 @@ function subCard(s, opts={}){
       <div style="margin-top:5px"><span class="chip ${stageClass(s.status)}">${esc(statusText(s.status,kind))}</span>${s.dtype&&!open?` <span class="m">${esc(s.dtype)}</span>`:""} ${open?chaseFlag(d):""}
       ${!book&&(open||s.status==="Planned")&&portal.src==="search"?`<button class="link" data-act="setlink" data-id="${s.id}" style="font-size:12.5px">🔗 Set login link</button>`:""}</div>
     </div>${d!=null?`<div class="days">${d}<small>days</small></div>`:""}</div>
+    ${window.XB&&s.status==="Under review"?XB.waitMeter(s,d):""}
     ${s.live&&open?`<div class="m" style="margin-top:6px;color:var(--ink)">🌐 <b>${esc(s.live.text)}</b> <span class="m">· checked ${fmt(s.live.at)}</span>${s.live.changedAt&&daysBetween(s.live.changedAt,today())<=14?` <span class="chip s-warn">🔔 changed${s.live.prev?" from "+esc(s.live.prev):""}</span>`:""}</div>`:""}
     ${(open||s.status==="Planned")&&!book?turnaroundLine(s.journal,open?d:null):""}
     ${s.notes?`<div class="m" style="margin-top:6px">${esc(s.notes)}</div>`:""}
@@ -611,7 +618,7 @@ function viewHome(){
   function score(i){ return ({"Revision due":3000,"Needs resubmission":2000,"Not yet submitted":1000}[i.stage]) + Math.min(i.idle||0,999); }
   const open = st.openSubs.slice().sort((a,b)=>(subDays(b)||0)-(subDays(a)||0));
   const stale = S.settings.lastUpdated ? daysBetween(S.settings.lastUpdated,today()) : null;
-  const searchBox=`<input class="search" id="q" placeholder="🔍 Search papers, journals, manuscript IDs…" value="${esc(query)}">`;
+  const searchBox=`<div style="display:flex;gap:8px;align-items:center"><input class="search" id="q" style="flex:1;margin-bottom:0" placeholder="🔍 Search papers, journals, manuscript IDs…" value="${esc(query)}">${window.XB?`<button class="ghost" data-act="xb" data-x="voice" title="Say what happened" aria-label="Voice entry" style="font-size:20px;padding:8px 12px">🎤</button>`:""}</div><div style="height:12px"></div>`;
   if(searching()){
     const ps=S.papers.filter(p=>matches(paperText(p))), ss=S.subs.filter(x=>matches(subText(x))).sort((a,b)=>(isOpen(b)-isOpen(a))||(b.submitted||"").localeCompare(a.submitted||""));
     return `${searchBox}
@@ -641,7 +648,8 @@ function viewHome(){
   ${["chapter","conf","grant"].map(k=>S.papers.some(p=>kindOf(p)===k)?bookCard(k):"").join("")}
   ${bookCard("media")}
   ${insightCard()}
-  <div class="actions"><button data-go="stats" style="flex:1">📊 Stats →</button><button class="card tap" data-act="timeline" style="width:100%;text-align:center;font:inherit;color:inherit;margin-top:8px">🗓 Timeline &amp; journeys →</button></div>
+  ${window.XB?XB.citeNewsHome():""}
+  <div class="actions"><button data-act="xb" data-x="board" style="flex:1">🗂 Pipeline board →</button><button data-go="stats" style="flex:1">📊 Stats →</button><button class="card tap" data-act="timeline" style="width:100%;text-align:center;font:inherit;color:inherit;margin-top:8px">🗓 Timeline &amp; journeys →</button></div>
   ${window.XA?`<h2>Research tools</h2>${XA.hub()}`:""}
   <h2>Under review now <small>longest wait first</small></h2>
   ${open.filter(isJournalSub).length?open.filter(isJournalSub).map(s=>subCard(s)).join(""):'<div class="empty">Nothing under review.</div>'}
@@ -904,6 +912,7 @@ document.addEventListener("click",e=>{
     case "newmedia": closeSheet(); newBookSheet("media"); break;
     case "newwork": closeSheet(); newBookSheet(a.dataset.k); break;
     case "xa": e.stopPropagation(); if(window.XA) XA.act(a.dataset.x,id,a); break;
+    case "xb": e.stopPropagation(); if(window.XB) XB.act(a.dataset.x,id,a); break;
     case "exportxlsx": exportXlsx(); break;
     case "exportjson": saveFile("RD-SK-backup-"+today()+".json", JSON.stringify(S,null,1), "application/json"); break;
     case "sharejson": shareText(JSON.stringify(S)); break;
@@ -1064,9 +1073,11 @@ function showPaper(p){
     <div class="actions">
       ${i.next&&i.stage!=="Under review"?`<button class="primary" id="pnext">Submit to ${esc(i.next.journal)} today</button>`:""}
       ${revRow?`<button data-act="xa" data-x="rev" data-id="${revRow.id}">✍ Revision plan</button><button class="primary" id="prev">Resubmit revision today</button>`:""}
-      <button id="padd">+ Submission</button><button id="pedit">Edit paper</button><button id="pai">✦ Ask AI</button></div>
+      <button id="padd">+ Submission</button><button id="pedit">Edit paper</button><button id="pai">✦ Ask AI</button>${window.XB?`<button data-act="xb" data-x="focus" data-id="${p.id}">⏱ Focus${XB.focusMin(p.id)?" · "+hrs(XB.focusMin(p.id)):""}</button>`:""}</div>
+    ${window.XB&&p.doi?XB.citeChart(p):""}
     ${(()=>{ const n=dupRows(p).length; return n?`<div class="banner" style="margin-top:10px">⚠ ${n} duplicate row${n>1?"s":""} (same journal, status and dates). <button class="link" id="pdup">Remove duplicates</button></div>`:""; })()}
     ${journeyMap(p)}
+    ${window.XB?XB.notesBlock(p):""}
     <h2>History</h2>${done.length?done.map(s=>subCard(s,{hidePaper:true})).join(""):'<div class="empty">Not sent anywhere yet.</div>'}
     <h2>Your shortlist <small>in priority order · ⭐ = submit next</small></h2>${planned.length?planned.map((s,k)=>`<div class="row"><div class="grow">${k===0?'<div class="m" style="color:var(--acc);font-weight:600;margin:2px 0 -2px">⭐ Next</div>':`<div class="m" style="margin:2px 0 -2px">#${k+1}</div>`}${subCard(s,{hidePaper:true})}${window.XA?XA.profLine(s.journal):""}</div>
       <div style="display:flex;flex-direction:column;gap:4px">${k>0?`<button class="ghost" data-mv="${s.id}:top" title="Make next">⭐</button>`:""}<button class="ghost" data-mv="${s.id}:-1" ${k===0?"disabled":""}>↑</button><button class="ghost" data-mv="${s.id}:1" ${k===planned.length-1?"disabled":""}>↓</button></div></div>`).join(""):'<div class="empty">Nothing shortlisted yet. Add journals you or your co-authors recommend, or pick from the suggestions below.</div>'}
@@ -1323,7 +1334,7 @@ function fromWorkbook(wb){
 function pushReminders(){
   if(!(window.Android && Android.setReminderData)) return;
   const subs=S.subs.filter(s=>s.status==="Under review"&&s.submitted).map(s=>{ const p=paperById(s.paper)||{}; return {id:s.id, journal:s.journal, paper:p.key||"", submitted:s.submitted}; });
-  let extra={}; try{ if(window.XA) extra=XA.alerts(); }catch(e){}
+  let extra={}; try{ if(window.XA) extra=XA.alerts(); if(window.XB) extra.cites=XB.citeForPhone(); }catch(e){}
   try{ Android.setReminderData(JSON.stringify(Object.assign({enabled:S.settings.reminders!==false, chaseDays:+S.settings.chaseDays||90, lastUpdated:S.settings.lastUpdated||"", subs},extra))); }catch(e){}
 }
 function askNotifications(force){
@@ -1478,6 +1489,7 @@ function viewStats(){
     return `<h2>Turnaround <small>median days to a decision, your history</small></h2><div class="card" style="padding:6px 10px">
       <div class="m" style="margin:4px 0">🐢 Slowest</div><table class="tbl">${t.slice(0,5).map(row).join("")}</table>
       <div class="m" style="margin:10px 0 4px">⚡ Fastest</div><table class="tbl">${t.slice(-5).reverse().map(row).join("")}</table></div>`; })()}
+  ${window.XB?XB.flowCard():""}
   <h2>Journals <small>by number of tries</small></h2>
   <div class="card" style="padding:6px 10px">
     <table class="tbl"><tr><th>Journal</th><th class="n">ABDC</th><th class="n">Tries</th><th class="n">Median days</th><th class="n">Result</th></tr>
@@ -1503,8 +1515,13 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="5.1", APP_BUILD="22 Nov 2026";
+const APP_VERSION="5.2", APP_BUILD="22 Nov 2026";
 const CHANGELOG=[
+  ["5.2","22 Nov 2026",["🗂 Pipeline board: drag cards between To submit, Under review, Revision and Accepted (or to the red bin), with undo",
+    "📚 Add earlier publications by DOI or from your ORCID record; 📈 citation tracking with weekly checks, alerts and a chart per paper",
+    "Journey flow chart in Stats; a wait meter on every card under review","⏱ Focus timer for writing sessions (counts towards your streak)",
+    "📅 Deadlines to Google Calendar in one tap, or all at once as a calendar file","🎤 Voice entry: “Submitted Who Spoke to New Media and Society today”",
+    "💬 Notes on each paper, shared with co-authors","A larger home-screen widget with this week's to-do list and your next deadline","🎮 Reviewer 2 Run: a tiny game for the long wait"]],
   ["5.1","22 Nov 2026",["Back button: clears a search first (and closes the Research Year recap) instead of closing the app"]],
   ["5.0","17 Nov 2026",["✍ Revision plans: paste the reviewers' comments, work through each point (who does what), and get the response letter drafted (Gemini can suggest replies)",
     "ℹ Journal profiles from open data: citations per article, articles a year, open access and author fees, recent topics; ⚖ compare your shortlist",
@@ -2398,7 +2415,10 @@ async function shareSyncOne(sh){
     papers:scoped.filter(p=>push.has(p.id)).map(p=>outPaper(p,now)),
     subs:S.subs.filter(x=>ids.has(x.paper)&&push.has(x.id)).map(x=>outSub(x,paperById(x.paper).key,now)),
     deleted:Object.keys(base).filter(id=>!localIds.has(id))};
-  if(body.papers.length||body.subs.length||body.deleted.length) await rdgSync(gApi,sh.id,body,opts);
+  // notes on these papers, both ways (newer edit wins)
+  if(j.app&&j.app.recs&&j.app.recs.note){ const inc={}; Object.values(j.app.recs.note).forEach(n=>{ if(n&&(ids.has(n.paper)||n.del)) inc[n.id]=n; }); const before=JSON.stringify(recColl("note")); recsIn({note:inc}); if(JSON.stringify(recColl("note"))!==before) persist(false); }
+  if(window.XB){ const mine=XB.notesForShare(ids), theirs=(j.app&&j.app.recs&&j.app.recs.note)||{}; if(Object.keys(mine).some(k=>!theirs[k]||(mine[k].at||0)>(theirs[k].at||0))) body.app={recs:{note:mine}}; }
+  if(body.papers.length||body.subs.length||body.deleted.length||body.app) await rdgSync(gApi,sh.id,body,opts);
   // 4. both sides now agree on this
   const nb={}; scoped.forEach(p=>nb[p.id]=sigP(p)); S.subs.filter(x=>ids.has(x.paper)).forEach(x=>nb[x.id]=sigS(x));
   sh.base=nb; sh.lastSync=Date.now();
@@ -2482,11 +2502,11 @@ function gsPayload(mode){
   const subs=S.subs.filter(x=>mode!=="normal"||(x.mod||0)>since).map(x=>outSub(x,pk(x.paper),mode==="overwrite"?now:0));
   return {papers,subs,deleted:mode==="normal"?GS.deleted.slice():[],savedInsights:(GS.savedInsights||[]).slice(),resolved:(GS.resolved||[]).slice(),emailDecisions:(GS.emailDecisions||[]).slice(),aiLog:(S.ai||[]).filter(x=>!x.sent).map(aiPlainEntry),epoch:GS.epoch||"",link:mode==="link"||undefined,overwrite:mode==="overwrite"||undefined,
     app:{portals:S.portals||{},contacts:S.contacts||{},chaseDays:mode==="link"?undefined:(+S.settings.chaseDays||90),
-      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false,coEmails:S.settings.coEmails||{},me:S.settings.me||""},
+      settings:mode==="link"?undefined:{myName:S.settings.myName||"",reminders:S.settings.reminders!==false,coEmails:S.settings.coEmails||{},me:S.settings.me||"",orcid:S.settings.orcid||"",scholar:S.settings.scholar||"",scopus:S.settings.scopus||""},
       secrets:mode!=="link"&&GS.gemini&&!(GS.drive&&GS.drive.shared)?{gemini:GS.gemini}:undefined, // never into a co-author's sheet
       checklists:mode!=="link"&&Object.keys(S.checklists||{}).length?S.checklists:undefined,
       importRequest:mode!=="link"&&GS.importReq?GS.importReq:undefined,
-      recs:mode!=="link"&&!(GS.drive&&GS.drive.shared)?recsOut():undefined,
+      recs:mode==="link"?undefined:(GS.drive&&GS.drive.shared)?(S.recs&&S.recs.note?{note:S.recs.note}:undefined):recsOut(),
       shares:mode!=="link"&&!(GS.drive&&GS.drive.shared)&&(GS.shares||[]).length?GS.shares.map(x=>({author:x.author,label:x.label,email:x.email,id:x.id,name:x.name})):undefined}};
 }
 async function gsSync(mode,manual){
@@ -2542,11 +2562,12 @@ function gsApply(j){
     if(j.app.importResult) GS.importResult=j.app.importResult;
     if(Array.isArray(j.app.shares)&&!(GS.shares||[]).length&&!(GS.drive&&GS.drive.shared)) GS.shares=j.app.shares.map(x=>Object.assign({base:{}},x)); // restored: no common base, so newer edit wins
     if(j.app.abdc) S.abdc=j.app.abdc;
-    if(j.app.recs&&!(GS.drive&&GS.drive.shared)) recsIn(j.app.recs);
+    if(j.app.recs) recsIn(GS.drive&&GS.drive.shared?{note:j.app.recs.note||{}}:j.app.recs);
     if(j.app.checklists){ const mine=S.checklists||{}; Object.keys(j.app.checklists).forEach(k=>{ const t=j.app.checklists[k]; if(!mine[k]||(t.at||"")>(mine[k].at||"")) mine[k]=t; }); S.checklists=mine; } S.portals=Object.assign({},S.portals,j.app.portals||{}); S.contacts=Object.assign({},S.contacts||{},j.app.contacts||{}); if(j.app.chaseDays) S.settings.chaseDays=j.app.chaseDays;
     if(j.app.settings){ if(j.app.settings.myName&&!S.settings.myName) S.settings.myName=j.app.settings.myName;
       if(j.app.settings.coEmails&&!Object.keys(S.settings.coEmails||{}).length) S.settings.coEmails=j.app.settings.coEmails;
-      if(j.app.settings.me&&!S.settings.me) S.settings.me=j.app.settings.me; if(j.app.settings.reminders===false) S.settings.reminders=false; } }
+      if(j.app.settings.me&&!S.settings.me) S.settings.me=j.app.settings.me;
+      ["orcid","scholar","scopus"].forEach(k=>{ if(j.app.settings[k]&&!S.settings[k]) S.settings[k]=j.app.settings[k]; }); if(j.app.settings.reminders===false) S.settings.reminders=false; } }
   if(JSON.stringify(S.papers.map(sigP).concat(S.subs.map(sigS)).sort())!==before) S.settings.lastUpdated=today(); // news from the sheet or Gmail
   trackPaused=true; persist(false); trackPaused=false; baseline();
   if(created.length){ const t=Date.now(); created.forEach(p=>{ p.mod=t; delete H[p.id]; }); trackChanges(); gsSchedule(); }

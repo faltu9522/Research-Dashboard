@@ -32,8 +32,9 @@ import java.nio.charset.StandardCharsets;
 
 /** Hosts the offline dashboard (assets/index.html) in a WebView; data is kept in the WebView's localStorage. */
 public class MainActivity extends Activity {
-    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8, GOOGLE_AUTH_LEGACY = 9, PICK_SHARED = 10;
+    private static final int PICK_FILE = 1, CHECK_STATUS = 5, PICK_ACCOUNT = 7, GOOGLE_AUTH = 8, GOOGLE_AUTH_LEGACY = 9, PICK_SHARED = 10, SPEECH = 11;
     private String pendingPick = null;
+    private String pendingSpeech = null;
     private static final String SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file";
     private String pendingGoogle = null;
     private WebView web;
@@ -245,6 +246,13 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == SPEECH) {
+            String id = pendingSpeech; pendingSpeech = null;
+            java.util.ArrayList<String> said = (resultCode == RESULT_OK && data != null) ? data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS) : null;
+            String text = said != null && !said.isEmpty() ? said.get(0) : "";
+            web.evaluateJavascript("window.rdHeard && rdHeard(" + JSONObject.quote(id == null ? "" : id) + "," + JSONObject.quote(text) + ")", null);
+            return;
+        }
         if (requestCode == PICK_ACCOUNT) {
             String id = pendingGoogle; pendingGoogle = null;
             String name = (resultCode == RESULT_OK && data != null) ? data.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME) : null;
@@ -448,6 +456,26 @@ public class MainActivity extends Activity {
                 pendingPick = id;
                 startActivityForResult(new Intent(MainActivity.this, PickerActivity.class).putExtra("token", token).putExtra("url", url), PICK_SHARED);
             });
+        }
+
+        /** Voice entry: Google's speech input screen (no microphone permission needed by RD SK); the text comes back via rdHeard. */
+        @JavascriptInterface
+        public void listen(String id, String prompt) {
+            runOnUiThread(() -> {
+                Intent i = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, prompt);
+                pendingSpeech = id;
+                try { startActivityForResult(i, SPEECH); }
+                catch (Exception e) { pendingSpeech = null; web.evaluateJavascript("window.rdHeard && rdHeard(" + JSONObject.quote(id) + ",'',true)", null); }
+            });
+        }
+
+        /** Keeps the screen on while a focus session runs. */
+        @JavascriptInterface
+        public void keepAwake(boolean on) {
+            runOnUiThread(() -> { if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); });
         }
 
         /** Home-screen widget numbers (JSON from the app). */
