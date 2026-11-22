@@ -508,7 +508,9 @@ window.addEventListener("popstate",()=>{ if($("#sheet").classList.contains("open
 // Android back button → close sheet first, else go to dashboard, else exit.
 window.rdOpen = t => { closeSheet(); setTab(t==="review"?"review":"home"); };
 window.rdBack = function(){
+  const yr=document.getElementById("yr"); if(yr){ yr.remove(); return true; }   // Research Year recap
   if($("#sheet").classList.contains("open")){ closeSheet(); return true; }
+  if(query){ query=""; const q=$("#q"); if(q) q.blur(); render(); window.scrollTo(0,0); return true; }   // a search: back clears it
   if(tab!=="home"){ setTab("home"); return true; }
   return false;
 };
@@ -1507,8 +1509,9 @@ function bindStats(){
 }
 
 /* ---------- about ---------- */
-const APP_VERSION="5.0", APP_BUILD="17 Nov 2026";
+const APP_VERSION="5.1", APP_BUILD="22 Nov 2026";
 const CHANGELOG=[
+  ["5.1","22 Nov 2026",["Back button: clears a search first (and closes the Research Year recap) instead of closing the app"]],
   ["5.0","17 Nov 2026",["✍ Revision plans: paste the reviewers' comments, work through each point (who does what), and get the response letter drafted (Gemini can suggest replies)",
     "ℹ Journal profiles from open data: citations per article, articles a year, open access and author fees, recent topics; ⚖ compare your shortlist",
     "📣 Calls for papers with countdowns and reminders; paste a call and RD SK fills it in","🧾 Publications & CV in APA or Harvard with DOIs and citations, plus a 📊 yearly report for appraisals",
